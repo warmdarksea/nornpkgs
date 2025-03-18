@@ -1,0 +1,1 @@
+SUBSYSTEM=="input", ACTION=="add", ATTRS{id/vendor}=="24c6" ATTRS{id/product}=="592a", RUN+="@out@/bin/calibrate.sh"

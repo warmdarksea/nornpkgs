@@ -1,0 +1,243 @@
+{ config, lib, pkgs, emacs-overlay, ... }: let
+  # myEmacs = (pkgs.emacsWithPackagesFromUsePackage {
+  #   package = pkgs.emacs29-pgtk;  # replace with pkgs.emacsPgtk, or another version if desired.
+  #   config = ../../emacs/config.el;
+  #   defaultInitFile = false;
+
+  #   # Optionally provide extra packages not in the configuration file.
+  #   extraEmacsPackages = epkgs: [
+  #     epkgs.use-package
+  #     pkgs.chez
+  #     pkgs.terraform-ls
+  #   ];
+
+  #   # Optionally override derivations.
+  #   # override = epkgs: epkgs // {
+  #   #   somePackage = epkgs.melpaPackages.somePackage.overrideAttrs(old: {
+  #   #      # Apply fixes here
+  #   #   });
+  #   # };
+  # });
+  local_infra = import ./local_pkgs.nix { inherit pkgs; };
+in {
+  #nixpkgs.overlays = [
+  #  emacs-overlay.overlays.default
+  #];
+  #home.packages = with pkgs; [emacs29-pgtk];
+  # home.sessionVariables = {
+  #   "QT_QPA_PLATFORM" = "wayland-egl";
+  #   "QT_WAYLAND_FORCE_DPI" = "physical";
+  #   "ECORE_EVAS_ENGINE" = "wayland_egl";
+  #   "ELM_ENGINE" = "wayland_egl";
+  #   "SDL_VIDEODRIVER" = "wayland";
+  #   "_JAVA_AWT_WM_NONREPARENTING" = "1";
+  #   "MOZ_ENABLE_WAYLAND" = "1";
+  #   "SAL_USE_VCLPLUGIN" = "gtk3";
+  #   "PATH" ="$HOME/.local/bin:$PATH";
+  #   "COLORTERM" = "truecolor"; # it is the year two-thousand and twenty-three
+  # };
+
+  home.packages = let
+    nix_thirdparty = with pkgs; [
+      nix-du
+      nix-index
+      nix-prefetch-scripts
+      nix-tree
+    ];
+    base_pkgs = with pkgs; [
+      bc
+      bind
+      curl
+      #dmidecode
+      #      emacs-nox
+      #neovim
+      fdupes
+      jq
+      yq
+      file
+      #gnum4
+      git
+      #gnupg
+      #gnutar
+      gzip
+      htop
+      inetutils
+      #inotify-tools
+      iperf
+      lsof
+      lz4
+      #mg
+      mosh
+      #moreutils
+      #proxychains-ng
+      nmap
+      #ntfs3g
+      p7zip
+      parallel
+      pari
+      psmisc
+      pv
+      rclone
+      #recode
+      rlwrap
+      rsync
+      #screenfetch
+      neofetch
+      netcat
+      speedtest-cli
+      #sqlite
+      sysstat
+      tmux
+      screen
+      #      unrar
+      unzip
+      pciutils
+      usbutils
+      wget
+      which
+      xz
+      xxd
+      zip
+      unrar-wrapper
+    ];
+    desktop_pkgs = with pkgs; [
+      #gnome.adwaita-icon-theme
+      #arandr
+      filelight
+      #breeze-qt5
+      chromium
+      # dfeet
+      #dconf
+      #desktop-file-utils
+      #dmenu
+      #gnome.dconf-editor
+      element-desktop-wayland
+      #      emacs-gtk
+      #      emacsPgtk
+      # myEmacs
+      #foliate
+      #okular
+      #evolution
+      #evtest
+      exif
+      feh
+      ffmpeg
+      ffmpegthumbnailer
+      file-roller
+      #gnome.gnome-calendar
+      #konsole
+      #lxappearance
+      #filezilla
+      firefox-wayland
+      #cdrkit
+      #cuetools
+      flac
+      #gedit
+      gimp
+      glxinfo
+      #gsettings-desktop-schemas
+      #gvfs
+      #hamster
+      #hexchat
+      #hicolor-icon-theme
+      #hplip
+      keepassxc
+      #liberation_ttf
+      #dunst
+      libreoffice
+      #megatools
+      qbittorrent
+      mpv
+      #      nerdfonts
+      pavucontrol
+      #pcmanfm
+      #read-edid
+      #scrot
+      sshfs-fuse
+      #trash-cli
+      vlc
+      wireshark-qt
+      #wmctrl
+      #xarchiver
+      #xbindkeys
+      #xbindkeys-config
+      #xscreensaver
+      #xclip
+      xorg.xclock
+      #xdotool
+      xorg.xev
+      xorg.xeyes
+      #xorg.xhost
+      #youtube-dl
+      yt-dlp
+      #streamlink
+      #gnome.zenity
+      #wdisplays
+      #kanshi
+    ];
+    dev_pkgs = with pkgs; [
+      aliyun-cli
+      cloc
+      colordiff
+      #    coq
+      # ddd
+      #eclipses.eclipse-platform
+      #gdb
+      #      gdbgui
+      #ghc
+      #glade
+      #sqlitebrowser
+      #subversion
+      virt-manager
+      #docker
+      #docker-compose
+      #vscodium
+      #xfig
+      #qemu
+      #stdenv
+      gnumake
+    ];
+    my_ghidra = pkgs.ghidra.overrideAttrs (oldAttrs: {
+    pname = "${oldAttrs.pname}-patched";
+    postFixup = ''
+      ${oldAttrs.postFixup or ""}
+      sed -i 's/-Dsun.java2d.uiScale=1/-Dsun.java2d.uiScale=2/' $out/lib/ghidra/support/launch.properties
+    '';
+  });
+    local_pkgs = with pkgs; [
+      blender
+      audacity
+      krita
+      obs-studio
+      #      calibre
+      # inkscape
+      # gzdoom
+      syncplay
+      ossutil
+      anki
+      my_ghidra
+      wl-clipboard
+    ];
+  in lib.concatLists [nix_thirdparty base_pkgs desktop_pkgs dev_pkgs local_pkgs];
+
+  programs.emacs = {
+    enable = true;
+    package = pkgs.emacs29-pgtk;
+    extraPackages = epkgs: [
+      epkgs.use-package
+      pkgs.chez
+      pkgs.terraform-ls];
+    extraConfig = ''
+		  (load-file "${../../../emacs/config.el}")
+    '';
+  };
+
+  programs.neovim = {
+    enable = true;
+    plugins = with pkgs.vimPlugins; [];
+  };
+
+  manual.manpages.enable = true;
+
+  home.stateVersion = "24.11";
+}

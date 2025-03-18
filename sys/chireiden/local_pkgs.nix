@@ -1,0 +1,173 @@
+{ pkgs }:
+{
+  nixthirdparty = with pkgs; [
+    nix-du
+    nix-index
+    nix-prefetch-scripts
+    nix-tree
+  ];
+  basepkgs = with pkgs; [
+    bc
+    bind
+    curl
+    dmidecode
+    #      emacs-nox
+    fdupes
+    jq
+    yq
+    file
+    gnum4
+    git
+    gnupg
+    gnutar
+    gzip
+    htop
+    inetutils
+    inotify-tools
+    iperf
+    lsof
+    lz4
+    mg
+    mosh
+    #moreutils
+    proxychains-ng
+    nmap
+    ntfs3g
+    p7zip
+    parallel
+    pari
+    psmisc
+    pv
+    rclone
+    recode
+    rlwrap
+    rsync
+    screenfetch
+    neofetch
+    netcat
+    speedtest-cli
+    sqlite
+    sysstat
+    tmux
+    screen
+    #      unrar
+    unzip
+    usbutils
+    wget
+    which
+    xz
+    xxd
+    zip
+    unrar-wrapper
+  ];
+  desktop_pkgs = with pkgs; [
+    gnome.adwaita-icon-theme
+    arandr
+    filelight
+    breeze-qt5
+    chromium
+    # dfeet
+    dconf
+    desktop-file-utils
+    dmenu
+    gnome.dconf-editor
+    element-desktop-wayland
+    #      emacs-gtk
+    #      emacsPgtk
+    # myEmacs
+    foliate
+    okular
+    evolution
+    evtest
+    exif
+    feh
+    ffmpeg
+    ffmpegthumbnailer
+    gnome.file-roller
+    gnome.gnome-calendar
+    konsole
+    lxappearance
+    filezilla
+    firefox-wayland
+    cdrkit
+    cuetools
+    flac
+    gedit
+    gimp
+    glxinfo
+    gsettings-desktop-schemas
+    gvfs
+    hamster
+    hexchat
+    hicolor-icon-theme
+    hplip
+    keepassxc
+    liberation_ttf
+    dunst
+    libreoffice
+    megatools
+    qbittorrent
+    mpv
+    #      nerdfonts
+    pavucontrol
+    pcmanfm
+    read-edid
+    scrot
+    sshfs-fuse
+    trash-cli
+    vlc
+    wireshark-qt
+    wmctrl
+    xarchiver
+    xbindkeys
+    xbindkeys-config
+    xscreensaver
+    xclip
+    xorg.xclock
+    xdotool
+    xorg.xev
+    xorg.xeyes
+    xorg.xhost
+    youtube-dl
+    yt-dlp
+    streamlink
+    gnome.zenity
+    wdisplays
+    kanshi
+  ];
+  dev_pkgs = with pkgs; [
+    aliyun-cli
+    cloc
+    colordiff
+#    coq
+    ddd
+    eclipses.eclipse-platform
+    gdb
+    #      gdbgui
+    ghc
+    glade
+    sqlitebrowser
+    subversion
+    virt-manager
+    docker
+    docker-compose
+    vscodium
+    xfig
+    qemu
+    stdenv
+  ];
+  local_pkgs = with pkgs; [
+    blender
+    audacity
+    krita
+    obs-studio
+    #      calibre
+    inkscape
+    gzdoom
+    syncplay
+    ossutil
+    anki
+    ghidra
+    wl-clipboard
+  ];
+}
