@@ -168,8 +168,8 @@
     "gensokyo-dotfiles": {
       "flake": false,
       "locked": {
-        "lastModified": 1741827428,
-        "narHash": "sha256-qYkWjXwJF263gXJHT86YuB6klyyhEPu7BgGJMQuf1Lg=",
+        "lastModified": 1743005764,
+        "narHash": "sha256-Fve/qemgx82ogfpbDamcM4CTqdZknTjd4rmawxoldJ8=",
         "path": "/home/clownpiece/src/gensokyo-dotfiles",
         "type": "path"
       },
@@ -237,7 +237,7 @@
       },
       "locked": {
         "lastModified": 1,
-        "narHash": "sha256-2lBLdVRi/l5pB50nAuUNkm2mpwqdCH7JaoIsGlaQ++0=",
+        "narHash": "sha256-Fcx26rsNtDQK+ewW68CajZAg8aPUbsktDPk683jTJz4=",
         "path": "./sys/hell",
         "type": "path"
       },

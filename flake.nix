@@ -64,44 +64,55 @@
 
   outputs = { self,
 
-              nixpkgs,
-              nixos-hardware,
-              emacs-overlay,
-              home-manager,
-              lanzaboote,
-              nixpak,
+  nixpkgs,
+  nixos-hardware,
+  emacs-overlay,
+  home-manager,
+  lanzaboote,
+  nixpak,
 
-              gensokyo-dotfiles,
+  gensokyo-dotfiles,
 
-              hell,
+  hell,
 
-              iso-minimal,
-              iso-livecd,
+  iso-minimal,
+  iso-livecd,
 
-              my-nixpkgs,
-              my-nixos-hardware,
+  my-nixpkgs,
+  my-nixos-hardware,
 
-              # fixpkgs_foo,
+  # fixpkgs_foo,
 
-              ... }@inputs:
-    {
-      # nix modules
+  ... }@inputs: let
+    overlay = { config, pkgs, lib, ... }: {
+      nixpkgs.overlays = [
+        # Overlay 1: Use `self` and `super` to express
+        # the inheritance relationship
+        (self: super: {
+          # ...
+        })
+        emacs-overlay.overlays.default
+        emacs-overlay.overlays.package
+      ];
+    };
+  in {
+    # nix modules
 
-      nixosModules.base = import lib/base.nix;
+    nixosModules.base = import lib/base.nix;
 
-      # home manager modules
+    # home manager modules
 
-      homeManagerModules.common = { config, lib, pkgs, ... }: {
-        imports = [ ./home/common.nix ];
-        _module.args.dotfiles = gensokyo-dotfiles;
+    homeManagerModules.common = { config, lib, pkgs, ... }: {
+      imports = [ ./home/common.nix ];
+      _module.args.dotfiles = gensokyo-dotfiles;
+    };
+    homeManagerModules.magician = { config, lib, pkgs, ... }: {
+      imports = [ ./home/common.nix ./home/magician.nix ];
+      _module.args = {
+        dotfiles = gensokyo-dotfiles;
+        nixpak = nixpak;
       };
-      homeManagerModules.magician = { config, lib, pkgs, ... }: {
-        imports = [ ./home/common.nix ./home/magician.nix ];
-        _module.args = {
-          dotfiles = gensokyo-dotfiles;
-          nixpak = nixpak;
-        };
-      };
+    };
 
     # systems            
     nixosConfigurations.cheese = nixpkgs.lib.nixosSystem {
@@ -138,7 +149,7 @@
       system = "x86_64-linux";
       modules = [
         lanzaboote.nixosModules.lanzaboote
-#        nixos-hardware.nixosModules.gpd-pocket-3
+        #        nixos-hardware.nixosModules.gpd-pocket-3
         ./sys/dusk/configuration.nix
         ./sys/dusk/hardware-configuration.nix
         ./lib/base.nix
@@ -151,7 +162,7 @@
       ];
     };
 
-    nixosConfigurations.hell = hell.nixosConfigurations.hell.extendModules {};
+    nixosConfigurations.hell = hell.nixosConfigurations.hell.extendModules { modules = [ overlay ]; };
 
     nixosConfigurations.magic = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
@@ -165,17 +176,17 @@
     nixosConfigurations.mausoleum = my-nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-#        lanzaboote.nixosModules.lanzaboote
-#        nixos-hardware.nixosModules.gpd-pocket-3
+        # lanzaboote.nixosModules.lanzaboote
+        #  nixos-hardware.nixosModules.gpd-pocket-3
         ./mausoleum/configuration.nix
         ./mausoleum/hardware-configuration.nix
         ./base.nix
-#        home-manager.nixosModules.home-manager {
-#          home-manager.useUserPackages = true;
-#          home-manager.useGlobalPkgs = true;
-#          #          home-manager.users."satori" = {};
-#          home-manager.users."yoshika" = import ./home.nix;
-#        }
+        # home-manager.nixosModules.home-manager {
+          # home-manager.useUserPackages = true;
+          # home-manager.useGlobalPkgs = true;
+          # home-manager.users."satori" = {};
+          # home-manager.users."yoshika" = import ./home.nix;
+          # }
       ];
     };
 

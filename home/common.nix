@@ -266,16 +266,45 @@
   programs.emacs = {
     enable = true;
     package = pkgs.emacs30-pgtk;
-    extraPackages = epkgs: [
-      epkgs.use-package
-      epkgs.forth-mode
+    extraPackages = let
+      lean4-mode = {
+        trivialBuild,
+        fetchFromGitHub,
+        lean4,
+        dash,
+        lsp-mode,
+        magit-section
+      }:
+      trivialBuild rec {
+        pname = "lean4-mode";
+        version = "1.1.2";
+        src = fetchFromGitHub {
+          owner = "leanprover-community";
+          repo = "lean4-mode";
+          rev = "76895d8939111654a472cfc617cfd43fbf5f1eb6";
+          hash = "sha256-DLgdxd0m3SmJ9heJ/pe5k8bZCfvWdaKAF0BDYEkwlMQ=";
+        };
+        postInstall = ''
+          mkdir -p $out/share/emacs/site-lisp/data/
+          cp -p $src/data/abbreviations.json $out/share/emacs/site-lisp/data/
+        '';
+        propagatedUserEnvPkgs = [ lean4 dash lsp-mode magit-section ];
+        buildInputs = propagatedUserEnvPkgs;
+      };
+    in epkgs: [
       pkgs.chez
       pkgs.terraform-ls
-      epkgs.go-mode];
+      epkgs.use-package
+      epkgs.forth-mode
+      epkgs.go-mode
+      epkgs.flycheck
+      (epkgs.callPackage lean4-mode {})
+    ];
+
+    # i do not recall what problem this was intended to fix...
     extraConfig = ''
-      ;; i do not recall what problem this was intended to fix...
       (when (not (boundp 'site-lisp-config))
-      (setq site-lisp-config "${dotfiles}/emacs/config.el}"))
+        (setq site-lisp-config "${dotfiles}/emacs/config.el"))
       (load-file site-lisp-config)
     '';
   };

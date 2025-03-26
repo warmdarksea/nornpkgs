@@ -58,6 +58,13 @@
   #services.tlp.enable = true;
   services.flatpak.enable = true;
 
+  nix.settings.experimental-features = [ "nix-command" "flakes" "cgroups" ];
+  nix.settings.use-cgroups = true;
+  systemd.services.nix-daemon.serviceConfig = {
+    MemoryHigh = "12G";
+    MemoryMax = "16G";
+  };
+
   #hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.stable_open;
 
   hardware.nvidia = {
@@ -415,7 +422,7 @@
     displayManager.gdm.enable = true;
     desktopManager.gnome.enable = true;
   };
-  services.xserver.displayManager.sessionPackages = [ pkgs.sway ];
+  services.displayManager.sessionPackages = [ pkgs.sway ];
   # services.dbus.enable = true;
   # xdg.portal = {
   #   enable = true;
@@ -480,7 +487,7 @@
   systemd.services."getty@tty1".enable = false;
   systemd.services."autovt@tty1".enable = false;
 
-  hardware.pulseaudio.enable = false;
+  services.pulseaudio.enable = false;
   # sound.enableOSSEmulation = true;
   security.rtkit.enable = true;
   services.pipewire = {
@@ -555,7 +562,7 @@
     xorg.xhost
     wayland-utils
     evtest
-    nvtop
+    nvtopPackages.full
     nethogs
     iotop
   ];

@@ -36,10 +36,16 @@ $(BUILD_DIR):
 # can't be bothered figuring out all of the dependencies, just build it again
 # every time
 .PHONY: $(BUILD_DIR)/sys-$(TARGET)
-$(BUILD_DIR)/sys-$(TARGET):
+$(BUILD_DIR)/sys-$(TARGET): flake.nix 	  	    \
+			    flake.lock 		    \
+			    sys/$(TARGET)/flake.nix \
+			    sys/$(TARGET)/flake.lock
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.$(TARGET).config.system.build.toplevel
 
-$(BUILD_DIR)/iso-$(ISO_FLAVOR): iso/$(ISO_FLAVOR)/flake.nix
+$(BUILD_DIR)/iso-$(ISO_FLAVOR): flake.nix 	  	    \
+				flake.lock 		    \
+				iso/$(ISO_FLAVOR)/flake.nix \
+				iso/$(ISO_FLAVOR)/flake.lock
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.iso-$(ISO_FLAVOR).config.system.build.isoImage
 
 #
@@ -135,3 +141,6 @@ query_config:
 .PHONY: why_depends_sys
 why_depends_sys:
 	nix why-depends -I nixos-config=sys/$(TARGET).nix $(NIX_FLAGS) --attr system sys/$(TARGET).nix
+
+#
+
