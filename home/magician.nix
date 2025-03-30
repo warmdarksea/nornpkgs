@@ -142,7 +142,9 @@
     };
   };
 in {
-  home.packages = [sandboxed-hydrus.config.script];
+  home.packages = [
+    # sandboxed-hydrus.config.script
+  ];
   # xdg.desktopEntries =  {
   #   hydrus = {
   #     name = "Hydrus (sandboxed)";

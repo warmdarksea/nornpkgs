@@ -227,6 +227,10 @@
         p.libvirt
       ]))
       git-lfs
+      # fixme: haskell lsp demands that these are in $PATH for some bizarre reason
+      ghc
+      cabal-install
+      haskell-language-server
     ];
     # my_ghidra = pkgs.ghidra.overrideAttrs (oldAttrs: {
     #   pname = "${oldAttrs.pname}-patched";
@@ -294,10 +298,14 @@
     in epkgs: [
       pkgs.chez
       pkgs.terraform-ls
+      pkgs.haskell-language-server
+      pkgs.ghc
       epkgs.use-package
       epkgs.forth-mode
       epkgs.go-mode
       epkgs.flycheck
+      epkgs.lsp-mode
+      epkgs.lsp-haskell
       (epkgs.callPackage lean4-mode {})
     ];
 

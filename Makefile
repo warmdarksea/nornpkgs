@@ -60,7 +60,7 @@ build_iso_closure: $(BUILD_DIR)/iso-$(ISO_FLAVOR)
 
 .PHONY: push_closure
 push_closure: $(BUILD_DIR)/sys-$(TARGET)
-	nix copy --to ssh://root@$(HOST) "$<"
+	nix copy --to "ssh://root@$(HOST)" "$<"
 
 # ah, memories
 .PHONY: push_closure_to
@@ -92,7 +92,7 @@ set_remote_boot_closure: $(BUILD_DIR)/sys-$(TARGET)
 #
 
 .PHONY: deploy_local_active_closure
-deploy_local_active_closure:   \
+deploy_local_active_closure:	   \
 	local_assert		   \
 	$(BUILD_DIR)/sys-$(TARGET) \
 	set_local_active_closure
@@ -104,17 +104,17 @@ deploy_local_boot_closure:	   \
 	set_local_boot_closure
 
 .PHONY: deploy_remote_active_closure
-deploy_remote_active_closure:  \
+deploy_remote_active_closure:	   \
 	remote_assert		   \
 	$(BUILD_DIR)/sys-$(TARGET) \
-	push_closure	   \
+	push_closure		   \
 	set_remote_active_closure
 
 .PHONY: deploy_remote_boot_closure
 deploy_remote_boot_closure:	   \
 	remote_assert		   \
 	$(BUILD_DIR)/sys-$(TARGET) \
-	push_closure	   \
+	push_closure		   \
 	set_remote_boot_closure
 
 .PHONY: install_closure_to_path
@@ -126,6 +126,18 @@ install_closure_to_path: $(BUILD_DIR)/sys-$(TARGET)
 .PHONY: clean
 clean:
 	rm -rf $(BUILD_DIR)
+
+.PHONY: collect_garbage
+collect_garbage:
+	sudo nix-collect-garbage -d
+
+# delete references to all generations in between the boot generation and the
+# current generation, exclusive (so skip the boot and current, obviously)
+# then update the boot menu
+.PHONY: cleanup_system_generations
+cleanup_system_generations:
+	bash bin/nix-cleanup-generations.sh
+	sudo /nix/var/nix/profiles/system/bin/switch-to-configuration boot
 
 #
 

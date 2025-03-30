@@ -6,12 +6,13 @@
 
   nixpkgs.config.allowlistedLicenses = with lib.licenses; [ bsl11 ];
 
-  boot.kernelParams = ["zfs.zfs_arc_min=536870912" "zfs.zfs_arc_max=2147483648"];
+  boot.kernelParams = [ "zfs.zfs_arc_min=536870912" "zfs.zfs_arc_max=2147483648" "cgroup_enable=memory" "systemd.unified_cgroup_hierarchy=1" "vm.min_free_kbytes=524288" ];
+  # "vm.min_free_kbytes=524288"
 
   #boot.loader.grub.device = "/dev/sdd";   # (for BIOS systems only)
   #boot.loader.systemd-boot.enable = true; # (for UEFI systems only)
   boot.zfs.package = pkgs.zfs_unstable;
-  boot.kernelPackages = pkgs.linuxPackages_6_11;
+  boot.kernelPackages = pkgs.linuxPackages_6_13;
   #boot.kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
   #boot.kernelPackages = pkgs.linuxPackages_latest;
 
@@ -47,10 +48,10 @@
   #  efi /EFI/Microsoft/Boot/bootmgfw.efi
   #'';
 
-  #services.printing = {
-  #  enable = true;
-  #  drivers = [pkgs.hplip pkgs.brlaser];
-  #};
+  services.printing = {
+   enable = true;
+   drivers = [pkgs.hplip pkgs.brlaser];
+  };
   
   programs.adb.enable = true;
   #services.fprintd.enable = lib.mkForce false;
@@ -60,10 +61,47 @@
 
   nix.settings.experimental-features = [ "nix-command" "flakes" "cgroups" ];
   nix.settings.use-cgroups = true;
-  systemd.services.nix-daemon.serviceConfig = {
-    MemoryHigh = "12G";
-    MemoryMax = "16G";
+
+  # Disable swap for the root slice (all other processes)
+  # systemd-run --slice=swap-allowed.slice --scope -p "MemorySwapMax=infinity" your-command
+  systemd.slices."-.slice" = {
+    description = "Root slice";
+    sliceConfig = {
+      MemorySwapMax = "0"; # Completely disable swap
+    };
   };
+  systemd.slices."swap-allowed" = {
+    description = "Slice for processes that can use swap";
+    sliceConfig = {
+      MemorySwapMax = "infinity"; # Allow unlimited swap
+    };
+  };
+
+  #   32 GB
+  # - 2  GB (VRAM)
+  # - 18 GB (build)
+  # - 6  GB (browser)
+  # -------
+  #   6  GB (rest)
+  systemd.services.nix-daemon.serviceConfig = {
+    Nice = 19;
+
+    # reserve core 0
+    AllowedCPUs = "1-15";
+    #CPUShares = "512";
+    CPUWeight = 50;         # Lower than default (100)
+    #CPUSchedulingPolicy = "idle";
+
+    MemoryHigh = "14G";
+    MemoryMax = "18G";
+
+    IOWeight = 50;          # Lower than default (100)
+    #IOSchedulingClass = "idle";
+
+    Slice = "swap-allowed.slice";
+  };
+  nix.daemonCPUSchedPolicy = "idle";
+  nix.daemonIOSchedClass = "idle";
 
   #hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.stable_open;
 
@@ -465,6 +503,9 @@
 
   services.gnome.gnome-keyring.enable = true;
 
+  # needed for oculus quest, MTP support
+  services.gvfs.enable = true;
+
   #services.pcscd.enable = true;
   programs.gnupg.agent = {
     enable = true;
@@ -552,6 +593,7 @@
     gnomeExtensions.workspace-matrix
     gnomeExtensions.appindicator
     gnomeExtensions.screen-rotate
+    gnomeExtensions.bing-wallpaper-changer
     gnome-terminal
     efibootmgr
     sbctl
@@ -565,6 +607,15 @@
     nvtopPackages.full
     nethogs
     iotop
+    smem
+    gnome-tweaks
+    memtree
+    sqlite
+    sqlitebrowser
+    zotero
+    nftables
+    virt-viewer
+    #freecad
   ];
 
   services.udev.packages = with pkgs; [ gnome-settings-daemon ];
