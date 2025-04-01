@@ -47,7 +47,16 @@
     };
 
     swapDevices = [
-      { device = "/dev/zvol/bell/swap"; }
+      # { device = "/dev/zvol/bell/swap"; }
+      {
+        device = "/dev/disk/by-partuuid/REDACTED";  # Replace with your partition
+        randomEncryption = {
+          enable = true;
+          cipher = "aes-xts-plain64";
+          keySize = 256;
+          allowDiscards = true;  # Optional, for SSDs
+        };
+      }
     ];
 
   # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
