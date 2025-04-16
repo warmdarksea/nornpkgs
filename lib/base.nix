@@ -3,6 +3,9 @@
 {
   nix.settings.auto-optimise-store = true;
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+  nixpkgs.config.allowlistedLicenses = with lib.licenses; [ bsl11 ];
+
   systemd.services.nixos-upgrade.path = [ pkgs.git ];
 
   boot.kernelParams = ["boot.shell_on_fail" "console=tty1"];

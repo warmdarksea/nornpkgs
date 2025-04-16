@@ -39,18 +39,18 @@
   sound.enableOSSEmulation = true;
   xdg.portal.enable = true;
   xdg.portal.extraPortals = [ pkgs.xdg-desktop-portal-wlr ];
-  fonts.fonts = with pkgs; [
-    noto-fonts
-    noto-fonts-cjk
-    noto-fonts-emoji
-    liberation_ttf
-    fira-code
-    fira-code-symbols
-    #mplus-outline-fonts
-    dina-font
-    proggyfonts
-    unifont unifont_upper font-awesome
-  ];
+  # fonts.fonts = with pkgs; [
+  #   noto-fonts
+  #   #noto-fonts-cjk
+  #   #noto-fonts-emoji
+  #   liberation_ttf
+  #   fira-code
+  #   fira-code-symbols
+  #   #mplus-outline-fonts
+  #   dina-font
+  #   proggyfonts
+  #   unifont unifont_upper font-awesome
+  # ];
   programs.nm-applet.indicator = true;
 
   security.rtkit.enable = true;

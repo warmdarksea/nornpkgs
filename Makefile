@@ -38,8 +38,7 @@ $(BUILD_DIR):
 .PHONY: $(BUILD_DIR)/sys-$(TARGET)
 $(BUILD_DIR)/sys-$(TARGET): flake.nix 	  	    \
 			    flake.lock 		    \
-			    sys/$(TARGET)/flake.nix \
-			    sys/$(TARGET)/flake.lock
+			    sys/$(TARGET)/flake.nix
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.$(TARGET).config.system.build.toplevel
 
 $(BUILD_DIR)/iso-$(ISO_FLAVOR): flake.nix 	  	    \

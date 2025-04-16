@@ -252,7 +252,7 @@
       anki
       ghidra
       wl-clipboard
-      prismlauncher
+      # prismlauncher
     ];
     shell_scripts = with pkgs; [
       (writeShellScriptBin "mktemp_home" (builtins.readFile "${dotfiles}/bin/mktemp_home.sh"))
@@ -277,7 +277,7 @@
         lean4,
         dash,
         lsp-mode,
-        magit-section
+        magit-section,
       }:
       trivialBuild rec {
         pname = "lean4-mode";
@@ -300,6 +300,8 @@
       pkgs.terraform-ls
       pkgs.haskell-language-server
       pkgs.ghc
+      pkgs.llvmPackages_19.clang
+      pkgs.llvmPackages_19.clang-tools
       epkgs.use-package
       epkgs.forth-mode
       epkgs.go-mode

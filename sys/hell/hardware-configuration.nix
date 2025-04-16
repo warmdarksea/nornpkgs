@@ -41,13 +41,9 @@
       fsType = "zfs";
     };
 
-  fileSystems."/mnt/steamapps" =
-    { device = "bell/steamapps";
-      fsType = "zfs";
-    };
+    # bell/userdata is ZFS-managed, so not recorded here.
 
     swapDevices = [
-      # { device = "/dev/zvol/bell/swap"; }
       {
         device = "/dev/disk/by-partuuid/REDACTED";  # Replace with your partition
         randomEncryption = {

@@ -29,6 +29,14 @@
     };
 
     # systems
+    cheese = {
+      url = "path:./sys/cheese";
+
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixos-hardware.follows = "my-nixos-hardware";
+      inputs.nix-gensokyo.follows = ""; # self-reference
+    };
+
     hell = {
       url = "path:./sys/hell";
 
@@ -73,6 +81,7 @@
 
   gensokyo-dotfiles,
 
+  cheese,
   hell,
 
   iso-minimal,
@@ -115,19 +124,21 @@
     };
 
     # systems            
-    nixosConfigurations.cheese = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
-      modules = [
-        nixos-hardware.nixosModules.gpd-pocket-3
-        ./sys/cheese/configuration.nix
-        ./sys/cheese/hardware-configuration.nix
-        home-manager.nixosModules.home-manager {
-          home-manager.useUserPackages = true;
-          home-manager.useGlobalPkgs = true;
-          #          home-manager.users."satori" = {};
-        }
-      ];
-    };
+    # nixosConfigurations.cheese = nixpkgs.lib.nixosSystem {
+    #   system = "x86_64-linux";
+    #   modules = [
+    #     nixos-hardware.nixosModules.gpd-pocket-3
+    #     ./sys/cheese/configuration.nix
+    #     ./sys/cheese/hardware-configuration.nix
+    #     home-manager.nixosModules.home-manager {
+    #       home-manager.useUserPackages = true;
+    #       home-manager.useGlobalPkgs = true;
+    #       #          home-manager.users."satori" = {};
+    #     }
+    #   ];
+    # };
+
+    nixosConfigurations.cheese = cheese.nixosConfigurations.cheese.extendModules { modules = [ overlay ]; };
 
     nixosConfigurations.chireiden = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
