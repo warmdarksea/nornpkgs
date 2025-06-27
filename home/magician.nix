@@ -143,7 +143,7 @@
   };
 in {
   home.packages = [
-    sandboxed-hydrus.config.script
+    # sandboxed-hydrus.config.script
   ];
   # xdg.desktopEntries =  {
   #   hydrus = {

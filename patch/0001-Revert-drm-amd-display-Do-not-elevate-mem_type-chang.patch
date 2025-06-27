@@ -1,0 +1,69 @@
+From ecf6e940736792a6ba1fe358aa0c0d3e24d77333 Mon Sep 17 00:00:00 2001
+From: clownpiece <clownpiece@gensokyo.internal>
+Date: Tue, 6 May 2025 11:41:21 -0400
+Subject: [PATCH] Revert "drm/amd/display: Do not elevate mem_type change to
+ full update"
+
+This reverts commit 4e4ab0748cd8c3ffb81a3fec735bce5a3dc3ec01.
+---
+ .../gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c | 29 ++++---------------
+ 1 file changed, 6 insertions(+), 23 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
+index f3cbff861557..08720c6e5330 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
+@@ -11483,25 +11483,6 @@ static int dm_crtc_get_cursor_mode(struct amdgpu_device *adev,
+ 	return 0;
+ }
+ 
+-static bool amdgpu_dm_crtc_mem_type_changed(struct drm_device *dev,
+-					    struct drm_atomic_state *state,
+-					    struct drm_crtc_state *crtc_state)
+-{
+-	struct drm_plane *plane;
+-	struct drm_plane_state *new_plane_state, *old_plane_state;
+-
+-	drm_for_each_plane_mask(plane, dev, crtc_state->plane_mask) {
+-		new_plane_state = drm_atomic_get_plane_state(state, plane);
+-		old_plane_state = drm_atomic_get_plane_state(state, plane);
+-
+-		if (old_plane_state->fb && new_plane_state->fb &&
+-		    get_mem_type(old_plane_state->fb) != get_mem_type(new_plane_state->fb))
+-			return true;
+-	}
+-
+-	return false;
+-}
+-
+ /**
+  * amdgpu_dm_atomic_check() - Atomic check implementation for AMDgpu DM.
+  *
+@@ -11699,6 +11680,10 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
+ 
+ 	/* Remove exiting planes if they are modified */
+ 	for_each_oldnew_plane_in_descending_zpos(state, plane, old_plane_state, new_plane_state) {
++		if (old_plane_state->fb && new_plane_state->fb &&
++		    get_mem_type(old_plane_state->fb) !=
++		    get_mem_type(new_plane_state->fb))
++			lock_and_validation_needed = true;
+ 
+ 		ret = dm_update_plane_state(dc, state, plane,
+ 					    old_plane_state,
+@@ -11993,11 +11978,9 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
+ 
+ 		/*
+ 		 * Only allow async flips for fast updates that don't change
+-		 * the FB pitch, the DCC state, rotation, mem_type, etc.
++		 * the FB pitch, the DCC state, rotation, etc.
+ 		 */
+-		if (new_crtc_state->async_flip &&
+-		    (lock_and_validation_needed ||
+-		     amdgpu_dm_crtc_mem_type_changed(dev, state, new_crtc_state))) {
++		if (new_crtc_state->async_flip && lock_and_validation_needed) {
+ 			drm_dbg_atomic(crtc->dev,
+ 				       "[CRTC:%d:%s] async flips are only supported for fast updates\n",
+ 				       crtc->base.id, crtc->name);
+-- 
+2.48.1
+

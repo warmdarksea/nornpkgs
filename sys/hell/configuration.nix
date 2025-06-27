@@ -40,19 +40,19 @@
   # boot.zfs.package = pkgs.zfs;
 
   nixpkgs.overlays = [
-  (self: super: {
-    linuxPackages_6_14 = super.linuxPackages_6_14.extend (lpself: lpsuper: {
-      zfs_unstable = lpsuper.zfs_unstable.overrideAttrs (oldAttrs: {
-        meta = oldAttrs.meta // { broken = true; }; # remove whenever you feel like it
+    (self: super: {
+      linuxPackages_6_14 = super.linuxPackages_6_14.extend (lpself: lpsuper: {
+        zfs_unstable = lpsuper.zfs_unstable.overrideAttrs (oldAttrs: {
+          meta = oldAttrs.meta // { broken = true; }; # remove whenever you feel like it
+        });
       });
-    });
-    my_zfs = super.zfs_unstable.overrideAttrs(old: {
-      kernelCompatible = true;
-      #meta.broken = false;
-      rev = "301da593ade391fa78a660c7b42325cd2ace593a";
-    });
-  })
-];
+      my_zfs = super.zfs_unstable.overrideAttrs(old: {
+        kernelCompatible = true;
+        #meta.broken = false;
+        #rev = "301da593ade391fa78a660c7b42325cd2ace593a";
+      });
+    })
+  ];
 
 
   specialisation = {
@@ -64,7 +64,25 @@
         #];
         #boot.zfs.package = pkgs.zfs;
     };
-    
+
+    # lts-patched.configuration = {
+    #   boot.kernelPackages = let
+    #     patchedKernel = pkgs.linux_6_12.override {
+    #       kernelPatches = pkgs.linux_6_12.kernelPatches ++ [
+    #         {
+    #           name = "Revert drm/amd/display: Do not elevate mem_type change to full update";
+    #           patch = ../../patch/0001-Revert-drm-amd-display-Do-not-elevate-mem_type-chang.patch;
+    #         }
+    #       ];
+    #     };
+        
+    #     linuxPackages_patched = pkgs.linuxPackagesFor patchedKernel;
+    #   in linuxPackages_patched;
+      
+    #   system.nixos.tags = [ "lts-patched-kernel" ];
+    #   # Your other specialization settings
+    # };
+
     stable.configuration = {
       boot.kernelPackages = pkgs.linuxPackages_6_13;
       system.nixos.tags = [ "stable-kernel" ];
@@ -72,49 +90,56 @@
       #boot.zfs.package = pkgs.zfs;
     };
 
+    latest.configuration = {
+      boot.kernelPackages = pkgs.linuxPackages_6_14;
+      system.nixos.tags = [ "latest-kernel" ];
+      #nixpkgs.config = licenseConfig;
+      #boot.zfs.package = pkgs.my_zfs;
+    };
+
     #latest.nixpkgs.config.allowBroken = true;
     # latest.configuration = {
-    #   boot.kernelPackages = pkgs.linuxPackages_6_14;
-    #   #boot.extraModulePackages = [
-    #   #  (pkgs.linuxPackages_latest.zfs_unstable.overrideAttrs(old: {
-    #   #    meta = (old.meta or {}) // { broken = false; };
-    #   #  }))
-    #   #];
-    #   system.nixos.tags = [ "latest-kernel" ];
-    #   boot.zfs.package = pkgs.my_zfs;
-      #boot.zfs.package = pkgs.zfs;
-      #nixpkgs.config = licenseConfig;
-      # nixpkgs options are global, so can't set per specialization
-      # nixpkgs.config.allowBroken = true;
-      #nixpkgs.overlays = [
-      #  (final: prev: {
-      #    linuxPackages_latest.zfs_unstable = prev.linuxPackages_latest.zfs_unstable.overrideAttrs(old: {
-      #    meta = (old.meta or {}) // { broken = false; };
-      #    });
-      #  })
-      #];
-    #   nixpkgs.overlays = (config.nixpkgs.overlays or []) ++ [
-    #   (final: prev: {
-    #     # Target the specific ZFS kernel module
-    #     #linuxPackages_latest = prev.linuxPackages_latest.extend (lpFinal: lpPrev: {
-    #     #  zfs_unstable = lpPrev.zfs_unstable.overrideAttrs (old: {
-    #     #    meta = (old.meta or {}) // { broken = false; };
-    #     #  });
-    #     #});
-    #     linuxKernel.packages.linux_6_14.zfs_unstable = prev.linuxKernel.packages.linux_latest.zfs_unstable.overrideAttrs (old: {
-    #       meta = (old.meta or {}) // { broken = false; };
-    #     });
-        
-    #     # Also unmark the general package as broken
-    #     zfs = prev.zfs.overrideAttrs (old: {
-    #       meta = (old.meta or {}) // { broken = false; };
-    #     });
-    #     zfs_unstable = prev.zfs_unstable.overrideAttrs (old: {
-    #       meta = (old.meta or {}) // { broken = false; };
-    #     });
-    #   })
-    # ];
-    #};
+      #   boot.kernelPackages = pkgs.linuxPackages_6_14;
+      #   #boot.extraModulePackages = [
+        #   #  (pkgs.linuxPackages_latest.zfs_unstable.overrideAttrs(old: {
+          #   #    meta = (old.meta or {}) // { broken = false; };
+          #   #  }))
+          #   #];
+          #   system.nixos.tags = [ "latest-kernel" ];
+          #   boot.zfs.package = pkgs.my_zfs;
+          #boot.zfs.package = pkgs.zfs;
+          #nixpkgs.config = licenseConfig;
+          # nixpkgs options are global, so can't set per specialization
+          # nixpkgs.config.allowBroken = true;
+          #nixpkgs.overlays = [
+            #  (final: prev: {
+              #    linuxPackages_latest.zfs_unstable = prev.linuxPackages_latest.zfs_unstable.overrideAttrs(old: {
+                #    meta = (old.meta or {}) // { broken = false; };
+                #    });
+                #  })
+                #];
+                #   nixpkgs.overlays = (config.nixpkgs.overlays or []) ++ [
+                  #   (final: prev: {
+                    #     # Target the specific ZFS kernel module
+                    #     #linuxPackages_latest = prev.linuxPackages_latest.extend (lpFinal: lpPrev: {
+                      #     #  zfs_unstable = lpPrev.zfs_unstable.overrideAttrs (old: {
+                        #     #    meta = (old.meta or {}) // { broken = false; };
+                        #     #  });
+                        #     #});
+                        #     linuxKernel.packages.linux_6_14.zfs_unstable = prev.linuxKernel.packages.linux_latest.zfs_unstable.overrideAttrs (old: {
+                          #       meta = (old.meta or {}) // { broken = false; };
+                          #     });
+                          
+                          #     # Also unmark the general package as broken
+                          #     zfs = prev.zfs.overrideAttrs (old: {
+                            #       meta = (old.meta or {}) // { broken = false; };
+                            #     });
+                            #     zfs_unstable = prev.zfs_unstable.overrideAttrs (old: {
+                              #       meta = (old.meta or {}) // { broken = false; };
+                              #     });
+                              #   })
+                              # ];
+                              #};
   };
 
   # Note: setting fileSystems is generally not
@@ -668,7 +693,7 @@
                       };
                     };
                   };
-
+                  services.usbmuxd.enable = true;
                   environment.systemPackages = with pkgs; [
                     #      gcc
                     #      libsForQt5.bismuth
@@ -703,6 +728,9 @@
                     virt-viewer
                     #freecad
                     smartmontools
+                    libimobiledevice
+                    ifuse # optional, to mount using 'ifuse'
+                    lean4
                   ];
 
                   services.udev.packages = with pkgs; [ gnome-settings-daemon ];

@@ -196,6 +196,7 @@
       flatpak
       flatpak-builder
       gnome-software
+      signal-desktop
     ];
     dev_pkgs = with pkgs; [
       aliyun-cli
@@ -307,7 +308,20 @@
       epkgs.go-mode
       epkgs.flycheck
       epkgs.lsp-mode
+      epkgs.lsp-ui
       epkgs.lsp-haskell
+      epkgs.magit
+      epkgs.bison-mode
+      epkgs.rust-mode
+      epkgs.paredit
+      epkgs.geiser
+      epkgs.geiser-chez
+      epkgs.neotree
+      epkgs.all-the-icons
+      epkgs.nix-mode
+      epkgs.nix-buffer
+      epkgs.gnuplot-mode
+      epkgs.yaml-mode
       (epkgs.callPackage lean4-mode {})
     ];
 
