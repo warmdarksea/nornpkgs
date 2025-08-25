@@ -42,6 +42,7 @@
 
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.nixos-hardware.follows = "my-nixos-hardware";
+      inputs.home-manager.follows = "home-manager";
       inputs.nix-gensokyo.follows = ""; # self-reference
     };
 
