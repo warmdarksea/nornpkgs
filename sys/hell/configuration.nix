@@ -612,6 +612,10 @@
 
                   services.gnome.gnome-keyring.enable = true;
 
+                  # needed for calendar to work with exchange
+                  programs.evolution.plugins = [ pkgs.evolution-ews ];
+                  services.gnome.evolution-data-server.plugins = [ pkgs.evolution-ews ];
+
                   # needed for oculus quest, MTP support
                   services.gvfs.enable = true;
 
@@ -724,6 +728,7 @@
                     sqlite
                     sqlitebrowser
                     zotero
+                    lyx
                     nftables
                     virt-viewer
                     #freecad
@@ -731,6 +736,10 @@
                     libimobiledevice
                     ifuse # optional, to mount using 'ifuse'
                     lean4
+                    gamescope
+                    please-cli
+                    libsecret
+                    dconf-editor
                   ];
 
                   services.udev.packages = with pkgs; [ gnome-settings-daemon ];
