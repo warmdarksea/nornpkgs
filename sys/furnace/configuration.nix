@@ -2,9 +2,16 @@
 # your system. Help is available in the configuration.nix(5) man page, on
 # https://search.nixos.org/options and in the NixOS manual (`nixos-help`).
 
+# todo:
+# webdav
+# komga
+# plex
+# generic 9p access
+# tailscale
+
 { config, lib, pkgs, ... }:
 
-{
+rec {
   imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
@@ -14,10 +21,17 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  # networking.hostName = "nixos"; # Define your hostname.
+  networking.hostName = "furnace"; # Define your hostname.
 
   # Configure network connections interactively with nmcli or nmtui.
   networking.networkmanager.enable = true;
+
+  services.diod = {
+    enable = true;
+    listen = [ "0.0.0.0:564" ];
+
+    exports = [ "/yet/vid" ];
+  };
 
   # Set your time zone.
   # time.timeZone = "Europe/Amsterdam";
@@ -37,8 +51,26 @@
   # Enable the X11 windowing system.
   # services.xserver.enable = true;
 
-
   
+  
+  virtualisation.docker = {
+    enable = true;
+
+    #enableNvidia = true;
+    storageDriver = "zfs";
+    daemon.settings = {
+      storage-opts = [ "zfs.fsname=fern/docker" ];
+    };
+  };
+  virtualisation.podman = {
+    enable = true;
+    #enableNvidia = true;
+    extraPackages = with pkgs; [
+      dive
+      podman-compose
+      podman-tui
+    ];
+  };
 
   # Configure keymap in X11
   # services.xserver.xkb.layout = "us";
@@ -59,22 +91,41 @@
   # services.libinput.enable = true;
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
-  # users.users.alice = {
-  #   isNormalUser = true;
-  #   extraGroups = [ "wheel" ]; # Enable ‘sudo’ for the user.
+  users.users.rin = {
+    uid = 5549;
+
+    subUidRanges = [
+      { startUid = 100000; count = 16777216; }
+      { startUid = users.users.www-webdav.uid; count = 1; }
+    ];
+    subGidRanges = [
+      { startGid = 100000; count = 16777216; }
+      { startGid = users.groups.www-webdav.gid; count = 1; }
+    ];
+
+    isNormalUser = true;
+    extraGroups = [ "wheel" "docker" "podman" ]; # Enable ‘sudo’ for the user.
   #   packages = with pkgs; [
   #     tree
   #   ];
-  # };
+  };
+
+  users.users.www-webdav = {
+    uid = 9031;
+    group = "www-webdav";
+    isSystemUser = true;
+  };
+  users.groups.www-webdav.gid = users.users.www-webdav.uid;
 
   # programs.firefox.enable = true;
 
   # List packages installed in system profile.
   # You can use https://search.nixos.org/ to find more packages (and options).
-  # environment.systemPackages = with pkgs; [
-  #   vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+  environment.systemPackages = with pkgs; [
+     vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
   #   wget
-  # ];
+  sbctl
+  ];
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.

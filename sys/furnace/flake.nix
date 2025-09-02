@@ -13,10 +13,10 @@
       #   url = "github:nix-community/home-manager";
       #   inputs.nixpkgs.follows = "nixpkgs";
       # };
-      # lanzaboote = {
-      #   url = "github:nix-community/lanzaboote/v0.4.2";
-      #   inputs.nixpkgs.follows = "nixpkgs";
-      # };
+      lanzaboote = {
+        url = "github:nix-community/lanzaboote/v0.4.2";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
 
       #
       nix-gensokyo = {
@@ -45,7 +45,7 @@
     #nixos-hardware,
     # emacs-overlay,
     #home-manager,
-    #lanzaboote,
+    lanzaboote,
     # nixpak,
 
     nix-gensokyo,
@@ -55,7 +55,7 @@
 
     # fixpkgs_blender,
     ... }@inputs: {
-      nixosConfigurations.hell = let
+      nixosConfigurations.furnace = let
         system = "x86_64-linux";
         pkgs = nixpkgs.legacyPackages.${system};
         # licenseConfig = with nixpkgs; {
@@ -87,7 +87,7 @@
           #   inherit nixpak;
           # };
           modules = [
-            #lanzaboote.nixosModules.lanzaboote
+            lanzaboote.nixosModules.lanzaboote
             #nixos-hardware.nixosModules.asus-x13-flow
             ./configuration.nix
             ./hardware-configuration.nix

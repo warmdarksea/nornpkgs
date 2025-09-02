@@ -15,6 +15,8 @@
   
   boot.initrd.luks.devices.cryptstorage.device = "/dev/disk/by-uuid/REDACTED";
 
+  boot.zfs.requestEncryptionCredentials = false;
+
   fileSystems."/" =
     { device = "bell";
       fsType = "zfs";

@@ -8,13 +8,123 @@
     [ (modulesPath + "/installer/scan/not-detected.nix")
     ];
 
-  boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usbhid" "usb_storage" "sd_mod" "sdhci_pci" ];
-  boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "kvm-intel" ];
-  boot.extraModulePackages = [ ];
+    #boot.kernelParams = ["console=tty0" "console=ttyUSB0" "earlyprintk=serial,ttyUSB0" "rootdelay=10"];
+    boot.kernelParams = [];
+    boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usbhid" "usb_storage" "sd_mod" "sdhci_pci" ];
+    boot.initrd.kernelModules = [
+      # for mounting ESP partition
+      "vfat"
+      "nls_utf8"
+      "nls_iso8859_1"
+      "nls_cp437"
+      "nls_iso8859_1"
 
-  swapDevices = [ ];
+      # usb serial devices
+      # "usbcore"
+      # "usbserial"
+      # "ftdi_sio"      # FTDI USB-serial chips (very common)
+      # "cp210x"        # Silicon Labs CP210x chips
+      # "ch341"         # WinChipHead CH341 chips  
+      # "pl2303"        # Prolific PL2303 chips
+      # "cdc_acm"       # USB CDC ACM (modem) devices
+    ];
+    boot.kernelModules = [ "kvm-intel" ];
+    boot.extraModulePackages = [ ];
 
-  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-  hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
+    boot.loader.systemd-boot.enable = lib.mkForce false;
+
+    boot.lanzaboote = {
+      enable = true;
+      pkiBundle = "/var/secret/secureboot";
+    };
+
+    systemd.services."serial-getty@ttyUSB0".enable = true;
+
+    boot.supportedFilesystems = [ "vfat" ];
+    boot.initrd.luks.reusePassphrases = true;
+    boot.zfs.requestEncryptionCredentials = false;
+
+    boot.initrd.postDeviceCommands = pkgs.lib.mkBefore ''
+      mkdir -p /boot
+      mount /dev/disk/by-uuid/REDACTED /boot
+    '';
+
+    boot.initrd.luks.devices = {
+      fern0 = {
+        device = "/dev/disk/by-id/REDACTED";
+        header = "/boot/crypt/fern0.h";
+        preLVM = false;
+      };
+      fern1 = {
+        device = "/dev/disk/by-id/REDACTED";
+        header = "/boot/crypt/fern1.h";
+        preLVM = false;
+      };
+    };
+
+    #   systemd.services.decrypt-yet = {
+      #   description = "Decrypt additional LUKS device";
+      #   after = [ "local-fs.target" ];  # wait for filesystems to be mounted
+      #   wantedBy = [ "multi-user.target" ];
+      #   path = with pkgs; [cryptsetup];
+      #   #BindReadOnlyPaths = [
+        #   #  "/var/secret/yet"                    # Your key file
+        #   #];
+        #   serviceConfig = {
+          #     Type = "oneshot";
+          #     #ProtectSystem = false;       # Need filesystem access
+          #     ExecStart = [
+            #       ""
+            #       "${pkgs.cryptsetup}/bin/cryptsetup luksOpen --header /var/secret/yet/yet0.h -d /var/secret/yet/yet0.k /dev/disk/by-id/REDACTED yet0"
+            #       "${pkgs.cryptsetup}/bin/cryptsetup luksOpen --header /var/secret/yet/yet1.h -d /var/secret/yet/yet1.k /dev/disk/by-id/REDACTED yet1"
+            #     ];
+            #     RemainAfterExit = true;
+            #   };
+            # };
+
+    fileSystems."/" = {
+      device = "fern";
+      fsType = "zfs";
+    };
+
+    fileSystems."/boot" = {
+      device = "/dev/disk/by-uuid/REDACTED";
+      fsType = "vfat";
+      options = [ "fmask=0022" "dmask=0022" ];
+    };
+
+    fileSystems."/home" = {
+      device = "fern/home";
+      fsType = "zfs";
+    };
+
+    fileSystems."/nix" = {
+      device = "fern/nix";
+      fsType = "zfs";
+    };
+
+    environment.etc.crypttab = {
+      mode = "0600";
+      text = ''
+        # <volume-name> <encrypted-device> [key-file] [options]
+        yet0 /dev/disk/by-id/REDACTED /var/secret/yet/yet0.k header=/var/secret/yet/yet0.h
+        yet1 /dev/disk/by-id/REDACTED /var/secret/yet/yet1.k header=/var/secret/yet/yet1.h
+      '';
+    };
+
+    fileSystems."/yet" = {
+      device = "yet";
+      fsType = "zfs";
+      options = [ "nofail" ];
+      #depends = [ "/dev/mapper/yet0" "/dev/mapper/yet1" ];
+    };
+
+    #systemd.services."zfs-import-yet".after = lib.mkForce [ "decrypt-yet.service" ];
+
+    swapDevices = [ ];
+    networking.useDHCP = lib.mkDefault true;
+    networking.hostId = "AAAAAAAA";
+
+    nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+    hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 }

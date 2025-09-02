@@ -37,21 +37,21 @@
   #boot.kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
   #boot.kernelPackages = pkgs.linuxPackages_latest;
   # at the time of writing, this is equal to zfs_unstable
-  # boot.zfs.package = pkgs.zfs;
+  boot.zfs.package = pkgs.zfs_unstable;
 
   nixpkgs.overlays = [
-    (self: super: {
-      linuxPackages_6_14 = super.linuxPackages_6_14.extend (lpself: lpsuper: {
-        zfs_unstable = lpsuper.zfs_unstable.overrideAttrs (oldAttrs: {
-          meta = oldAttrs.meta // { broken = true; }; # remove whenever you feel like it
-        });
-      });
-      my_zfs = super.zfs_unstable.overrideAttrs(old: {
-        kernelCompatible = true;
-        #meta.broken = false;
-        #rev = "301da593ade391fa78a660c7b42325cd2ace593a";
-      });
-    })
+    # (self: super: {
+    #   linuxPackages_6_14 = super.linuxPackages_6_14.extend (lpself: lpsuper: {
+    #     zfs_unstable = lpsuper.zfs_unstable.overrideAttrs (oldAttrs: {
+    #       meta = oldAttrs.meta // { broken = true; }; # remove whenever you feel like it
+    #     });
+    #   });
+    #   my_zfs = super.zfs_unstable.overrideAttrs(old: {
+    #     kernelCompatible = true;
+    #     #meta.broken = false;
+    #     #rev = "301da593ade391fa78a660c7b42325cd2ace593a";
+    #   });
+    # })
   ];
 
 
@@ -83,19 +83,19 @@
     #   # Your other specialization settings
     # };
 
-    stable.configuration = {
-      boot.kernelPackages = pkgs.linuxPackages_6_13;
-      system.nixos.tags = [ "stable-kernel" ];
+    #stable.configuration = {
+    #  boot.kernelPackages = pkgs.linuxPackages_6_16;
+    #  system.nixos.tags = [ "stable-kernel" ];
       #nixpkgs.config = licenseConfig;
       #boot.zfs.package = pkgs.zfs;
-    };
+    #};
 
-    latest.configuration = {
-      boot.kernelPackages = pkgs.linuxPackages_6_14;
-      system.nixos.tags = [ "latest-kernel" ];
+    #latest.configuration = {
+    #  boot.kernelPackages = pkgs.linuxPackages_6_17;
+    #  system.nixos.tags = [ "latest-kernel" ];
       #nixpkgs.config = licenseConfig;
       #boot.zfs.package = pkgs.my_zfs;
-    };
+    #};
 
     #latest.nixpkgs.config.allowBroken = true;
     # latest.configuration = {
@@ -746,6 +746,8 @@
                   services.udev.extraRules = ''
                     SUBSYSTEM=="input", ATTRS{id/vendor}=="2dc8", ATTRS{id/product}=="6101", SYMLINK+="input/by-id/8bitdo-sn30-pro", MODE="0660", GROUP="games"
                   '';
+
+                  nix.settings.trusted-users = [ "root" "clownpiece" ];
 
                   users.groups.magician.gid = 381;
                   users.groups.games.gid = 382;

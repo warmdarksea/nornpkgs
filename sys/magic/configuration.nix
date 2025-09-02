@@ -79,12 +79,13 @@
 
   networking.hostName = "magic";
   networking.hostId = "AAAAAAAA";
-  networking.dhcpcd.enable = false;
-  networking.interfaces.enp6s0.ipv4.addresses = [
-    { address = "0.0.0.0"; prefixLength = 24; }
-  ];
-  networking.defaultGateway = "0.0.0.0";
-  networking.nameservers = ["0.0.0.0"];
+  networking.useDHCP = lib.mkDefault true;
+  #networking.dhcpcd.enable = false;
+  #networking.interfaces.enp6s0.ipv4.addresses = [
+  #  { address = "0.0.0.0"; prefixLength = 24; }
+  #];
+  #networking.defaultGateway = "0.0.0.0";
+  #networking.nameservers = ["0.0.0.0"];
 
   virtualisation.docker = {
     enable = true;
@@ -106,6 +107,7 @@
     cudatoolkit
     docker
     docker-compose
+    dtach
   ];
 
   #system.copySystemConfiguration = true;
