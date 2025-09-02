@@ -37,11 +37,28 @@
       inputs.nix-gensokyo.follows = ""; # self-reference
     };
 
+    furnace = {
+      url = "path:./sys/furnace";
+
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixos-hardware.follows = "my-nixos-hardware";
+      inputs.nix-gensokyo.follows = ""; # self-reference
+    };
+
     hell = {
       url = "path:./sys/hell";
 
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.nixos-hardware.follows = "my-nixos-hardware";
+      inputs.home-manager.follows = "home-manager";
+      inputs.nix-gensokyo.follows = ""; # self-reference
+    };
+
+    magic = {
+      url = "path:./sys/magic";
+
+      inputs.nixpkgs.follows = "nixpkgs";
+      #inputs.nixos-hardware.follows = "my-nixos-hardware";
       inputs.home-manager.follows = "home-manager";
       inputs.nix-gensokyo.follows = ""; # self-reference
     };
@@ -83,7 +100,9 @@
   gensokyo-dotfiles,
 
   cheese,
+  furnace,
   hell,
+  magic,
 
   iso-minimal,
   iso-livecd,
@@ -174,16 +193,18 @@
       ];
     };
 
+    nixosConfigurations.furnace = furnace.nixosConfigurations.furnace.extendModules { modules = [ ]; };
     nixosConfigurations.hell = hell.nixosConfigurations.hell.extendModules { modules = [ overlay ]; };
+    nixosConfigurations.magic = magic.nixosConfigurations.magic.extendModules { modules = [ ]; };
 
-    nixosConfigurations.magic = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
-      modules = [
-        ./sys/magic/configuration.nix
-        ./sys/magic/hardware-configuration.nix
-        ./lib/base.nix
-      ];
-    };
+    # nixosConfigurations.magic = nixpkgs.lib.nixosSystem {
+    #   system = "x86_64-linux";
+    #   modules = [
+    #     ./sys/magic/configuration.nix
+    #     ./sys/magic/hardware-configuration.nix
+    #     ./lib/base.nix
+    #   ];
+    # };
 
     nixosConfigurations.mausoleum = my-nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
