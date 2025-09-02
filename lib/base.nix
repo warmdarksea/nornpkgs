@@ -21,7 +21,7 @@
   services.resolved.enable = true;
   services.resolved.extraConfig = ''
   [Resolve]
-  DNS=0.0.0.0 0.0.0.0
+  DNS=0.0.0.0
   Domains=~gensokyo.internal
   '';
 
