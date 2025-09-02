@@ -1,4 +1,4 @@
-# make references symlink target mtime, not symlink mtime, so targets that are
+# make references symlink target mtime, not symlink mtime. targets that are
 # symlinks to store paths will always be built without this flag
 MAKEFLAGS+=-L
 
@@ -13,6 +13,10 @@ TARGET=nonexistant
 ISO_FLAVOR=nonexistant
 REMOTE_STORE_PATH=/nonexistant
 INSTALL_PATH=/nonexistant
+
+#
+
+DTACH_FLAGS=-n
 
 #
 
@@ -43,8 +47,7 @@ $(BUILD_DIR)/sys-$(TARGET): flake.nix 	  	    \
 
 $(BUILD_DIR)/iso-$(ISO_FLAVOR): flake.nix 	  	    \
 				flake.lock 		    \
-				iso/$(ISO_FLAVOR)/flake.nix \
-				iso/$(ISO_FLAVOR)/flake.lock
+				iso/$(ISO_FLAVOR)/flake.nix
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.iso-$(ISO_FLAVOR).config.system.build.isoImage
 
 #
@@ -57,11 +60,37 @@ build_iso_closure: $(BUILD_DIR)/iso-$(ISO_FLAVOR)
 
 #
 
+.PHONY: build_remote_sys_closure
+build_remote_sys_closure:
+	$(eval DRV_PATH := $(shell nix build --dry-run --json .#nixosConfigurations.$(TARGET).config.system.build.toplevel | jq -r '.[].drvPath' | tail -n1))
+	@echo "Derivation path: $(DRV_PATH)"
+	nix copy "$(DRV_PATH)" --to "ssh://root@$(HOST)"
+	$(eval SOCK_PATH := $(shell ssh "root@$(HOST)" 'mktemp -u /tmp/nixbuild-XXXXXX.sock'))
+	ssh -t "root@$(HOST)" -- dtach $(DTACH_FLAGS) $(SOCK_PATH) nix-store --realise "$(DRV_PATH)"
+
+.PHONY: pull_remote_sys_closure
+pull_remote_sys_closure:
+	$(eval OUTPUT_PATH := $(shell nix build --dry-run --json .#nixosConfigurations.furnace.config.system.build.toplevel | jq -r '.[].outputs.out'))
+	@echo "Pulling $(OUTPUT_PATH) from $(HOST)"
+	nix copy --no-check-sigs --from "ssh://root@$(HOST)" "$(OUTPUT_PATH)"
+	rm -f $(BUILD_DIR)/sys-$(TARGET)
+	ln -s $(OUTPUT_PATH) $(BUILD_DIR)/sys-$(TARGET)
+
+.PHONY: check_remote_sys_closure
+check_remote_sys_closure:
+	$(eval OUTPUT_PATH := $(shell nix build --dry-run --json .#nixosConfigurations.furnace.config.system.build.toplevel | jq -r '.[].outputs.out'))
+	ssh "root@$(HOST)" -- ls -d "$(OUTPUT_PATH)"
+
+#
+
 .PHONY: push_closure
 push_closure: $(BUILD_DIR)/sys-$(TARGET)
 	nix copy --to "ssh://root@$(HOST)" "$<"
 
 # ah, memories
+#
+# REMOTE_STORE_PATH should be missing the final /nix, so e.g. /mnt/nix should be
+# /mnt
 .PHONY: push_closure_to
 push_closure_to: $(BUILD_DIR)/sys-$(TARGET)
 	nix copy "$<" --to "ssh://root@$(HOST)?remote-store=$(REMOTE_STORE_PATH)"
@@ -119,6 +148,14 @@ deploy_remote_boot_closure:	   \
 .PHONY: install_closure_to_path
 install_closure_to_path: $(BUILD_DIR)/sys-$(TARGET)
 	sudo nixos-install --no-root-password --root "$(INSTALL_PATH)" --system "$<"
+
+# make remote_install_closure_to_path SSH_FLAGS="-i ~/.ssh/id_satori -o StrictHostKeyChecking=false" HOST=furnace REMOTE_STORE_PATH=/mnt INSTALL_PATH=/mnt TARGET=furnace
+.PHONY: remote_install_closure_to_path
+remote_install_closure_to_path: $(BUILD_DIR)/sys-$(TARGET) \
+	remote_assert		   \
+	$(BUILD_DIR)/sys-$(TARGET) \
+	push_closure_to		   
+	ssh $(SSH_FLAGS) "root@$(HOST)" -- nixos-install --no-root-password --root "$(INSTALL_PATH)" --system "$(shell readlink $<)"
 
 #
 
