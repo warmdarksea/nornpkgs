@@ -67,6 +67,7 @@
             "nvidia-x11"
             "nvidia-persistenced"
             "nvidia-settings"
+            "cudnn"
             #    "cuda_cudart"
             #    "cuda_cccl"
             #    "libcublas"
@@ -87,6 +88,7 @@
           #   inherit nixpak;
           # };
           modules = [
+            #licenseConfig
             lanzaboote.nixosModules.lanzaboote
             nixos-hardware.nixosModules.asus-x13-flow
             ./configuration.nix

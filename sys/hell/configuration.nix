@@ -11,6 +11,7 @@
     "nvidia-x11"
     "nvidia-persistenced"
     "nvidia-settings"
+    "cudnn"
     #    "cuda_cudart"
     #    "cuda_cccl"
     #    "libcublas"
@@ -707,8 +708,9 @@
                     gnomeExtensions.appindicator
                     gnomeExtensions.screen-rotate
                     gnomeExtensions.bing-wallpaper-changer
-                    gnomeExtensions.kimpanel
+                    #gnomeExtensions.kimpanel
                     gnomeExtensions.gtk4-desktop-icons-ng-ding
+                    gnomeExtensions.week-start-modifier
                     gnome-terminal
                     efibootmgr
                     sbctl

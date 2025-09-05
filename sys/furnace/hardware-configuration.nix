@@ -103,6 +103,26 @@
       fsType = "zfs";
     };
 
+    fileSystems."/srv" = {
+      device = "fern/srv";
+      fsType = "zfs";
+    };
+
+    fileSystems."/srv/jellyfin" = {
+      device = "fern/srv/jellyfin";
+      fsType = "zfs";
+    };
+
+    fileSystems."/srv/komga" = {
+      device = "fern/srv/komga";
+      fsType = "zfs";
+    };
+
+    fileSystems."/srv/webdav" = {
+      device = "fern/srv/webdav";
+      fsType = "zfs";
+    };
+
     environment.etc.crypttab = {
       mode = "0600";
       text = ''

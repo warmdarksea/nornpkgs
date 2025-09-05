@@ -5,14 +5,14 @@
 # todo:
 # webdav
 # komga
-# plex
+# jellyfin
 # generic 9p access
 # tailscale
 
 { config, lib, pkgs, ... }:
 
-rec {
-  imports =
+  rec {
+    imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
     ];
@@ -24,7 +24,9 @@ rec {
   networking.hostName = "furnace"; # Define your hostname.
 
   # Configure network connections interactively with nmcli or nmtui.
-  networking.networkmanager.enable = true;
+  
+  networking.useDHCP = lib.mkDefault true;
+  #networking.networkmanager.enable = true;
 
   services.diod = {
     enable = true;
@@ -96,10 +98,14 @@ rec {
 
     subUidRanges = [
       { startUid = 100000; count = 16777216; }
+      { startUid = users.users.www-jellyfin.uid; count = 1; }
+      { startUid = users.users.www-komga.uid; count = 1; }
       { startUid = users.users.www-webdav.uid; count = 1; }
     ];
     subGidRanges = [
       { startGid = 100000; count = 16777216; }
+      { startGid = users.groups.www-jellyfin.gid; count = 1; }
+      { startGid = users.groups.www-komga.gid; count = 1; }
       { startGid = users.groups.www-webdav.gid; count = 1; }
     ];
 
@@ -109,6 +115,20 @@ rec {
   #     tree
   #   ];
   };
+
+  users.users.www-jellyfin = {
+    uid = 1536;
+    group = "www-jellyfin";
+    isSystemUser = true;
+  };
+  users.groups.www-jellyfin.gid = users.users.www-jellyfin.uid;
+
+  users.users.www-komga = {
+    uid = 8209;
+    group = "www-komga";
+    isSystemUser = true;
+  };
+  users.groups.www-komga.gid = users.users.www-komga.uid;
 
   users.users.www-webdav = {
     uid = 9031;
