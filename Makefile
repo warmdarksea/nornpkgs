@@ -12,6 +12,7 @@ BUILD_DIR=build
 TARGET=nonexistant
 ISO_FLAVOR=nonexistant
 REMOTE_STORE_PATH=/nonexistant
+REMOTE_NIX_FLAGS=
 INSTALL_PATH=/nonexistant
 
 #
@@ -65,8 +66,22 @@ build_remote_sys_closure:
 	$(eval DRV_PATH := $(shell nix build --dry-run --json .#nixosConfigurations.$(TARGET).config.system.build.toplevel | jq -r '.[].drvPath' | tail -n1))
 	@echo "Derivation path: $(DRV_PATH)"
 	nix copy "$(DRV_PATH)" --to "ssh://root@$(HOST)"
-	$(eval SOCK_PATH := $(shell ssh "root@$(HOST)" 'mktemp -u /tmp/nixbuild-XXXXXX.sock'))
-	ssh -t "root@$(HOST)" -- dtach $(DTACH_FLAGS) $(SOCK_PATH) nix-store --realise "$(DRV_PATH)"
+	ssh "root@$(HOST)" -- systemd-run --uid=0 --property=StandardOutput=journal --property=StandardError=journal --service-type=oneshot --no-block --unit=nixbuild-$(TARGET) -- nix-store --realise "$(DRV_PATH)"
+#	$(eval SOCK_PATH := $(shell ssh "root@$(HOST)" 'mktemp -u /tmp/nixbuild-XXXXXX.sock'))
+#	ssh -t "root@$(HOST)" -- dtach $(DTACH_FLAGS) $(SOCK_PATH) nix-store $(REMOTE_NIX_FLAGS) --realise "$(DRV_PATH)"
+
+
+.PHONY: check_build_logs
+check_build_logs:
+	ssh "root@$(HOST)" 'journalctl -u nixbuild-$(TARGET) -f'
+
+.PHONY: check_build_status
+check_build_status:
+	ssh "root@$(HOST)" 'systemctl status nixbuild-$(TARGET)'
+
+.PHONY: reset_build
+reset_build:
+	ssh root@magic 'systemctl reset-failed nixbuild-hell'
 
 .PHONY: pull_remote_sys_closure
 pull_remote_sys_closure:
