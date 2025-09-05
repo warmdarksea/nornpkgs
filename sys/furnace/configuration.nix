@@ -11,8 +11,8 @@
 
 { config, lib, pkgs, ... }:
 
-  rec {
-    imports =
+rec {
+  imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
     ];
@@ -111,9 +111,9 @@
 
     isNormalUser = true;
     extraGroups = [ "wheel" "docker" "podman" ]; # Enable ‘sudo’ for the user.
-  #   packages = with pkgs; [
-  #     tree
-  #   ];
+    #   packages = with pkgs; [
+    #     tree
+    #   ];
   };
 
   users.users.www-jellyfin = {
@@ -142,9 +142,9 @@
   # List packages installed in system profile.
   # You can use https://search.nixos.org/ to find more packages (and options).
   environment.systemPackages = with pkgs; [
-     vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
-  #   wget
-  sbctl
+    vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+    #   wget
+    sbctl
   ];
 
   # Some programs need SUID wrappers, can be configured further or are

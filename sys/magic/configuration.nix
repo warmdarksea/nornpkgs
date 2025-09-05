@@ -2,7 +2,7 @@
   imports = [
   ];
 
-    nixpkgs.config.allowUnfreePredicate = pkg: (builtins.elem (lib.getName pkg) [
+  nixpkgs.config.allowUnfreePredicate = pkg: (builtins.elem (lib.getName pkg) [
     "corefonts"
     "nvidia-x11"
     "nvidia-persistenced"
@@ -14,12 +14,12 @@
     #    "nvtop"
     "vcv-rack"
   ]) || (builtins.all (license:
-  license.free || builtins.elem license.shortName [
-    "CUDA EULA"
-    #    "cuDNN EULA"
-    #    "cuTENSOR EULA"
-    "NVidia OptiX EULA"
-  ]
+    license.free || builtins.elem license.shortName [
+      "CUDA EULA"
+      #    "cuDNN EULA"
+      #    "cuTENSOR EULA"
+      "NVidia OptiX EULA"
+    ]
   ) (if builtins.isList pkg.meta.license then pkg.meta.license else [ pkg.meta.license ]));
 
   boot.loader.efi.efiSysMountPoint = "/boot/EFI";
