@@ -128,6 +128,7 @@
     # nix modules
 
     nixosModules.base = import lib/base.nix;
+    #nixosModules.gensokyo = import lib/gensokyo.nix;
 
     # home manager modules
 

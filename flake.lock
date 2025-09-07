@@ -367,8 +367,8 @@
     "gensokyo-dotfiles": {
       "flake": false,
       "locked": {
-        "lastModified": 1757087618,
-        "narHash": "sha256-0zOSQatBygKJQnsqnj4zsN9XK4PivyN5Zkk5Ufae3bo=",
+        "lastModified": 1757215574,
+        "narHash": "sha256-Y5aWiZmtgcr0wW1JhAPMAbMr7UjCrxkdO6HdmcW/gfY=",
         "path": "/home/clownpiece/src/gensokyo-dotfiles",
         "type": "path"
       },
