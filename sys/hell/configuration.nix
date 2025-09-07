@@ -219,8 +219,8 @@
     CPUWeight = 50;         # Lower than default (100)
     #CPUSchedulingPolicy = "idle";
 
-    MemoryHigh = "14G";
-    MemoryMax = "18G";
+    MemoryHigh = "16G";
+    MemoryMax = "20G";
 
     IOWeight = 50;          # Lower than default (100)
     #IOSchedulingClass = "idle";
@@ -279,7 +279,9 @@
   # we will want to use the wgN device with one or possibly multiple network namespaces, but it can only be in one at a time. so instead we keep it in the default namespace and create a bridge, and make veth pairs for each additional network namespace we want to use.
   # we also may not want to have any routing table rules in the default network namespace, because the interface may be for testing or other weird stuff. instead, we... wait, what do we do? it looks like we create a new routing table with the weird "multiple routing table" thingie, in the default netns. why do we need that... can't we just have the routing table in the namespace with the veth pair? what routing even happens in the default network namespace? in fact, i kind of specifically want there to not be any routing for wgN in the default netns, it will conflict with at least one other wgN (for the DNS server)
   
-  #networking.firewall.allowedUDPPorts = [44283];
+  #networking.firewall.allowedUDPPorts = [
+  #  config.networking.wireguard.interfaces.wg-redacted.listenPort
+  #];
   #networking.firewall.allowedUDPPortRanges = [
   #  { from = 60000; to = 61000; }
   #];
@@ -287,10 +289,10 @@
   services.tailscale.enable = true;
 
   # nuclear option, do not use
-  networking.firewall.trustedInterfaces = [ "lxdbr0" "virbr0" ];
-  networking.firewall.extraCommands = ''
-      iptables -I INPUT -i lxdbr0 -d 0.0.0.0/8,0.0.0.0/12,0.0.0.0/16 -j DROP
-      iptables -I INPUT -i lxdbr0 -d 0.0.0.0/24 -j ACCEPT
+  #networking.firewall.trustedInterfaces = [ "lxdbr0" "virbr0" ];
+  #networking.firewall.extraCommands = ''
+  #    iptables -I INPUT -i lxdbr0 -d 0.0.0.0/8,0.0.0.0/12,0.0.0.0/16 -j DROP
+  #    iptables -I INPUT -i lxdbr0 -d 0.0.0.0/24 -j ACCEPT
   #  # allow dhcp/dns traffic on lxd bridge
   #  # iptables -A INPUT -i lxdbr0 -p udp --dport 67:68 --sport 67:68 -j ACCEPT
   #  # iptables -A INPUT -i lxdbr0 -p udp --dport 53 --sport 53 -j ACCEPT
@@ -307,17 +309,18 @@
   networking.firewall.checkReversePath = "loose";
   networking.firewall.rejectPackets = true;
 
-  networking.iproute2.rttablesExtraConfig = ''
-        # 109 rt_redacted
-        # 247 rt_redacted
-      '';
+  # networking.iproute2.rttablesExtraConfig = ''
+  #       # 109 rt_redacted
+  #       # 247 rt_redacted
+  #       176 rt_redacted
+  #     '';
 
-  networking.bridges = {
+  #networking.bridges = {
     # egress: wg1 (redacted redacted)
     # wgbr1 = {
     #   interfaces = [ ]; # gets NAT forwarded to wg1
     # };
-  };
+  #};
 
   # systemd.services."wireguard-wg1".after = ["wgbr1-netdev.service"];
   # networking.interfaces.wgbr1 = {
@@ -338,41 +341,41 @@
   #];
   # };
 
-  networking.wireguard.interfaces = {
+  #networking.wireguard.interfaces = {
 
     # higan
-    wg0 = {
-      ips = [ "0.0.0.0/24" ];
-      # remember to open the port for this in allowedUDPPorts
-      listenPort = 44283;
+    # wg0 = {
+    #   ips = [ "0.0.0.0/24" ];
+    #   # remember to open the port for this in allowedUDPPorts
+    #   listenPort = 44283;
 
-      # make sure this is a string, not a file path, or it'll end up in the
-      # store
-      privateKeyFile = "/var/secret/wg/higan/privkey";
+    #   # make sure this is a string, not a file path, or it'll end up in the
+    #   # store
+    #   privateKeyFile = "/var/secret/wg/higan/privkey";
 
-      # we need to set route weights, so do it manually
-      allowedIPsAsRoutes = false;
-      postSetup = ''
-                      ip route add 0.0.0.0/24 dev wg0 metric 200
-                      ip route add 0.0.0.0/24 dev wg0 via 0.0.0.0 metric 200
-                    '';
+    #   # we need to set route weights, so do it manually
+    #   allowedIPsAsRoutes = false;
+    #   postSetup = ''
+    #                   ip route add 0.0.0.0/24 dev wg0 metric 200
+    #                   ip route add 0.0.0.0/24 dev wg0 via 0.0.0.0 metric 200
+    #                 '';
 
-      peers = [
-        {
-          publicKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-          presharedKeyFile = "/var/secret/wg/higan/psk";
+    #   peers = [
+    #     {
+    #       publicKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    #       presharedKeyFile = "/var/secret/wg/higan/psk";
 
-          allowedIPs = [ "0.0.0.0/24" "0.0.0.0/24" ];
+    #       allowedIPs = [ "0.0.0.0/24" "0.0.0.0/24" ];
 
-          # note: need to do some firewall stuff for handshake to work, see:
-          # https://discourse.nixos.org/t/solved-minimal-firewall-setup-for-wireguard-client/7577
-          endpoint = "0.0.0.0:44283"; 
+    #       # note: need to do some firewall stuff for handshake to work, see:
+    #       # https://discourse.nixos.org/t/solved-minimal-firewall-setup-for-wireguard-client/7577
+    #       endpoint = "0.0.0.0:44283"; 
 
-          # Send keepalives every 25 seconds. Important to keep NAT tables alive.
-          persistentKeepalive = 25;
-        }
-      ];
-    };
+    #       # Send keepalives every 25 seconds. Important to keep NAT tables alive.
+    #       persistentKeepalive = 25;
+    #     }
+    #   ];
+    # };
 
     # redacted redacted (test1)
     # to test: ip route add 0.0.0.0/32 dev wg1 (then resolve something with it obv)
@@ -528,8 +531,40 @@
     # wg3 = {
     #
     # };
+
+    # wg-redacted = {
+    #   ips = [ "0.0.0.0/32" ];
+    #   # remember to open the port for this in allowedUDPPorts
+    #   listenPort = 51820;
+
+    #   # make sure this is a string, not a file path, or it'll end up in the
+    #   # store
+    #   privateKeyFile = "/var/secret/wg/redacted/privkey";
+
+    #   peers = [
+    #     {
+    #       publicKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+    #       # for testing
+    #       allowedIPs = [ "0.0.0.0/32" ];
+
+    #       # redacted's DNS server + (all IPs - RFC1918)
+    #       #allowedIPs = [ "0.0.0.0/32" "0.0.0.0/5" "0.0.0.0/7" "0.0.0.0/8" "0.0.0.0/6" "0.0.0.0/4" "0.0.0.0/3" "0.0.0.0/2" "0.0.0.0/3" "0.0.0.0/5" "0.0.0.0/6" "0.0.0.0/12" "0.0.0.0/11" "0.0.0.0/10" "0.0.0.0/9" "0.0.0.0/8" "0.0.0.0/7" "0.0.0.0/4" "0.0.0.0/9" "0.0.0.0/11" "0.0.0.0/13" "0.0.0.0/16" "0.0.0.0/15" "0.0.0.0/14" "0.0.0.0/12" "0.0.0.0/10" "0.0.0.0/8" "0.0.0.0/7" "0.0.0.0/6" "0.0.0.0/5" "0.0.0.0/4" ];
+
+    #       # note: need to do some firewall stuff for handshake to work, see:
+    #       # https://discourse.nixos.org/t/solved-minimal-firewall-setup-for-wireguard-client/7577
+    #       endpoint = "0.0.0.0:3161";
+    #     }
+    #   ];
+
+    #   # we need to set route weights, so do it manually
+    #   allowedIPsAsRoutes = false;
+    #   #postSetup = ''
+    #   #  true
+    #   #'';
+    # };
     
-  };
+  #};
 
   #networking.wireless.extraConfig = ''
   #  debug_level=0
@@ -537,12 +572,12 @@
 
   #networking.networkmanager.settings.device.wifi.backend = "${pkgs.wpa_supplicant}/bin/wpa_supplicant";
   #networking.networkmanager.settings.device.wifi.wpa_supplicant_args = "-q";
-  systemd.services.wpa_supplicant.serviceConfig = {
-    ExecStart = [
-      ""  # This empty string clears the existing ExecStart
-      "${pkgs.wpa_supplicant}/bin/wpa_supplicant -u -q"
-    ];
-  };
+  #systemd.services.wpa_supplicant.serviceConfig = {
+  #  ExecStart = [
+  #    ""  # This empty string clears the existing ExecStart
+  #    "${pkgs.wpa_supplicant}/bin/wpa_supplicant -u -q"
+  #  ];
+  #};
 
   hardware.bluetooth.enable = true;
   hardware.sensor.iio.enable = true;
@@ -749,7 +784,7 @@
                     SUBSYSTEM=="input", ATTRS{id/vendor}=="2dc8", ATTRS{id/product}=="6101", SYMLINK+="input/by-id/8bitdo-sn30-pro", MODE="0660", GROUP="games"
                   '';
 
-  nix.settings.trusted-users = [ "root" "clownpiece" ];
+  nix.settings.trusted-users = [ "clownpiece" ];
 
   users.groups.magician.gid = 381;
   users.groups.games.gid = 382;
