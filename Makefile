@@ -46,6 +46,11 @@ $(BUILD_DIR)/sys-$(TARGET): flake.nix 	  	    \
 			    sys/$(TARGET)/flake.nix
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.$(TARGET).config.system.build.toplevel
 
+$(BUILD_DIR)/img-$(TARGET): flake.nix 	  	    \
+			    flake.lock 		    \
+			    sys/$(TARGET)/flake.nix
+	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.$(TARGET).config.system.build.sdImage
+
 $(BUILD_DIR)/iso-$(ISO_FLAVOR): flake.nix 	  	    \
 				flake.lock 		    \
 				iso/$(ISO_FLAVOR)/flake.nix
@@ -56,8 +61,11 @@ $(BUILD_DIR)/iso-$(ISO_FLAVOR): flake.nix 	  	    \
 .PHONY: build_sys_closure
 build_sys_closure: $(BUILD_DIR)/sys-$(TARGET)
 
+.PHONY: build_img
+build_img: $(BUILD_DIR)/img-$(TARGET)
+
 .PHONY: build_iso_closure
-build_iso_closure: $(BUILD_DIR)/iso-$(ISO_FLAVOR)
+build_iso: $(BUILD_DIR)/iso-$(ISO_FLAVOR)
 
 #
 
