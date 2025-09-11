@@ -29,6 +29,14 @@
     };
 
     # systems
+    abandonedfactory = {
+      url = "path:./sys/abandonedfactory";
+
+      inputs.nixpkgs.follows = "nixpkgs";
+      #inputs.nixos-hardware.follows = "my-nixos-hardware";
+      inputs.nix-gensokyo.follows = ""; # self-reference
+    };
+
     cheese = {
       url = "path:./sys/cheese";
 
@@ -98,7 +106,8 @@
   nixpak,
 
   gensokyo-dotfiles,
-
+              
+  abandonedfactory,
   cheese,
   furnace,
   hell,
@@ -158,6 +167,8 @@
     #     }
     #   ];
     # };
+
+    nixosConfigurations.abandonedfactory = abandonedfactory.nixosConfigurations.abandonedfactory.extendModules { modules = [ ]; };
 
     nixosConfigurations.cheese = cheese.nixosConfigurations.cheese.extendModules { modules = [ overlay ]; };
 

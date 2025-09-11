@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "abandonedfactory": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "path": "./sys/abandonedfactory",
+        "type": "path"
+      },
+      "original": {
+        "path": "./sys/abandonedfactory",
+        "type": "path"
+      },
+      "parent": []
+    },
     "cheese": {
       "inputs": {
         "home-manager": "home-manager",
@@ -1085,6 +1101,7 @@
     },
     "root": {
       "inputs": {
+        "abandonedfactory": "abandonedfactory",
         "cheese": "cheese",
         "emacs-overlay": "emacs-overlay",
         "furnace": "furnace",
