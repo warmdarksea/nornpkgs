@@ -3,16 +3,60 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    lanzaboote = {
+      url = "github:nix-community/lanzaboote/v0.4.2";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    #
+    nix-gensokyo = {
+      url = "path:/home/clownpiece/src/nix-gensokyo";
+      flake = true;
+      inputs.nixpkgs.follows = "nixpkgs";
+    };  
   };
 
-  outputs = { self, nixpkgs }: {
-    nixosConfigurations.abandonedfactory = nixpkgs.lib.nixosSystem {
+  outputs = {
+    self,
+      nixpkgs ,
+      # emacs-overlay,
+      #home-manager,
+      lanzaboote,
+      # nixpak,
+
+      nix-gensokyo
+  }: {
+    nixosConfigurations.abandonedfactory = let
       system = "x86_64-linux";
+      pkgs = nixpkgs.legacyPackages.${system};
+      lib = pkgs.lib;
+    in nixpkgs.lib.nixosSystem {
+      system = "${system}";
       modules = [
-        "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-x86_64.nix"
+        nix-gensokyo.nixosModules.base
+        lanzaboote.nixosModules.lanzaboote
+        #"${nixpkgs}/nixos/modules/installer/sd-card/sd-image-x86_64.nix"
+        ./hardware-configuration.nix
         {
           # Basic system configuration
           system.stateVersion = "23.11";
+
+          # Use the systemd-boot EFI boot loader.
+          #boot.loader.systemd-boot.enable = true;
+          boot.loader.efi.canTouchEfiVariables = true;
+          boot.loader.systemd-boot.enable = lib.mkForce false;
+          boot.initrd.systemd.enable = true;
+          boot.kernelParams = ["intel_idle.max_cstate=1" "acpi_osi=\"Windows 2015\"" "nomodeset"];
+          security.tpm2 = {
+            enable = true;
+            #pkcs11.enable = true;
+            #tctiEnvironment.enable = true;
+          };
+
+          boot.lanzaboote = {
+            enable = true;
+            pkiBundle = "/var/lib/sbctl";
+          };
           
           # Enable SSH for remote access
           services.openssh.enable = true;
@@ -32,20 +76,16 @@
           security.sudo.wheelNeedsPassword = false;
 
           # Basic networking
-          networking.hostName = "nixos-sdcard";
-          networking.networkmanager.enable = true;
-
-          # SD card specific settings
-          sdImage = {
-            # Image size (adjust as needed)
-            imageBaseName = "nixos-sd-image";
-            compressImage = true;
-
-            populateRootCommands = "";
-            
-            # Optional: customize partition sizes
-            # rootPartitionUUID = "00000000-0000-0000-0000-000000000000";
-          };
+          networking.hostName = "abandonedfactory";
+          #networking.networkmanager.enable = true;
+          networking.useDHCP = nixpkgs.lib.mkDefault true;
+          environment.systemPackages = with pkgs; [
+            vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+            #   wget
+            sbctl
+             tpm2-tss
+  tpm2-tools
+          ];
         }
       ];
     };
