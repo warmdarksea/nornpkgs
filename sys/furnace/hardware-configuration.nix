@@ -123,6 +123,11 @@
       fsType = "zfs";
     };
 
+    fileSystems."/srv/nextcloud" = {
+      device = "fern/srv/nextcloud";
+      fsType = "zfs";
+    };
+
     environment.etc.crypttab = {
       mode = "0600";
       text = ''

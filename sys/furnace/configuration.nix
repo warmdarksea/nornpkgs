@@ -101,12 +101,14 @@ rec {
       { startUid = users.users.www-jellyfin.uid; count = 1; }
       { startUid = users.users.www-komga.uid; count = 1; }
       { startUid = users.users.www-webdav.uid; count = 1; }
+      { startUid = users.users.www-nextcloud.uid; count = 1; }
     ];
     subGidRanges = [
       { startGid = 100000; count = 16777216; }
       { startGid = users.groups.www-jellyfin.gid; count = 1; }
       { startGid = users.groups.www-komga.gid; count = 1; }
       { startGid = users.groups.www-webdav.gid; count = 1; }
+      { startGid = users.groups.www-nextcloud.gid; count = 1; }
     ];
 
     isNormalUser = true;
@@ -137,6 +139,13 @@ rec {
   };
   users.groups.www-webdav.gid = users.users.www-webdav.uid;
 
+  users.users.www-nextcloud = {
+    uid = 3568;
+    group = "www-nextcloud";
+    isSystemUser = true;
+  };
+  users.groups.www-nextcloud.gid = users.users.www-nextcloud.uid;
+
   # programs.firefox.enable = true;
 
   # List packages installed in system profile.
@@ -161,7 +170,7 @@ rec {
   # services.openssh.enable = true;
 
   # Open ports in the firewall.
-  # networking.firewall.allowedTCPPorts = [ ... ];
+  networking.firewall.allowedTCPPorts = [ 443 ];
   # networking.firewall.allowedUDPPorts = [ ... ];
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;
