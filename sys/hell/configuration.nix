@@ -279,9 +279,9 @@
   # we will want to use the wgN device with one or possibly multiple network namespaces, but it can only be in one at a time. so instead we keep it in the default namespace and create a bridge, and make veth pairs for each additional network namespace we want to use.
   # we also may not want to have any routing table rules in the default network namespace, because the interface may be for testing or other weird stuff. instead, we... wait, what do we do? it looks like we create a new routing table with the weird "multiple routing table" thingie, in the default netns. why do we need that... can't we just have the routing table in the namespace with the veth pair? what routing even happens in the default network namespace? in fact, i kind of specifically want there to not be any routing for wgN in the default netns, it will conflict with at least one other wgN (for the DNS server)
   
-  #networking.firewall.allowedUDPPorts = [
-  #  config.networking.wireguard.interfaces.wg-redacted.listenPort
-  #];
+  networking.firewall.allowedUDPPorts = [
+    config.networking.wireguard.interfaces.wg-redacted.listenPort
+  ];
   #networking.firewall.allowedUDPPortRanges = [
   #  { from = 60000; to = 61000; }
   #];
@@ -316,10 +316,10 @@
   #     '';
 
   #networking.bridges = {
-    # egress: wg1 (redacted redacted)
-    # wgbr1 = {
-    #   interfaces = [ ]; # gets NAT forwarded to wg1
-    # };
+  # egress: wg1 (redacted redacted)
+  # wgbr1 = {
+  #   interfaces = [ ]; # gets NAT forwarded to wg1
+  # };
   #};
 
   # systemd.services."wireguard-wg1".after = ["wgbr1-netdev.service"];
@@ -341,7 +341,7 @@
   #];
   # };
 
-  #networking.wireguard.interfaces = {
+  networking.wireguard.interfaces = {
 
     # higan
     # wg0 = {
@@ -532,39 +532,39 @@
     #
     # };
 
-    # wg-redacted = {
-    #   ips = [ "0.0.0.0/32" ];
-    #   # remember to open the port for this in allowedUDPPorts
-    #   listenPort = 51820;
+    wg-redacted = {
+      ips = [ "0.0.0.0/32" ];
+      # remember to open the port for this in allowedUDPPorts
+      listenPort = 51820;
 
-    #   # make sure this is a string, not a file path, or it'll end up in the
-    #   # store
-    #   privateKeyFile = "/var/secret/wg/redacted/privkey";
+      # make sure this is a string, not a file path, or it'll end up in the
+      # store
+      privateKeyFile = "/var/secret/wg/redacted/privkey";
 
-    #   peers = [
-    #     {
-    #       publicKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+      peers = [
+        {
+          publicKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
-    #       # for testing
-    #       allowedIPs = [ "0.0.0.0/32" ];
+          # for testing
+          allowedIPs = [ "0.0.0.0/32" ];
 
-    #       # redacted's DNS server + (all IPs - RFC1918)
-    #       #allowedIPs = [ "0.0.0.0/32" "0.0.0.0/5" "0.0.0.0/7" "0.0.0.0/8" "0.0.0.0/6" "0.0.0.0/4" "0.0.0.0/3" "0.0.0.0/2" "0.0.0.0/3" "0.0.0.0/5" "0.0.0.0/6" "0.0.0.0/12" "0.0.0.0/11" "0.0.0.0/10" "0.0.0.0/9" "0.0.0.0/8" "0.0.0.0/7" "0.0.0.0/4" "0.0.0.0/9" "0.0.0.0/11" "0.0.0.0/13" "0.0.0.0/16" "0.0.0.0/15" "0.0.0.0/14" "0.0.0.0/12" "0.0.0.0/10" "0.0.0.0/8" "0.0.0.0/7" "0.0.0.0/6" "0.0.0.0/5" "0.0.0.0/4" ];
+          # redacted's DNS server + (all IPs - RFC1918)
+          #allowedIPs = [ "0.0.0.0/32" "0.0.0.0/5" "0.0.0.0/7" "0.0.0.0/8" "0.0.0.0/6" "0.0.0.0/4" "0.0.0.0/3" "0.0.0.0/2" "0.0.0.0/3" "0.0.0.0/5" "0.0.0.0/6" "0.0.0.0/12" "0.0.0.0/11" "0.0.0.0/10" "0.0.0.0/9" "0.0.0.0/8" "0.0.0.0/7" "0.0.0.0/4" "0.0.0.0/9" "0.0.0.0/11" "0.0.0.0/13" "0.0.0.0/16" "0.0.0.0/15" "0.0.0.0/14" "0.0.0.0/12" "0.0.0.0/10" "0.0.0.0/8" "0.0.0.0/7" "0.0.0.0/6" "0.0.0.0/5" "0.0.0.0/4" ];
 
-    #       # note: need to do some firewall stuff for handshake to work, see:
-    #       # https://discourse.nixos.org/t/solved-minimal-firewall-setup-for-wireguard-client/7577
-    #       endpoint = "0.0.0.0:3161";
-    #     }
-    #   ];
+          # note: need to do some firewall stuff for handshake to work, see:
+          # https://discourse.nixos.org/t/solved-minimal-firewall-setup-for-wireguard-client/7577
+          endpoint = "0.0.0.0:3161";
+        }
+      ];
 
-    #   # we need to set route weights, so do it manually
-    #   allowedIPsAsRoutes = false;
-    #   #postSetup = ''
-    #   #  true
-    #   #'';
-    # };
+      # we need to set route weights, so do it manually
+      allowedIPsAsRoutes = false;
+      #postSetup = ''
+      #  true
+      #'';
+    };
     
-  #};
+  };
 
   #networking.wireless.extraConfig = ''
   #  debug_level=0
@@ -823,7 +823,7 @@
 
   users.users.seiran = {
     uid = 5912;
-    extraGroups = [ "wheel" "video" "sudo" "render" "networkmanager" "docker" "podman" "libvirtd" "wireshark" "lxd" "input" "plugdev" "pipewire" "lp" "scanner" "adbusers" "kvm"];
+    extraGroups = config.users.users.clownpiece.extraGroups;
     isNormalUser = true;
   };
 

@@ -25,6 +25,10 @@
   Domains=~gensokyo.internal
   '';
 
+  security.pki.certificateFiles = [
+    ../etc/certs/gensokyo.internal.ca.pem
+  ];
+
   services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = false;
   services.openssh.settings.PermitRootLogin = "prohibit-password";
