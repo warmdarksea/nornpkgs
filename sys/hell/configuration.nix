@@ -152,6 +152,10 @@
 
   services.resolved.llmnr = "false";
 
+  security.pki.certificateFiles = [
+    ../../etc/certs/gensokyo.internal.ca.pem
+  ];
+
   # Enable the OpenSSH server.
   services.sshd.enable = true;
 

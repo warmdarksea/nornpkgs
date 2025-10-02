@@ -22,7 +22,7 @@
     nix-gensokyo = {
       url = "path:/home/clownpiece/src/nix-gensokyo";
       flake = true;
-      inputs.nixpkgs.follows = "nixpkgs";
+      #inputs.nixpkgs.follows = "nixpkgs";
     };    
 
     # fixup inputs
