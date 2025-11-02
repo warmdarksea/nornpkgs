@@ -93,7 +93,7 @@ reset_build:
 
 .PHONY: pull_remote_sys_closure
 pull_remote_sys_closure:
-	$(eval OUTPUT_PATH := $(shell nix build --dry-run --json .#nixosConfigurations.furnace.config.system.build.toplevel | jq -r '.[].outputs.out'))
+	$(eval OUTPUT_PATH := $(shell nix build --dry-run --json .#nixosConfigurations.$(TARGET).config.system.build.toplevel | jq -r '.[].outputs.out'))
 	@echo "Pulling $(OUTPUT_PATH) from $(HOST)"
 	nix copy --no-check-sigs --from "ssh://root@$(HOST)" "$(OUTPUT_PATH)"
 	rm -f $(BUILD_DIR)/sys-$(TARGET)
@@ -101,7 +101,7 @@ pull_remote_sys_closure:
 
 .PHONY: check_remote_sys_closure
 check_remote_sys_closure:
-	$(eval OUTPUT_PATH := $(shell nix build --dry-run --json .#nixosConfigurations.furnace.config.system.build.toplevel | jq -r '.[].outputs.out'))
+	$(eval OUTPUT_PATH := $(shell nix build --dry-run --json .#nixosConfigurations.$(TARGET).config.system.build.toplevel | jq -r '.[].outputs.out'))
 	ssh "root@$(HOST)" -- ls -d "$(OUTPUT_PATH)"
 
 #

@@ -128,6 +128,11 @@
       fsType = "zfs";
     };
 
+    fileSystems."/srv/log" = {
+      device = "fern/srv/log";
+      fsType = "zfs";
+    };
+
     environment.etc.crypttab = {
       mode = "0600";
       text = ''

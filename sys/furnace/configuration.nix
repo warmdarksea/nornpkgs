@@ -28,12 +28,12 @@ rec {
   networking.useDHCP = lib.mkDefault true;
   #networking.networkmanager.enable = true;
 
-  services.diod = {
-    enable = true;
-    listen = [ "0.0.0.0:564" ];
+  #services.diod = {
+  #  enable = true;
+  #  listen = [ "0.0.0.0:564" ];
 
-    exports = [ "/yet/vid" ];
-  };
+  #  exports = [ "/yet/vid" ];
+  #};
 
   # Set your time zone.
   # time.timeZone = "Europe/Amsterdam";
@@ -53,7 +53,36 @@ rec {
   # Enable the X11 windowing system.
   # services.xserver.enable = true;
 
-  
+  services.vector = {
+    enable = true;
+    journaldAccess = true;  # Gives Vector permission to read journald
+    
+    settings = {
+      sources.receive = {
+        type = "http_server";
+        address = "0.0.0.0:9081";
+      };
+
+      sources.journald = {
+        type = "journald";
+        current_boot_only = false;
+      };
+
+      sinks.local = {
+        type = "file";
+        inputs = ["journald"];
+        path = "/srv/log/vector/%Y-%m-%d-localhost.log";
+        encoding.codec = "json";
+      };
+      
+      sinks.remote = {
+        type = "file";  # or "socket" to send to another Vector instance
+        inputs = ["receive"];
+        path = "/srv/log/vector/%Y-%m-%d-{{ source_ip }}.log";
+        encoding.codec = "json";  # structured data in text files
+      };
+    };
+  };
   
   virtualisation.docker = {
     enable = true;
@@ -170,7 +199,7 @@ rec {
   # services.openssh.enable = true;
 
   # Open ports in the firewall.
-  networking.firewall.allowedTCPPorts = [ 443 ];
+  networking.firewall.allowedTCPPorts = [ 443 9081 ];
   # networking.firewall.allowedUDPPorts = [ ... ];
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;

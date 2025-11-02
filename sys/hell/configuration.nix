@@ -17,6 +17,7 @@
     #    "libcublas"
     #    "nvtop"
     "vcv-rack"
+    "bitwig-studio-unwrapped" # fixme: i don't actually want this directly in the system derivation... i only want the sandbox launcher in the system derivation
   ]) || (builtins.all (license:
     license.free || builtins.elem license.shortName [
       "CUDA EULA"
@@ -289,6 +290,8 @@
   #networking.firewall.allowedUDPPortRanges = [
   #  { from = 60000; to = 61000; }
   #];
+
+  networking.nftables.enable = true;
 
   services.tailscale.enable = true;
 
@@ -612,14 +615,14 @@
   services.displayManager.sessionPackages = [ pkgs.sway ];
   # services.dbus.enable = true;
   # xdg.portal = {
-  #   enable = true;
-  #   wlr.enable = true;
-  #   # gtk portal needed to make gtk apps happy
-  #   extraPortals = lib.mkForce [ pkgs.xdg-desktop-portal-gtk pkgs.xdg-desktop-portal-wlr ];
-  # };
+  #  enable = true;
+    #   wlr.enable = true;
+    #   # gtk portal needed to make gtk apps happy
+  #  extraPortals = lib.mkForce [ pkgs.xdg-desktop-portal-gtk pkgs.xdg-desktop-portal-wlr ];
+  #};
 
   # fixes file conflict with some portal-related file
-  xdg.portal.extraPortals = lib.mkForce [ pkgs.xdg-desktop-portal-gtk pkgs.xdg-desktop-portal-wlr ];
+  #xdg.portal.extraPortals = lib.mkForce [ pkgs.xdg-desktop-portal-gtk pkgs.xdg-desktop-portal-wlr ];
   programs.sway = {
     enable = true;
     extraOptions = [
@@ -700,7 +703,11 @@
   };
 
   hardware.nvidia-container-toolkit.enable = true;
-  virtualisation.lxd = {
+  #virtualisation.lxd = {
+  #  enable = true;
+  #  ui.enable = true;
+  #};
+  virtualisation.incus = {
     enable = true;
     ui.enable = true;
   };
@@ -781,6 +788,10 @@
     please-cli
     libsecret
     dconf-editor
+    desktop-file-utils
+    imagemagick
+    graphviz
+    openssl
   ];
 
   services.udev.packages = with pkgs; [ gnome-settings-daemon ];
@@ -800,6 +811,7 @@
     subUidRanges = [
       { startUid = 100000; count = 16777216; }
       { startUid = 4204; count = 1; }
+      { startUid = config.users.users.clownpiece-audio.uid; count = 1; }
     ];
     subGidRanges = [
       { startGid = 100000; count = 16777216; }  # Default range
@@ -807,10 +819,19 @@
       { startGid = config.ids.gids.video; count = 1; }
       { startGid = config.ids.gids.render; count = 1; }
       { startGid = config.users.groups.games.gid; count = 1; }
+      { startGid = config.users.users.clownpiece-audio.uid; count = 1; }
     ];
     extraGroups = [ "magician" "wheel" "audio" "video" "sudo" "render" "networkmanager" "docker" "podman" "libvirtd" "wireshark" "lxd" "input" "games" "plugdev" "pipewire" "lp" "scanner" "adbusers" "kvm"];
     isNormalUser = true;
   };
+
+  users.users.clownpiece-audio = {
+    uid = 3280;
+    group = "clownpiece-audio";
+    extraGroups = [ "audio" "video" "render" "input" "plugdev" "pipewire"];
+    isSystemUser = true;
+  };
+  users.groups.clownpiece-audio.gid = config.users.users.clownpiece-audio.uid;
 
   users.users.flandre = {
     uid = 4204;
