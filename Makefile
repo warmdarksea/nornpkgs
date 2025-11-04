@@ -75,9 +75,6 @@ build_remote_sys_closure:
 	@echo "Derivation path: $(DRV_PATH)"
 	nix copy "$(DRV_PATH)" --to "ssh://root@$(HOST)"
 	ssh "root@$(HOST)" -- systemd-run --uid=0 --property=StandardOutput=journal --property=StandardError=journal --service-type=oneshot --no-block --unit=nixbuild-$(TARGET) -- nix-store --realise "$(DRV_PATH)"
-#	$(eval SOCK_PATH := $(shell ssh "root@$(HOST)" 'mktemp -u /tmp/nixbuild-XXXXXX.sock'))
-#	ssh -t "root@$(HOST)" -- dtach $(DTACH_FLAGS) $(SOCK_PATH) nix-store $(REMOTE_NIX_FLAGS) --realise "$(DRV_PATH)"
-
 
 .PHONY: check_build_logs
 check_build_logs:
@@ -89,7 +86,7 @@ check_build_status:
 
 .PHONY: reset_build
 reset_build:
-	ssh root@magic 'systemctl reset-failed nixbuild-hell'
+	ssh "root@$(HOST)" 'systemctl reset-failed nixbuild-$(TARGET)'
 
 .PHONY: pull_remote_sys_closure
 pull_remote_sys_closure:

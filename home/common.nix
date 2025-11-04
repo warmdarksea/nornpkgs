@@ -127,7 +127,7 @@
       #dmenu
       #gnome.dconf-editor
       #element-desktop-wayland
-      element-desktop
+      #element-desktop
       #      emacs-gtk
       #      emacsPgtk
       # myEmacs
@@ -144,13 +144,15 @@
       #konsole
       #lxappearance
       #filezilla
-      firefox-wayland
+      #firefox-wayland
+      firefox
       #cdrkit
       #cuetools
       flac
       #gedit
       gimp
-      glxinfo
+      #glxinfo
+      mesa-demos
       #gsettings-desktop-schemas
       #gvfs
       #hamster
