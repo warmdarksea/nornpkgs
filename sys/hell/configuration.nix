@@ -382,6 +382,8 @@ in rec {
     graphviz
     openssl
     dtach
+    hunspell
+    hunspellDicts.en_US
   ];
 
   users.groups.magician.gid = 381;
