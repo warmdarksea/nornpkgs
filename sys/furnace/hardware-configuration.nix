@@ -128,6 +128,11 @@
       fsType = "zfs";
     };
 
+    fileSystems."/srv/torrent" = {
+      device = "fern/srv/torrent";
+      fsType = "zfs";
+    };
+
     fileSystems."/srv/log" = {
       device = "fern/srv/log";
       fsType = "zfs";

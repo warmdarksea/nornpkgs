@@ -175,6 +175,13 @@ rec {
   };
   users.groups.www-nextcloud.gid = users.users.www-nextcloud.uid;
 
+  users.users.rtorrent = {
+    uid = 4880;
+    group = "rtorrent";
+    isSystemUser = true;
+  };
+  users.groups.rtorrent.gid = users.users.rtorrent.uid;
+
   # programs.firefox.enable = true;
 
   # List packages installed in system profile.
