@@ -40,14 +40,14 @@
     "GLFW_IM_MODULE" = "ibus";
   };
 
-  i18n.inputMethod = {
-    enabled = "fcitx5";
-    fcitx5.addons = with pkgs; [
-      fcitx5-mozc
-      fcitx5-gtk
-    ];
-    #ibus.engines = with pkgs.ibus-engines; [ anthy ];
-  };
+  # i18n.inputMethod = {
+  #   enabled = "fcitx5";
+  #   fcitx5.addons = with pkgs; [
+  #     fcitx5-mozc
+  #     fcitx5-gtk
+  #   ];
+  #   #ibus.engines = with pkgs.ibus-engines; [ anthy ];
+  # };
 
   programs.home-manager.enable = true;
 
@@ -224,10 +224,10 @@
       awscli2
       flarectl
       (pkgs.terraform.withPlugins (p: [
-        p.null
-        p.tls
-        p.aws
-        p.libvirt
+        p.hashicorp_null
+        p.hashicorp_tls
+        p.hashicorp_aws
+        p.dmacvicar_libvirt
       ]))
       git-lfs
       # fixme: haskell lsp demands that these are in $PATH for some bizarre reason
