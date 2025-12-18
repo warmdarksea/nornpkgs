@@ -18,13 +18,13 @@
       #url = "github:nix-community/lanzaboote/pull/487/head";
       inputs = {
         nixpkgs.follows = "nixpkgs";
-        rust-overlay.follows = "rust-overlay";
+      #  rust-overlay.follows = "rust-overlay";
       };
     };
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    #rust-overlay = {
+    #  url = "github:oxalica/rust-overlay";
+    #  inputs.nixpkgs.follows = "nixpkgs";
+    #};
 
     nixpak = {
       url = "github:nixpak/nixpak";
@@ -58,7 +58,8 @@
       url = "path:./sys/furnace";
 
       inputs.nixpkgs.follows = "nixpkgs";
-      inputs.nixos-hardware.follows = "my-nixos-hardware";
+      #inputs.nixos-hardware.follows = "my-nixos-hardware";
+      inputs.lanzaboote.follows = "lanzaboote";
       inputs.nix-gensokyo.follows = ""; # self-reference
     };
 
@@ -77,7 +78,7 @@
 
       inputs.nixpkgs.follows = "nixpkgs";
       #inputs.nixos-hardware.follows = "my-nixos-hardware";
-      inputs.home-manager.follows = "home-manager";
+      #inputs.home-manager.follows = "home-manager";
       inputs.nix-gensokyo.follows = ""; # self-reference
     };
 
