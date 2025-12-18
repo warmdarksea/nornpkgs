@@ -76,6 +76,8 @@ in rec {
     "zfs.zfs_arc_max=2147483648"
     "cgroup_enable=memory"
     "systemd.unified_cgroup_hierarchy=1"
+    # found online, might reduce stuttering?
+    # "amdgpu.preempt_mm=0"
   ];
 
   boot.kernel.sysctl = {
@@ -184,10 +186,10 @@ in rec {
           publicKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
           # for testing
-          allowedIPs = [ "0.0.0.0/32" ];
+          #allowedIPs = [ "0.0.0.0/32" ];
 
           # redacted's DNS server + (all IPs - RFC1918)
-          #allowedIPs = [ "0.0.0.0/32" ] + RFC1918Addresses;
+          allowedIPs = [ "0.0.0.0/32" ] ++ RFC1918Addresses;
 
           # note: need to do some firewall stuff for handshake to work, see:
           # https://discourse.nixos.org/t/solved-minimal-firewall-setup-for-wireguard-client/7577
@@ -197,11 +199,10 @@ in rec {
 
       # we need to set route weights, so do it manually
       allowedIPsAsRoutes = false;
-      #postSetup = ''
-      #  true
-      #'';
+      postSetup = ''
+        ip route add 0.0.0.0/32 dev wg-redacted
+      '';
     };
-    
   };
 
   security.pki.certificateFiles = [
@@ -225,12 +226,11 @@ in rec {
   powerManagement.enable = true;
   #services.tlp.enable = true;
   services.flatpak.enable = true;
+  
+  services.displayManager.gdm.enable = true;
+  services.desktopManager.gnome.enable = true;
 
-  services.xserver = {
-    enable = true;
-    displayManager.gdm.enable = true;
-    desktopManager.gnome.enable = true;
-  };
+  programs.hyprland.enable = true;
 
   services.displayManager.defaultSession = "gnome";
   services.displayManager.autoLogin = {
@@ -274,10 +274,10 @@ in rec {
     SUBSYSTEM=="input", ATTRS{id/vendor}=="2dc8", ATTRS{id/product}=="6101", SYMLINK+="input/by-id/8bitdo-sn30-pro", MODE="0660", GROUP="games"
   '';
 
-  #services.pcscd.enable = true;
+  services.pcscd.enable = true;
   programs.gnupg.agent = {
-    enable = true;
-    pinentryPackage = pkgs.pinentry-gnome3;
+   enable = true;
+   pinentryPackage = pkgs.pinentry-gnome3;
   };
 
   # fixme: package windows fonts, maybe...?
