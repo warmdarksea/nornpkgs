@@ -201,7 +201,7 @@
       signal-desktop
     ];
     dev_pkgs = with pkgs; [
-      aliyun-cli
+      # aliyun-cli
       cloc
       colordiff
       #    coq

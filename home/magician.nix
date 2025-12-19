@@ -184,10 +184,10 @@
     };
 
   bitwig-studio6 = pkgs.bitwig-studio5-unwrapped.overrideAttrs (old: rec {
-    version="6.0 Beta 5";
+    version="6.0 Beta 11";
     src = pkgs.fetchurl {
-      url = "https://www.bitwig.com/dl/Bitwig%20Studio/6.0%20Beta%205/installer_linux/bitwig-studio-6.0-beta-5.deb";
-      sha256 = "sha256-v0ONhknzBrBlK99JeJ5DZuHvG19I0iaw04iM/mO7j+8=";
+      url = "https://www.bitwig.com/dl/Bitwig%20Studio/6.0%20Beta%2011/installer_linux/bitwig-studio-6.0-beta-11.deb";
+      sha256 = "03iy8mx4k8xxf0n86fyrn7br82gw69cg1xq0x240x8rmc9qkbav1";
     };
   });
 
