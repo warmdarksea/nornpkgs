@@ -84,6 +84,8 @@ in rec {
     "vm.min_free_kbytes" = 524288;
   };
 
+  boot.blacklistedKernelModules = [ "dvb_usb_rtl28xxu" ];
+
   system.nixos.tags = [ "lts-kernel" ];
   boot.kernelPackages = pkgs.linuxPackages;
   # at the time of writing, this is equal to zfs_unstable
@@ -98,6 +100,7 @@ in rec {
 
   hardware.bluetooth.enable = true;
   hardware.sensor.iio.enable = true;
+  hardware.rtl-sdr.enable = true;
   hardware.nvidia = {
     package = config.boot.kernelPackages.nvidiaPackages.beta;
     prime.amdgpuBusId = "PCI:1:0:0";
@@ -384,6 +387,8 @@ in rec {
     dtach
     hunspell
     hunspellDicts.en_US
+    rtl-sdr
+    gqrx
   ];
 
   users.groups.magician.gid = 381;
