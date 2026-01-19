@@ -256,7 +256,7 @@
       ghidra
       wl-clipboard
       retroarch-free
-      prismlauncher
+      #prismlauncher
     ];
     shell_scripts = with pkgs; [
       (writeShellScriptBin "mktemp_home" (builtins.readFile "${dotfiles}/bin/mktemp_home.sh"))
