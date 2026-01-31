@@ -38,9 +38,41 @@
   fileSystems."/home" =
     { device = "bell/home";
       fsType = "zfs";
+      options = [ "nofail" ];
     };
 
-    # bell/userdata is ZFS-managed, so not recorded here.
+
+  fileSystems."/home/clownpiece" =
+    { device = "bell/home/clownpiece";
+      fsType = "zfs";
+      options = [ "nofail" ];
+    };
+
+  fileSystems."/home/clownpiece/.cache" =
+    { device = "bell/home/clownpiece/cache";
+      fsType = "zfs";
+      options = [ "nofail" ];
+    };
+
+  fileSystems."/home/clownpiece/Pictures/hydrus" =
+    { device = "bell/home/clownpiece/hydrus";
+      fsType = "zfs";
+      options = [ "noauto" "nofail" ];
+    };
+
+  fileSystems."/home/clownpiece/.local/secrets" =
+    { device = "bell/home/clownpiece/secrets";
+      fsType = "zfs";
+      options = [ "nofail" ];
+    };
+
+  fileSystems."/home/clownpiece/.local/opt/steamapps" =
+    { device = "bell/home/clownpiece/steamapps";
+      fsType = "zfs";
+      options = [ "nofail" ];
+    };
+
+  # bell/userdata is ZFS-managed, so not recorded here.
 
     swapDevices = [
       {
