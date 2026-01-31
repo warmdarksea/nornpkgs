@@ -272,6 +272,28 @@
         "type": "github"
       }
     },
+    "flake-parts_5": {
+      "inputs": {
+        "nixpkgs-lib": [
+          "nornpkgs",
+          "nixpak",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1765835352,
+        "narHash": "sha256-XswHlK/Qtjasvhd1nOa1e8MgZ8GS//jBoTqWtrS1Giw=",
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "rev": "a34fae9c08a15ad73f295041fec82323541400a9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "type": "github"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -457,6 +479,33 @@
         "owner": "hercules-ci",
         "repo": "hercules-ci-effects",
         "rev": "b0585849abe7d02a774a853f7952d07bb910fd9e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hercules-ci",
+        "repo": "hercules-ci-effects",
+        "type": "github"
+      }
+    },
+    "hercules-ci-effects_2": {
+      "inputs": {
+        "flake-parts": [
+          "nornpkgs",
+          "nixpak",
+          "flake-parts"
+        ],
+        "nixpkgs": [
+          "nornpkgs",
+          "nixpak",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1765774562,
+        "narHash": "sha256-UQhfCggNGDc7eam+EittlYmeW89CZVT1KkFIHZWBH7k=",
+        "owner": "hercules-ci",
+        "repo": "hercules-ci-effects",
+        "rev": "edcbb19948b6caf1700434e369fde6ff9e6a3c93",
         "type": "github"
       },
       "original": {
@@ -723,6 +772,29 @@
         "type": "github"
       }
     },
+    "nixpak_2": {
+      "inputs": {
+        "flake-parts": "flake-parts_5",
+        "hercules-ci-effects": "hercules-ci-effects_2",
+        "nixpkgs": [
+          "nornpkgs",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1767234689,
+        "narHash": "sha256-b44HZf+3NbRvxH3rXtjLNTW3ojAXn172iygCcJr6NhA=",
+        "owner": "nixpak",
+        "repo": "nixpak",
+        "rev": "ff179ec0158164037ee9036f93c081de6a8bf949",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixpak",
+        "repo": "nixpak",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1765779637,
@@ -801,6 +873,24 @@
         "ref": "nixos-24.05",
         "repo": "nixpkgs",
         "type": "github"
+      }
+    },
+    "nornpkgs": {
+      "inputs": {
+        "nixpak": "nixpak_2",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1768857851,
+        "narHash": "sha256-kqiyUGoeMYWN5MrP406nVrO+8CtBWEsE5qPnlNsMuRU=",
+        "path": "/home/clownpiece/src/nornpkgs",
+        "type": "path"
+      },
+      "original": {
+        "path": "/home/clownpiece/src/nornpkgs",
+        "type": "path"
       }
     },
     "pre-commit": {
@@ -930,7 +1020,8 @@
         "my-nixpkgs": "my-nixpkgs",
         "nixos-hardware": "nixos-hardware",
         "nixpak": "nixpak",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "nornpkgs": "nornpkgs"
       }
     },
     "rust-overlay": {

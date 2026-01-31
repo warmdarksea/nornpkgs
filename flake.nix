@@ -37,6 +37,11 @@
       flake = false;
     };
 
+    nornpkgs = {
+      url = "path:/home/clownpiece/src/nornpkgs";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # systems
     abandonedfactory = {
       url = "path:./sys/abandonedfactory";
@@ -117,6 +122,7 @@
   nixpak,
 
   gensokyo-dotfiles,
+  nornpkgs,
               
   abandonedfactory,
   cheese,
@@ -162,6 +168,7 @@
       _module.args = {
         dotfiles = gensokyo-dotfiles;
         nixpak = nixpak;
+        nornpkgs = nornpkgs;
       };
     };
 
