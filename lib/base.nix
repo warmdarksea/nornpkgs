@@ -19,11 +19,13 @@
   networking.domain = "gensokyo.internal";
 
   services.resolved.enable = true;
-  services.resolved.extraConfig = ''
-  [Resolve]
-  DNS=0.0.0.0
-  Domains=~gensokyo.internal
-  '';
+  #services.resolved.extraConfig = ''
+  #[Resolve]
+  #DNS=0.0.0.0
+  #Domains=~gensokyo.internal
+  #'';
+  services.resolved.settings.Resolve.DNS = [ "0.0.0.0" ];
+  services.resolved.settings.Resolve.Domains = [ "~gensokyo.internal" ];
 
   security.pki.certificateFiles = [
     ../etc/certs/gensokyo.internal.ca.pem

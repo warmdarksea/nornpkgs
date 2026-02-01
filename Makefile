@@ -71,7 +71,7 @@ build_iso: $(BUILD_DIR)/iso-$(ISO_FLAVOR)
 
 .PHONY: build_remote_sys_closure
 build_remote_sys_closure:
-	$(eval DRV_PATH := $(shell nix build --dry-run --json .#nixosConfigurations.$(TARGET).config.system.build.toplevel | jq -r '.[].drvPath' | tail -n1))
+	$(eval DRV_PATH := $(shell NIXPKGS_ALLOW_UNFREE=$$NIXPKGS_ALLOW_UNFREE nix build $(NIX_FLAGS) --dry-run --json .#nixosConfigurations.$(TARGET).config.system.build.toplevel | jq -r '.[].drvPath' | tail -n1))
 	@echo "Derivation path: $(DRV_PATH)"
 	nix copy "$(DRV_PATH)" --to "ssh://root@$(HOST)"
 	ssh "root@$(HOST)" -- systemd-run --uid=0 --property=StandardOutput=journal --property=StandardError=journal --service-type=oneshot --no-block --unit=nixbuild-$(TARGET) -- nix-store --realise "$(DRV_PATH)"
