@@ -4,7 +4,7 @@
     "vcv-rack"
     # fixme: i don't actually want this directly in the system derivation... i
     # only want the sandbox launcher in the system derivation
-    "bitwig-studio-unwrapped" 
+    "bitwig-studio-unwrapped"
   ];
 
   # fixme: is there really no clean way to modularize this
@@ -207,6 +207,12 @@ in rec {
     };
   };
 
+  #i18n.supportedLocales = [
+  #  "en_US.UTF-8/UTF-8"
+  #  "ja_JP.UTF-8/UTF-8"
+  #  "ja_JP.SJIS"
+  #];
+
   security.pki.certificateFiles = [
     ../../etc/certs/gensokyo.internal.ca.pem
   ];
@@ -222,7 +228,7 @@ in rec {
     drivers = [pkgs.hplip pkgs.brlaser];
   };
   
-  programs.adb.enable = true;
+  #programs.adb.enable = true;
   programs.wireshark.enable = true;
   #services.fprintd.enable = lib.mkForce false;
   powerManagement.enable = true;
@@ -390,6 +396,7 @@ in rec {
     gqrx
     element
     element-desktop
+    android-tools
   ];
 
   users.groups.magician.gid = 381;

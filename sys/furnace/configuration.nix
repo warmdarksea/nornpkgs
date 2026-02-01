@@ -107,13 +107,13 @@ in rec {
   #  ];
   # ipv4.routes = [ {options.scope = "link";} ];
 
-   ipv4.routes = [
-     {
-       address = "0.0.0.0";
-       prefixLength = 16;
-       options.table = "rt_redacted";
-     }
-   ];
+   # ipv4.routes = [
+   #   {
+   #     address = "0.0.0.0";
+   #     prefixLength = 16;
+   #     options.table = "rt_redacted";
+   #   }
+   # ];
 
   networking.wireguard.interfaces = {
     wg-redacted = {
