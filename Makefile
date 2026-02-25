@@ -1,4 +1,5 @@
 # ---------- Config ----------
+ARCH := x86_64-linux
 FORMAT        ?= qcow2
 VM_NAME       := nixvm
 SSH_USER      := admin
@@ -10,17 +11,12 @@ POOL_DIR      := $(STATE_DIR)/pool
 LIBVIRT_URI   := qemu:///system
 LIBVIRT_FLAGS := -c $(LIBVIRT_URI)
 
+LIBVIRT_HOST  := ldtest.hell.gensokyo.internal
+
 # Tofu variables
 TOFU_VARS := -var="libvirt_uri=$(LIBVIRT_URI)" \
              -var="pool_path=$(abspath $(POOL_DIR))"
 TOFU_FLAGS := $(TOFU_VARS) -state=$(STATE_DIR)/terraform.tfstate
-
-# ---------- Build Targets ----------
-BASE_DRV_PATH  := $(BUILD_DIR)/base
-VM_DRV_PATH    := $(BUILD_DIR)/vm
-QCOW2_DRV_PATH := $(BUILD_DIR)/qcow2
-AMI_DRV_PATH   := $(BUILD_DIR)/amazon
-GCE_DRV_PATH   := $(BUILD_DIR)/gce
 
 .PHONY: help init plan deploy destroy start stop restart status ssh clean clean-state nuke
 
@@ -42,73 +38,87 @@ $(POOL_DIR):
 
 # 
 
-$(BASE_DRV_PATH): flake.nix | $(BUILD_DIR)
-	nix build .#nixosConfigurations.tercha.config.system.build.toplevel -o $@
+$(BUILD_DIR)/bootstrap-drv: flake.nix | $(BUILD_DIR)
+	nix build .#nixosConfigurations.bootstrap.config.system.build.toplevel -o $@
 
-$(VM_DRV_PATH): flake.nix | $(BUILD_DIR)
-	nix build .#nixosConfigurations.oplawn.config.system.build.toplevel -o $@
+$(BUILD_DIR)/live-drv: flake.nix | $(BUILD_DIR)
+	nix build .#nixosConfigurations.live.config.system.build.toplevel -o $@
 
-$(QCOW2_DRV_PATH): flake.nix | $(BUILD_DIR)
-	nix build .#qcow2 -o $@
+$(BUILD_DIR)/libvirt-bootstrap-drv: flake.nix | $(BUILD_DIR)
+	nix build .#nixosConfigurations.libvirt-bootstrap.config.system.build.toplevel -o $@
 
-$(AMI_DRV_PATH): flake.nix | $(BUILD_DIR)
-	nix build .#amazon -o $@
+$(BUILD_DIR)/libvirt-bootstrap-qcow2: flake.nix | $(BUILD_DIR)
+	nix build .#nixosConfigurations.libvirt-bootstrap.config.system.build.images.qemu -o $@
 
-$(GCE_DRV_PATH): flake.nix | $(BUILD_DIR)
-	nix build .#gce -o $@
+$(BUILD_DIR)/libvirt-live-drv: flake.nix | $(BUILD_DIR)
+	nix build .#nixosConfigurations.libvirt-live.config.system.build.toplevel -o $@
 
-# $(OPLAWN): flake.nix
-# 	@echo "==> Building oplawn..."
-# 	@mkdir -p $(BUILD_DIR)
-# 	nix build .#nixosConfigurations.oplawn.config.system.build.toplevel -o $@
-# 	@echo "==> System: $$(readlink -f $@)/"
-# 	@ls -lh $@/
+$(BUILD_DIR)/oci-bootstrap-drv: flake.nix | $(BUILD_DIR)
+	nix build .#nixosConfigurations.oci-bootstrap.config.system.build.toplevel -o $@
 
-# $(QCOW2): flake.nix
-# 	@echo "==> Building qcow2 image..."
-# 	@mkdir -p $(BUILD_DIR)
-# 	nix build .#qcow2 -o $@
-# 	@echo "==> Image: $$(readlink -f $@)/"
-# 	@ls -lh $@/
+$(BUILD_DIR)/oci-bootstrap-qcow2: flake.nix | $(BUILD_DIR)
+	nix build .#nixosConfigurations.oci-bootstrap.config.system.build.images.qemu-efi -o $@
 
-# $(AMAZON): flake.nix
-# 	@echo "==> Building Amazon image..."
-# 	@mkdir -p $(BUILD_DIR)
-# 	nix build .#amazon -o $@
-# 	@echo "==> Image: $$(readlink -f $@)/"
-# 	@ls -lh $@/
+$(BUILD_DIR)/oci-live-drv: flake.nix | $(BUILD_DIR)
+	nix build .#nixosConfigurations.oci-live.config.system.build.toplevel -o $@
 
-# $(GCE): flake.nix
-# 	@echo "==> Building GCE image..."
-# 	@mkdir -p $(BUILD_DIR)
-# 	nix build .#gce -o $@
-# 	@echo "==> Image: $$(readlink -f $@)/"
-# 	@ls -lh $@/
+#
 
-# Convenience phony targets
-.PHONY: base vm qcow2 amazon gce
-base: $(BASE_DRV_PATH)   ## Build tercha (base system derivation)
-vm: $(VM_DRV_PATH)   ## Build oplawn (full system with boot/filesystem)
-qcow2: $(QCOW2_DRV_PATH)     ## Build qcow2 image (libvirt/KVM)
-amazon: $(AMAZON_DRV_PATH)   ## Build Amazon AMI image
-gce: $(GCE_DRV_PATH)         ## Build GCE image
+libvirt_plan_bootstrap: $(BUILD_DIR)/libvirt-bootstrap-qcow2 | $(STATE_DIR)
+	$(TOFU) plan $(TOFU_FLAGS) -var=bootstrap_img_path=$(realpath $(wildcard $</*.qcow2))
+
+libvirt_deploy_bootstrap: $(BUILD_DIR)/libvirt-bootstrap-qcow2 | $(STATE_DIR)
+	$(TOFU) apply $(TOFU_FLAGS) -var=bootstrap_img_path=$(realpath $(wildcard $</*.qcow2))
+
+#libvirt_plan_live: $(BUILD_DIR)/libvirt-live-drv | $(STATE_DIR)
+#	$(TOFU) plan $(TOFU_FLAGS) -var=disk_img_path=$(realpath $(wildcard $</*.qcow2))
+
+libvirt_deploy_live: $(BUILD_DIR)/libvirt-live-drv
+	nix-copy-closure $(LIBVIRT_HOST) "$(realpath $<)"
+	ssh $(LIBVIRT_HOST) "$(realpath $<)/bin/switch-to-configuration switch && nix-collect-garbage -d"
+
+libvirt_destroy:
+	$(TOFU) destroy $(TOFU_FLAGS)
+
+# static content
+
+$(BUILD_DIR)/akkoma-fe-drv: flake.nix | $(BUILD_DIR)
+	nix build .#packages.$(ARCH).akkoma-fe -o $@
+
+$(BUILD_DIR)/akkoma-fe: $(BUILD_DIR)/akkoma-fe-drv \
+			config/akkoma-fe.config.json \
+			config/akkoma-fe.local.json | $(BUILD_DIR)
+	mkdir -p $@
+	cp -Rpv $(BUILD_DIR)/akkoma-fe-drv/. $@
+	chmod -R 755 $@
+	cp -pv config/akkoma-fe.config.json $@/static/config.json
+
+deploy_akkoma_fe: $(BUILD_DIR)/akkoma-fe
+	wrangler pages deploy $< --project-name=akkoma-fe
+
+#
+
+deploy_prod:
+	$(TOFU) plan
+
+# dns
 
 # ---------- Tofu / Infra (libvirt) ----------
-init: ## Initialize OpenTofu
-	$(TOFU) init
+#init: ## Initialize OpenTofu
+#	$(TOFU) init
 
 plan: $(QCOW2_DRV_PATH) | $(STATE_DIR) $(POOL_DIR) ## Plan libvirt deployment
 	$(TOFU) plan $(TOFU_FLAGS) -var=disk_image_path=$(abspath $(QCOW2_DRV_PATH)/nixos.qcow2)
 
 deploy: $(QCOW2_DRV_PATH) | $(STATE_DIR) $(POOL_DIR) ## Build qcow2 + deploy VM via OpenTofu
-	$(TOFU) apply -auto-approve $(TOFU_FLAGS) -var=disk_image_path=$(abspath $(QCOW2_DRV_PATH)/nixos.qcow2)
+	$(TOFU) apply $(TOFU_FLAGS) -var=disk_image_path=$(abspath $(QCOW2_DRV_PATH)/nixos.qcow2)
 
 # ---------- VM Lifecycle (libvirt) ----------
 start: ## Start the VM
 	virsh $(LIBVIRT_FLAGS) start $(VM_NAME)
 
 stop: ## Gracefully stop the VM
-	virsh $(LIBVIRT_FLAGS) shutdown $(VM_NAME)
+	virsh $(LIBVIRT_FLAGS) destroy $(VM_NAME)
 
 restart: stop ## Restart the VM
 	@echo "Waiting for shutdown..."

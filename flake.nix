@@ -8,60 +8,15 @@
   outputs = { self, nixpkgs, ... }:
     let
       system = "x86_64-linux";
+      pkgs = nixpkgs.legacyPackages.${system};
+      lib = pkgs.lib;
 
-      # ---------------------------------------------------------------
-      # tercha - Core system derivation (base config, users, services)
-      # ---------------------------------------------------------------
-      tercha = { config, pkgs, lib, ... }: {
-        # --- Networking ---
-        networking = {
-          hostName = "nixvm";
-          useDHCP = true;
-          firewall = {
-            enable = true;
-            allowedTCPPorts = [ 22 ];
-          };
+      bootstrap-module = {
+        networking.firewall = {
+          enable = true;
+          allowedTCPPorts = [ 22 ];
         };
 
-        # --- Packages ---
-        environment.systemPackages = with pkgs; [
-          vim
-          htop
-          curl
-          git
-          tmux
-        ];
-
-        # --- Locale / Time ---
-        time.timeZone = "America/New_York";
-        i18n.defaultLocale = "en_US.UTF-8";
-
-        # --- Nix settings ---
-        nix = {
-          settings = {
-            experimental-features = [ "nix-command" "flakes" ];
-            auto-optimise-store = true;
-          };
-          gc = {
-            automatic = true;
-            dates = "weekly";
-            options = "--delete-older-than 30d";
-          };
-        };
-
-        # --- Users ---
-        users.users.admin = {
-          isNormalUser = true;
-          extraGroups = [ "wheel" ];
-          openssh.authorizedKeys.keys = [
-            # TODO: add your SSH public key(s) here
-            # "ssh-ed25519 AAAA..."
-          ];
-        };
-
-        security.sudo.wheelNeedsPassword = false;
-
-        # --- Services ---
         services.openssh = {
           enable = true;
           settings = {
@@ -69,111 +24,229 @@
             PasswordAuthentication = false;
             KbdInteractiveAuthentication = false;
           };
-          extraConfig = ''
-            AllowAgentForwarding no
-            AllowTcpForwarding yes
-            X11Forwarding no
-          '';
         };
+
+        users.users.root.openssh.authorizedKeys.keys = [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA redacted"
+        ];
+
+        # lets us build this derivation standalone
+        boot.isContainer = lib.mkDefault true;
 
         system.stateVersion = "24.11";
       };
 
-      # ---------------------------------------------------------------
-      # oplawn - System with boot/filesystem (includes tercha)
-      # ---------------------------------------------------------------
-      oplawn = { modulesPath, ... }: {
-        imports = [
-          tercha
-          (modulesPath + "/profiles/qemu-guest.nix")
-        ];
+      live-module = {
+        services.postgresql = {
+          enable = true;
+          package = pkgs.postgresql_18;
+          #ensureDatabases = [ "test" ];
+          #ensureUsers = [
+          #  {
+          #    name = "test";
+          #    ensureDBOwnership = true;
+          #  }
+          #];
+        };
 
-        boot.loader.grub = {
+        services.nginx = {
+          enable = true;
+          virtualHosts."akkoma" = {
+            listen = [{ addr = "0.0.0.0"; port = 80; }];
+            locations."/" = {
+              return = ''200 "it works\n"'';
+              extraConfig = ''
+                default_type text/plain;
+              '';
+            };
+          };
+        };
+
+        services.akkoma = {
+          enable = true;
+
+          config = {
+            ":pleroma" = {
+              ":instance" = {
+                name = "My Akkoma instance";
+                description = "More detailed description";
+                email = "admin@example.com";
+                registration_open = false;
+              };
+
+              "Pleroma.Web.Endpoint" = {
+                url.host = "ap.ldtest.hell.gensokyo.internal";
+              };
+              "Pleroma.Upload".base_url = "lddn0.ldtest.hell.gensokyo.internal";
+            };
+          };
+        };
+
+        #services.matrix-synapse = {
+        #  enable = true;
+        #};
+
+        #services.znc = {
+        #  enable = true;
+        #};
+
+        networking.firewall.allowedTCPPorts = [ 80 ];
+      };
+
+      libvirt-module = {
+        system.nixos.label = "libvirt";
+        boot.isContainer = false;
+        boot.initrd.availableKernelModules = [ "virtio_pci" "virtio_blk" "virtio_scsi" ];
+
+        boot.loader.grub = lib.mkForce {
           enable = true;
           device = "/dev/vda";
         };
 
-        fileSystems."/" = {
+        fileSystems."/" = lib.mkForce {
           device = "/dev/vda1";
           fsType = "ext4";
         };
+
+        # QEMU guest agent for IP reporting
+        services.qemuGuest.enable = true;
+
+        networking.interfaces.eth0 = {
+          useDHCP = false;
+          ipv4.addresses = [ {
+            address = "0.0.0.0";
+            prefixLength = 24;
+          } ];
+        };
+        networking.defaultGateway = "0.0.0.0";
+        networking.nameservers = [ "0.0.0.0" ];  # or whatever your DNS is
       };
 
-    in rec
-    {
-      # ---------------------------------------------------------------
-      # Image outputs — build with:
-      #   nix build .#qcow2
-      #   nix build .#amazon
-      #   nix build .#gce
-      # ---------------------------------------------------------------
-      packages.${system} =
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
+      oci-module = {
+        system.nixos.label = "oci";
 
-          # QCOW2 disk image configuration
-          qcow2System = nixpkgs.lib.nixosSystem {
-            inherit system;
-            modules = [
-              oplawn
-              ({ config, lib, pkgs, modulesPath, ... }: {
-                imports = [ (modulesPath + "/profiles/qemu-guest.nix") ];
+        boot.isContainer = lib.mkForce false;
 
-                # Build a disk image
-                system.build.qcow2 = import (modulesPath + "/../lib/make-disk-image.nix") {
-                  inherit lib config pkgs;
-                  diskSize = 8192;
-                  format = "qcow2";
-                  partitionTableType = "legacy";
-                };
-              })
-            ];
-          };
+        # ---------- Boot / kernel ----------
+        # OCI paravirtualized instances use virtio for everything
+        boot.initrd.availableKernelModules = [
+          "virtio_pci"
+          "virtio_blk"
+          "virtio_scsi"
+          "virtio_net"
+          "virtio_mmio"
+        ];
 
-          # Amazon AMI configuration
-          amazonSystem = nixpkgs.lib.nixosSystem {
-            inherit system;
-            modules = [
-              tercha
-              ({ modulesPath, ... }: {
-                imports = [ (modulesPath + "/virtualisation/amazon-image.nix") ];
-                ec2.hvm = true;
-              })
-            ];
-          };
+        # boot.loader.grub = lib.mkForce {
+        #   enable = true;
+        #   # For qcow2 images built by nixos-generators / system.build.images.qemu
+        #   device = "/dev/vda";
+        #   #efiSupport = false;
+        # };
 
-          # GCE image configuration
-          gceSystem = nixpkgs.lib.nixosSystem {
-            inherit system;
-            modules = [
-              tercha
-              ({ modulesPath, ... }: {
-                imports = [ (modulesPath + "/virtualisation/google-compute-image.nix") ];
-              })
-            ];
-          };
+        # fileSystems."/" = lib.mkForce {
+        #   device = "/dev/vda1";
+        #   fsType = "ext4";
+        # };
 
-        in {
-          qcow2   = qcow2System.config.system.build.qcow2;
-          amazon  = amazonSystem.config.system.build.amazonImage;
-          gce     = gceSystem.config.system.build.googleComputeImage;
+        boot.loader.systemd-boot.enable = true;
+        boot.loader.efi.canTouchEfiVariables = false;  # OCI has no NVRAM
+
+        fileSystems."/boot/efi" = lib.mkForce {
+          device = "/dev/vda1";  # ESP partition
+          fsType = "vfat";
         };
 
-      # ---------------------------------------------------------------
-      # nixosConfigurations - for building system derivations
-      # ---------------------------------------------------------------
+        fileSystems."/" = lib.mkForce {
+          device = "/dev/vda2";   # root is now partition 2
+          fsType = "ext4";
+        };
+
+        # ---------- Cloud-init ----------
+        # OCI uses cloud-init to inject SSH keys at launch time.
+        # This is critical — without it you'll have no way to SSH in
+        # unless you bake keys into the image (which you already do,
+        # but cloud-init lets OCI's metadata service work too).
+        services.cloud-init = {
+          enable = true;
+          network.enable = true;
+          settings = {
+            system_info = {
+              distro = "nixos";
+              default_user = {
+                name = "root";
+              };
+            };
+            # OCI metadata endpoint
+            datasource_list = [ "Oracle" "None" ];
+            datasource.Oracle = {};
+          };
+        };
+
+        # ---------- Networking ----------
+        # Let cloud-init / DHCP handle it — OCI VCN assigns IPs via DHCP
+        networking.useDHCP = true;
+        #systemd.network.enable = false;
+        networking.useNetworkd = true;
+
+        # Don't wait forever for a network interface name we don't know yet
+        networking.usePredictableInterfaceNames = true;
+      };
+
+    in rec {
+      packages.${system} = {
+        akkoma-fe = pkgs.akkoma-fe;
+        # akkoma-fe = pkgs.akkoma-fe.overrideAttrs (old: {
+        #   postPatch = (old.postPatch or "") + ''
+        #     cp ${./config/akkoma-fe.local.json} config/local.json
+        #   '';
+        # });
+      };
       nixosConfigurations = {
-        # tercha - base system only (no boot/filesystem)
-        tercha = nixpkgs.lib.nixosSystem {
+        bootstrap = nixpkgs.lib.nixosSystem {
           inherit system;
-          modules = [ tercha ];
+          modules = [ bootstrap-module ];
         };
-
-        # oplawn - full system with boot/filesystem configuration
-        oplawn = nixpkgs.lib.nixosSystem {
+        live = nixpkgs.lib.nixosSystem {
           inherit system;
-          modules = [ oplawn ];
+          modules = [ bootstrap-module live-module ];
         };
+        libvirt-bootstrap = nixpkgs.lib.nixosSystem {
+          inherit system;
+          modules = [ bootstrap-module libvirt-module ];
+        };
+        libvirt-live = nixpkgs.lib.nixosSystem {
+          inherit system;
+          modules = [ bootstrap-module live-module libvirt-module ];
+        };
+        oci-bootstrap = nixpkgs.lib.nixosSystem {
+          inherit system;
+          modules = [ bootstrap-module oci-module ];
+        };
+        oci-live = nixpkgs.lib.nixosSystem {
+          inherit system;
+          modules = [ bootstrap-module live-module oci-module ];
+        };
+      };
+      devShells.${system}.default = pkgs.mkShell {
+        packages = with pkgs; [
+          #aliyun-cli
+          #awscli2
+          #azure-cli
+          libvirt
+          oci-cli
+          wrangler
+          (opentofu.withPlugins (p: [
+            p.hashicorp_null
+            p.hashicorp_tls
+            p.dmacvicar_libvirt
+            #p.hashicorp_aws
+            #p.hashicorp_azurerm
+            #p.aliyun_alicloud
+            p.oracle_oci
+            p.cloudflare_cloudflare
+          ]))
+        ];
       };
     };
 }
