@@ -16,33 +16,212 @@ terraform {
   }
 }
 
-#
+# global variables
+
+variable "my_ip" {
+  type    = string
+  default = "0.0.0.0"
+}
 
 variable "ssh_public_key" {
   type    = string
   default = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA redacted"
 }
 
-# cloudflare
+variable "ssh_private_key_path" {
+  type    = string
+  default = "~/.ssh/id_ed25519"
+}
 
-variable "cloudflare_api_token" {
+#
+# cloudflare
+#
+
+variable "cf_api_token" {
   type      = string
   sensitive = true
   default   = ""
 }
 
-variable "cloudflare_account_id" {
+variable "cf_account_id" {
   type    = string
   default = ""
 }
 
-variable "cloudflare_zone_id" {
+variable "cf_tunnel_secret" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "cf_zone_id_littledevil_club" {
+  type    = string
+  default = ""
+}
+
+variable "cf_zone_id_littledevil_org" {
   type    = string
   default = ""
 }
 
 provider "cloudflare" {
-  api_token = var.cloudflare_api_token
+  api_token = var.cf_api_token
+}
+
+# littledevil.club — www
+resource "cloudflare_pages_project" "www_club" {
+  account_id        = var.cf_account_id
+  name              = "www-littledevil-club"
+  production_branch = "master"
+}
+
+resource "cloudflare_pages_domain" "www_club" {
+  account_id   = var.cf_account_id
+  project_name = cloudflare_pages_project.www_club.name
+  name         = "littledevil.club"
+}
+
+resource "cloudflare_dns_record" "www_club" {
+  zone_id = var.cf_zone_id_littledevil_club
+  name    = "@"
+  content = cloudflare_pages_project.www_club.subdomain
+  type    = "CNAME"
+  proxied = true
+  ttl     = 1  # 1 = automatic when proxied
+}
+
+# littledevil.org — www
+resource "cloudflare_pages_project" "www_org" {
+  account_id        = var.cf_account_id
+  name              = "www-littledevil-org"
+  production_branch = "master"
+}
+
+resource "cloudflare_pages_domain" "www_org" {
+  account_id   = var.cf_account_id
+  project_name = cloudflare_pages_project.www_org.name
+  name         = "littledevil.org"
+}
+
+resource "cloudflare_dns_record" "www_org" {
+  zone_id = var.cf_zone_id_littledevil_org
+  name    = "@"
+  content = cloudflare_pages_project.www_org.subdomain
+  type    = "CNAME"
+  proxied = true
+  ttl     = 1
+}
+
+# akkoma frontend
+resource "cloudflare_pages_project" "akkoma" {
+  account_id        = var.cf_account_id
+  name              = "akkoma-littledevil-club"
+  production_branch = "master"
+}
+
+resource "cloudflare_pages_domain" "akkoma" {
+  account_id   = var.cf_account_id
+  project_name = cloudflare_pages_project.akkoma.name
+  name         = "akkoma.littledevil.club"
+}
+
+resource "cloudflare_dns_record" "akkoma" {
+  zone_id = var.cf_zone_id_littledevil_club
+  name    = "akkoma"
+  content = cloudflare_pages_project.akkoma.subdomain
+  type    = "CNAME"
+  proxied = true
+  ttl     = 1
+}
+
+# worker that proxies /api, /oauth, /nodeinfo to the akkoma backend
+# while letting pages handle everything else (the frontend)
+resource "cloudflare_workers_script" "akkoma_proxy" {
+  account_id     = var.cf_account_id
+  script_name    = "akkoma-api-proxy"
+  content_file   = "${path.module}/cf/workers/akkoma-proxy.js"
+  content_sha256 = filesha256("${path.module}/cf/workers/akkoma-proxy.js")
+  main_module    = "akkoma-proxy.js"
+
+  bindings = [{
+    name = "BACKEND_ORIGIN"
+    text = "https://ap.littledevil.club"
+    type = "plain_text"
+  }]
+}
+
+resource "cloudflare_workers_route" "akkoma_api" {
+  zone_id = var.cf_zone_id_littledevil_club
+  pattern = "akkoma.littledevil.club/api/*"
+  script  = cloudflare_workers_script.akkoma_proxy.script_name
+}
+
+resource "cloudflare_workers_route" "akkoma_oauth" {
+  zone_id = var.cf_zone_id_littledevil_club
+  pattern = "akkoma.littledevil.club/oauth/*"
+  script  = cloudflare_workers_script.akkoma_proxy.script_name
+}
+
+resource "cloudflare_workers_route" "akkoma_nodeinfo" {
+  zone_id = var.cf_zone_id_littledevil_club
+  pattern = "akkoma.littledevil.club/nodeinfo/*"
+  script  = cloudflare_workers_script.akkoma_proxy.script_name
+}
+
+# backend
+resource "cloudflare_dns_record" "backend" {
+  zone_id = var.cf_zone_id_littledevil_club
+  name    = "ap"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.prod.id}.cfargotunnel.com"
+  type    = "CNAME"
+  proxied = true
+  ttl     = 1
+}
+
+# tunnel
+resource "cloudflare_zero_trust_tunnel_cloudflared" "prod" {
+  account_id    = var.cf_account_id
+  name          = "littledevil-prod"
+  config_src    = "cloudflare"
+  tunnel_secret = var.cf_tunnel_secret
+}
+
+resource "cloudflare_zero_trust_tunnel_cloudflared_config" "prod" {
+  account_id = var.cf_account_id
+  tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.prod.id
+
+  config = {
+    ingress = [
+      {
+        hostname = "ap.littledevil.club"
+        service  = "http://localhost:4000"
+      },
+      {
+        service = "http_status:404"
+      }
+    ]
+  }
+}
+
+# r2 bucket for uploads
+resource "cloudflare_r2_bucket" "prod_upload" {
+  account_id = var.cf_account_id
+  name       = "littledevil-prod1"
+  location   = "ENAM"  # or whatever's closest to your server
+}
+
+resource "cloudflare_r2_custom_domain" "prod_upload" {
+  account_id  = var.cf_account_id
+  bucket_name = cloudflare_r2_bucket.prod_upload.name
+  domain      = "lddn3.littledevil.org"
+  zone_id     = var.cf_zone_id_littledevil_org
+  enabled     = true
+  min_tls     = "1.2"
+}
+
+output "cf_tunnel_id" {
+  value     = cloudflare_zero_trust_tunnel_cloudflared.prod.id
+  sensitive = true
 }
 
 # libvirt
@@ -65,6 +244,18 @@ variable "libvirt_bootstrap_img_path" {
 variable "libvirt_pool_path" {
   type    = string
   default = ""
+}
+
+variable "libvirt_ovmf_code" {
+  type    = string
+  default = "/nix/store/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee-OVMF-202402-fd/FV/OVMF_CODE.fd"
+  description = "Path to OVMF code firmware (should come from nix)"
+}
+
+variable "libvirt_ovmf_vars" {
+  type    = string
+  default = "/nix/store/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee-OVMF-202402-fd/FV/OVMF_VARS.fd"
+  description = "Path to OVMF vars template (should come from nix)"
 }
 
 provider "libvirt" {
@@ -115,6 +306,14 @@ resource "libvirt_domain" "vm" {
   vcpu      = 2
   running   = false
   autostart = false
+
+  # EFI/UEFI firmware for OCI images
+  firmware = var.libvirt_ovmf_code
+
+  nvram {
+    file     = "${var.libvirt_pool_path}/${var.libvirt_vm_name}_VARS.fd"
+    template = var.libvirt_ovmf_vars
+  }
 
   disk {
     volume_id = libvirt_volume.overlay.id
@@ -170,9 +369,19 @@ variable "oci_compartment_ocid" {
   default = ""
 }
 
-variable "oci_bootstrap_image_path" {
+variable "oci_bootstrap_image_store_path" {
   type    = string
-  default = ""
+  default = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-oci-image"
+}
+
+variable "oci_bootstrap_image_file_path" {
+  type    = string
+  default = "nixos-image-oci-x86_64-linux.qcow2"
+}
+
+variable "oci_live_config_store_path" {
+  type    = string
+  default = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 }
 
 provider "oci" {
@@ -211,15 +420,15 @@ resource "oci_objectstorage_bucket" "images" {
   }
 }
 
-resource "oci_objectstorage_object" "bootstrap_qcow2" {
+resource "oci_objectstorage_object" "bootstrap_img_obj" {
   namespace    = data.oci_objectstorage_namespace.ns.namespace
   bucket       = oci_objectstorage_bucket.images.name
-  object       = "bootstrap-oci.qcow2"
-  source       = var.oci_bootstrap_image_path
+  object       = "${var.oci_bootstrap_image_store_path}/${var.oci_bootstrap_image_file_path}"
+  source       = var.oci_bootstrap_image_store_path
   content_type = "application/octet-stream"
 }
 
-resource "oci_core_image" "bootstrap" {
+resource "oci_core_image" "bootstrap_img" {
   compartment_id = var.oci_compartment_ocid
   display_name   = "nixos-bootstrap-oci"
   launch_mode    = "PARAVIRTUALIZED"
@@ -228,7 +437,7 @@ resource "oci_core_image" "bootstrap" {
     source_type       = "objectStorageTuple"
     namespace_name    = data.oci_objectstorage_namespace.ns.namespace
     bucket_name       = oci_objectstorage_bucket.images.name
-    object_name       = oci_objectstorage_object.bootstrap_qcow2.object
+    object_name       = oci_objectstorage_object.bootstrap_img_obj.object
     source_image_type = "QCOW2"
   }
 
@@ -238,6 +447,12 @@ resource "oci_core_image" "bootstrap" {
 
   timeouts {
     create = "45m"
+  }
+
+  lifecycle {
+    replace_triggered_by = [
+      oci_objectstorage_object.bootstrap_img_obj
+    ]
   }
 }
 
@@ -285,7 +500,7 @@ resource "oci_core_security_list" "public_sl" {
   # SSH
   ingress_security_rules {
     protocol  = "6"
-    source    = "0.0.0.0/0"
+    source    = "${var.my_ip}/32"
     stateless = false
     tcp_options {
       min = 22
@@ -294,26 +509,26 @@ resource "oci_core_security_list" "public_sl" {
   }
 
   # HTTP
-  ingress_security_rules {
-    protocol  = "6"
-    source    = "0.0.0.0/0"
-    stateless = false
-    tcp_options {
-      min = 80
-      max = 80
-    }
-  }
+  # ingress_security_rules {
+  #   protocol  = "6"
+  #   source    = "0.0.0.0/0"
+  #   stateless = false
+  #   tcp_options {
+  #     min = 80
+  #     max = 80
+  #   }
+  # }
 
-  # HTTPS
-  ingress_security_rules {
-    protocol  = "6"
-    source    = "0.0.0.0/0"
-    stateless = false
-    tcp_options {
-      min = 443
-      max = 443
-    }
-  }
+  # # HTTPS
+  # ingress_security_rules {
+  #   protocol  = "6"
+  #   source    = "0.0.0.0/0"
+  #   stateless = false
+  #   tcp_options {
+  #     min = 443
+  #     max = 443
+  #   }
+  # }
 
   # ICMP
   ingress_security_rules {
@@ -342,7 +557,15 @@ resource "oci_core_instance" "prod" {
   compartment_id      = var.oci_compartment_ocid
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[1].name
   display_name        = "littledevil-prod"
-  shape               = "VM.Standard.E2.1.Micro"
+  #shape               = "VM.Standard.E2.1.Micro"
+  #shape = "VM.Standard.A1.Flex"
+  #shape               = var.oci_instance_shape
+
+  # --- NEW: required for flex shapes, ignored for fixed shapes ---
+  #shape_config {
+  #  ocpus         = 4
+  #  memory_in_gbs = 24
+  #}
 
   create_vnic_details {
     subnet_id        = oci_core_subnet.public.id
@@ -351,7 +574,7 @@ resource "oci_core_instance" "prod" {
 
   source_details {
     source_type             = "image"
-    source_id               = oci_core_image.bootstrap.id
+    source_id               = oci_core_image.bootstrap_img.id
     boot_volume_size_in_gbs = 50
   }
 
@@ -362,19 +585,121 @@ resource "oci_core_instance" "prod" {
   freeform_tags = {
     "tier" = "always-free"
   }
+
+  # Automatically recreate instance when bootstrap image changes
+  lifecycle {
+    replace_triggered_by = [
+      oci_core_image.bootstrap_img
+    ]
+  }
+
+  # wait for ssh before declaring the resource created
+  provisioner "remote-exec" {
+    connection {
+      type = "ssh"
+      host = self.public_ip
+      user = "root"
+      private_key = file("${var.ssh_private_key_path}")
+    }
+    inline = [ "true" ]
+  }
+}
+
+# volume — never destroy
+resource "oci_core_volume" "prod_data" {
+  compartment_id      = var.oci_compartment_ocid
+  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[1].name
+  display_name        = "littledevil-prod-data"
+  size_in_gbs         = 50
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "oci_core_volume_attachment" "prod_data_conn" {
+  attachment_type = "paravirtualized"
+  instance_id     = oci_core_instance.prod.id
+  volume_id       = oci_core_volume.prod_data.id
+}
+
+output "oci_public_ip" {
+  value = oci_core_instance.prod.public_ip
 }
 
 # build targets
 # terraform modules are stupid and don't really encapsulate anything, so we just
 # use these null resources to refer to everything in a set and build those
 
-resource "null_resource" "prod" {
+resource "null_resource" "oci_prod_bootstrap" {
   depends_on = [
     oci_core_instance.prod
   ]
+
+  triggers = {
+    instance_id = oci_core_instance.prod.id
+  }
 }
 
-resource "null_resource" "test" {
+resource "null_resource" "oci_prod_live" {
+  depends_on = [
+    oci_core_instance.prod,
+    oci_core_volume_attachment.prod_data_conn,
+    cloudflare_pages_project.www_club,
+    cloudflare_pages_domain.www_club,
+    cloudflare_dns_record.www_club,
+    cloudflare_pages_project.www_org,
+    cloudflare_pages_domain.www_org,
+    cloudflare_dns_record.www_org,
+    cloudflare_zero_trust_tunnel_cloudflared.prod,
+    cloudflare_zero_trust_tunnel_cloudflared_config.prod,
+    cloudflare_dns_record.backend,
+    cloudflare_pages_project.akkoma,
+    cloudflare_pages_domain.akkoma,
+    cloudflare_dns_record.akkoma,
+    cloudflare_workers_script.akkoma_proxy,
+    cloudflare_workers_route.akkoma_api,
+    cloudflare_workers_route.akkoma_oauth,
+    cloudflare_workers_route.akkoma_nodeinfo,
+  ]
+  triggers = {
+    deps = join(",", [
+      oci_core_instance.prod.id,
+      oci_core_security_list.public_sl.id,
+      var.oci_live_config_store_path,
+      cloudflare_pages_project.www_club.id,
+      cloudflare_pages_domain.www_club.id,
+      cloudflare_dns_record.www_club.id,
+      cloudflare_pages_project.www_org.id,
+      cloudflare_pages_domain.www_org.id,
+      cloudflare_dns_record.www_org.id,
+      cloudflare_zero_trust_tunnel_cloudflared.prod.id,
+      cloudflare_zero_trust_tunnel_cloudflared_config.prod.id,
+      cloudflare_dns_record.backend.id,
+      cloudflare_r2_custom_domain.prod_upload.domain,
+      cloudflare_pages_project.akkoma.id,
+      cloudflare_pages_domain.akkoma.id,
+      cloudflare_dns_record.akkoma.id,
+      cloudflare_workers_script.akkoma_proxy.id,
+    ])
+  }
+
+  provisioner "local-exec" {
+    command = "nix-copy-closure --to root@${oci_core_instance.prod.public_ip} ${var.oci_live_config_store_path}"
+  }
+
+  provisioner "remote-exec" {
+    connection {
+      type        = "ssh"
+      host        = oci_core_instance.prod.public_ip
+      user        = "root"
+      private_key = file("${var.ssh_private_key_path}")
+    }
+    inline = ["${var.oci_live_config_store_path}/bin/switch-to-configuration switch"]
+  }
+}
+
+resource "null_resource" "libvirt_test" {
   depends_on = [
     libvirt_domain.vm,
   ]
