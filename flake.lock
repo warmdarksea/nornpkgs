@@ -883,8 +883,8 @@
         ]
       },
       "locked": {
-        "lastModified": 1768857851,
-        "narHash": "sha256-kqiyUGoeMYWN5MrP406nVrO+8CtBWEsE5qPnlNsMuRU=",
+        "lastModified": 1770323517,
+        "narHash": "sha256-2fVbSWlus7aWZgiyZ6QAspuP7hhUUHCxAjyW+q74/cA=",
         "path": "/home/clownpiece/src/nornpkgs",
         "type": "path"
       },
