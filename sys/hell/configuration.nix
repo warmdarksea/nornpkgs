@@ -86,6 +86,8 @@ in rec {
 
   boot.blacklistedKernelModules = [ "dvb_usb_rtl28xxu" ];
 
+  boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+
   system.nixos.tags = [ "lts-kernel" ];
   boot.kernelPackages = pkgs.linuxPackages;
   # at the time of writing, this is equal to zfs_unstable
@@ -156,6 +158,19 @@ in rec {
 
   networking.hostName = "hell";
 
+  networking.extraHosts = ''
+    0.0.0.0 ldtest.hell.gensokyo.internal
+    0.0.0.0 iplz.ldtest.hell.gensokyo.internal
+    0.0.0.0 hello.ldtest.hell.gensokyo.internal
+    0.0.0.0 akkoma.ldtest.hell.gensokyo.internal
+    0.0.0.0 synapse.ldtest.hell.gensokyo.internal
+    0.0.0.0 foo.ldtest.hell.gensokyo.internal
+    0.0.0.0 ap.ldtest.hell.gensokyo.internal
+    0.0.0.0 lddn0.ldtest.hell.gensokyo.internal
+    0.0.0.0 lddn1.ldtest.hell.gensokyo.internal
+    0.0.0.0 element.ldtest.hell.gensokyo.internal
+  '';
+
   # some networking notes
   # we will want to use the wgN device with one or possibly multiple network namespaces, but it can only be in one at a time. so instead we keep it in the default namespace and create a bridge, and make veth pairs for each additional network namespace we want to use.
   # we also may not want to have any routing table rules in the default network namespace, because the interface may be for testing or other weird stuff. instead, we... wait, what do we do? it looks like we create a new routing table with the weird "multiple routing table" thingie, in the default netns. why do we need that... can't we just have the routing table in the namespace with the veth pair? what routing even happens in the default network namespace? in fact, i kind of specifically want there to not be any routing for wgN in the default netns, it will conflict with at least one other wgN (for the DNS server)
@@ -166,12 +181,18 @@ in rec {
   networking.nftables.enable = true;
 
   services.tailscale.enable = true;
+  services.tailscale.extraSetFlags = [ "--accept-routes" ];
+  services.tailscale.useRoutingFeatures = "client";
 
   networking.iproute2.enable = true;
   
   # this means we don't need reverse-routes for everything in the routing table
   networking.firewall.checkReversePath = "loose";
   networking.firewall.rejectPackets = true;
+
+  networking.localCommands = ''
+    ip rule add to 0.0.0.0/24 lookup main priority 5200 || true
+  '';
 
   networking.wireguard.interfaces = {
     wg-redacted = {
@@ -397,6 +418,7 @@ in rec {
     element
     element-desktop
     android-tools
+    tor-browser
   ];
 
   users.groups.magician.gid = 381;

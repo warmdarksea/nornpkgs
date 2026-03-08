@@ -223,11 +223,19 @@
       gnumake
       awscli2
       flarectl
-      (pkgs.terraform.withPlugins (p: [
+      # (pkgs.terraform.withPlugins (p: [
+      #   p.hashicorp_null
+      #   p.hashicorp_tls
+      #   p.hashicorp_aws
+      #   p.dmacvicar_libvirt
+      # ]))
+      (pkgs.opentofu.withPlugins (p: [
         p.hashicorp_null
         p.hashicorp_tls
-        p.hashicorp_aws
         p.dmacvicar_libvirt
+        p.hashicorp_aws
+        p.hashicorp_azurerm
+        p.aliyun_alicloud
       ]))
       git-lfs
       # fixme: haskell lsp demands that these are in $PATH for some bizarre reason
@@ -301,7 +309,7 @@
       };
     in epkgs: [
       pkgs.chez
-      pkgs.terraform-ls
+      #pkgs.terraform-ls
       pkgs.haskell-language-server
       pkgs.ghc
       pkgs.llvmPackages_19.clang
@@ -327,6 +335,8 @@
       epkgs.gnuplot-mode
       epkgs.yaml-mode
       (epkgs.callPackage lean4-mode {})
+      epkgs.terraform-mode
+      pkgs.tofu-ls
     ];
 
     # i do not recall what problem this was intended to fix...
