@@ -98,10 +98,10 @@
     };
 
     # fixup/overlay inputs
-    my-nixpkgs = {
-      url = "path:/home/clownpiece/src/nixpkgs";
-      flake = true;
-    };
+    #my-nixpkgs = {
+    #  url = "path:/home/clownpiece/src/nixpkgs";
+    #  flake = true;
+    #};
     my-nixos-hardware = {
       url = "path:/home/clownpiece/src/nixos-hardware";
       flake = true;
@@ -133,7 +133,7 @@
   iso-minimal,
   iso-livecd,
 
-  my-nixpkgs,
+  #my-nixpkgs,
   my-nixos-hardware,
 
   # fixpkgs_foo,
@@ -145,6 +145,10 @@
         # the inheritance relationship
         (self: super: {
           # ...
+        })
+        (final: prev: {
+          # https://github.com/NixOS/nixpkgs/issues/493503
+          guile-zlib = prev.guile-zlib.overrideAttrs { doCheck = false; };
         })
         emacs-overlay.overlays.default
         emacs-overlay.overlays.package
@@ -207,7 +211,7 @@
       ];
     };
 
-    nixosConfigurations.dusk = my-nixpkgs.lib.nixosSystem {
+    nixosConfigurations.dusk = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         lanzaboote.nixosModules.lanzaboote
@@ -237,7 +241,7 @@
     #   ];
     # };
 
-    nixosConfigurations.mausoleum = my-nixpkgs.lib.nixosSystem {
+    nixosConfigurations.mausoleum = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         # lanzaboote.nixosModules.lanzaboote

@@ -96,7 +96,8 @@
       rlwrap
       rsync
       #screenfetch
-      neofetch
+      #neofetch
+      fastfetch
       netcat
       speedtest-cli
       #sqlite

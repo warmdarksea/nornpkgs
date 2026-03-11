@@ -86,7 +86,7 @@ in rec {
 
   boot.blacklistedKernelModules = [ "dvb_usb_rtl28xxu" ];
 
-  boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+  #boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
 
   system.nixos.tags = [ "lts-kernel" ];
   boot.kernelPackages = pkgs.linuxPackages;
