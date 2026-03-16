@@ -5,13 +5,19 @@
     #nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     #nixpkgs.url = "path:/home/clownpiece/src/nixpkgs"
     #nixpkgs.url = "git+file:///workspace/littledevil/nixpkgs";
-    nixpkgs.url = "path:/workspace/nix-vmtools/src/nixpkgs"
+    #nixpkgs.url = "path:/workspace/nix-cross/src/nixpkgs";
+    nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?ref=littledevil-prod";
+    nix-minecraft.url = "github:Infinidoge/nix-minecraft";
   };
 
-  outputs = { self, nixpkgs, ... }:
+  outputs = inputs@{ self, nixpkgs, nix-minecraft, ... }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      crossPkgs = import nixpkgs {
+        localSystem.system = "${system}";
+        crossSystem.system = "aarch64-linux";
+      };
       lib = pkgs.lib;
 
       # bootstrap is for boot volumes and ssh
@@ -47,12 +53,27 @@
         system.stateVersion = "24.11";
       };
 
-      nixosModules.live = {
+      nixosModules.live_test = { config, pkgs, lib, ... }: {
         fileSystems."/data" = {
           device = "/dev/disk/by-label/REDACTED";
           fsType = "ext4";
         };
 
+          services.nginx = {
+            enable = true;
+            virtualHosts."_" = {
+              listen = [{ addr = "0.0.0.0"; port = 4000; }];
+              locations."/" = {
+                return = ''200 "it works\n"'';
+                extraConfig = ''
+                  default_type text/plain;
+                '';     
+              };
+            };
+          };
+      };
+
+      nixosModules.live = { config, pkgs, lib, ... }: {
         services.postgresql = {
           enable = true;
           package = pkgs.postgresql_18;
@@ -64,8 +85,9 @@
           #  }
           #];
           authentication = lib.mkOverride 10 ''
-            local all postgres           peer
-            local all all                scram-sha-256
+            local all postgres          peer
+            local all akkoma            peer
+            local all all               scram-sha-256
             host  all all 0.0.0.0/32  scram-sha-256
             host  all all ::1/128       scram-sha-256
             host  all all 0.0.0.0/0     reject
@@ -108,7 +130,7 @@
           };
         };
 
-        #systemd.services.akkoma-initdb.serviceConfig.User = "postgres";
+        systemd.services.akkoma-initdb.serviceConfig.User = "postgres";
         systemd.services.akkoma-config.serviceConfig = {
           User = "akkoma";
           Group = "akkoma";
@@ -117,8 +139,8 @@
           enable = true;
 
           # workaround: this is kind of broken and i cannot get it to work
-          initDb.enable = false; 
-          #initDb.username = lib.mkForce "postgres";
+          initDb.enable = true; 
+          initDb.username = lib.mkForce "postgres";
           #initDb.password = {
           #  _secret = "/var/secret/akkoma/dbpassword";
           #};
@@ -147,9 +169,10 @@
 
               "Pleroma.Repo" = {
                 adapter = (pkgs.formats.elixirConf { }).lib.mkRaw "Ecto.Adapters.Postgres";
+                socket_dir = "/run/postgresql";
                 username = "akkoma";
                 database = "akkoma";
-                password = { _secret = "/var/secret/akkoma/dbpassword"; };
+                #password = { _secret = "/var/secret/akkoma/dbpassword"; };
               };
 
               "Pleroma.Upload" = {
@@ -203,13 +226,20 @@
         networking.firewall.allowedTCPPorts = [ 80 ];
       };
 
-      nixosModules.prod = let
+      nixosModules.prod = { config, pkgs, lib, ... }: let
         # Your Grafana Cloud Loki user ID (the number, not your email)
         grafanaUser = "1500402";
 
         # Grafana Cloud Loki push endpoint
         lokiEndpoint = "https://logs-prod-042.grafana.net";
       in {
+        fileSystems."/data" = {
+          device = "/dev/disk/by-label/REDACTED";
+          fsType = "ext4";
+        };
+
+        services.postgresql.dataDir = "/data/postgres/postgres${config.services.postgresql.package.psqlSchema}";
+
         services.vector = {
           enable = true;
           journaldAccess = true;
@@ -272,10 +302,37 @@
           authKeyFile = "/var/secret/tailscale/authkey";
         };
 
+        services.minecraft-servers.dataDir = "/data/minecraft";
+
+        systemd.tmpfiles.rules = [
+          #"d /data 0755 root root -"
+          "d ${config.services.postgresql.dataDir} 0750 postgres postgres -"
+          "d /data/akkoma 0750 akkoma akkoma -"
+          "L+ /var/lib/akkoma - - - - /data/akkoma"
+          "d /data/minecraft 0750 minecraft minecraft -"
+        ];
+
         nixpkgs.config.allowUnfree = true;
       };
 
-      nixosModules.libvirt = {
+      nixosModules.minecraft = { config, pkgs, lib, ... }: {
+        #nixpkgs.overlays = [ inputs.nix-minecraft.overlay ];
+        imports = [ nix-minecraft.nixosModules.minecraft-servers ];
+        services.minecraft-servers = {
+          enable = true;
+          eula = true;
+          openFirewall = true;
+          servers.vanilla = {
+            enable = true;
+            jvmOpts = "-Xmx4G -Xms2G";
+
+            # Specify the custom minecraft server package
+            package = nix-minecraft.packages.aarch64-linux.vanilla-server;
+          };
+        };
+      };
+
+      nixosModules.libvirt = { config, pkgs, lib, ... }: {
         system.nixos.label = "libvirt";
         boot.isContainer = false;
         boot.initrd.availableKernelModules = [ "virtio_pci" "virtio_blk" "virtio_scsi" ];
@@ -375,6 +432,7 @@
           { nixpkgs.crossSystem.system = "aarch64-linux"; }
           "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"     
           {
+            oci.efi = lib.mkForce true;
             boot.loader.grub.enable = lib.mkForce false;
             boot.loader.systemd-boot.enable = true;
           }
@@ -410,6 +468,29 @@
         ];
       };
 
+      packages.aarch64.nixosConfigurations.oci-live = nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = [
+          nixosModules.oci
+          nixosModules.live
+          nixosModules.minecraft
+          nixosModules.prod
+          nixosModules.bootstrap
+          {
+            #nixpkgs.buildPlatform = "${system}-linux";
+            #nixpkgs.hostPlatform = "aarch64-linux";
+            nixpkgs.localSystem.system = "${system}";
+            nixpkgs.crossSystem.system = "aarch64-linux";
+          }
+          "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"
+          {            
+            oci.efi = lib.mkForce true;
+            boot.loader.grub.enable = lib.mkForce false;
+            boot.loader.systemd-boot.enable = true;
+          }
+        ];
+      };
+
       # packages.aarch64.nixosConfigurations.base-bootstrap = nixpkgs.lib.nixosSystem {
       #   inherit system;
       #   modules = [
@@ -432,6 +513,27 @@
         #   '';
         # });
         ovmf = pkgs.OVMF.fd;
+      };
+      packages.aarch64-linux = {
+        akkoma-fe = pkgs.akkoma-fe;
+        # akkoma-fe = pkgs.akkoma-fe.overrideAttrs (old: {
+        #   postPatch = (old.postPatch or "") + ''
+        #     cp ${./config/akkoma-fe.local.json} config/local.json
+        #   '';
+        # });
+        ovmf = pkgs.OVMF.fd;
+        erlang = let
+          crossPkgs = import nixpkgs {
+            localSystem.system = "x86_64-linux";
+            crossSystem.system = "aarch64-linux";
+          };
+          erlang = crossPkgs.beamMinimal26Packages.erlang;
+        in erlang;
+        #pkgs.pkgsCross.aarch64-multiplatform.beam.packages.erlang_26.erlang;
+        akkoma = crossPkgs.akkoma;
+        webkit = crossPkgs.gtk3;
+        erlang28 = crossPkgs.erlang;
+        rebar3 = crossPkgs.beamMinimal26Packages.rebar3;
       };
       nixosConfigurations = {
         # bootstrap = nixpkgs.lib.nixosSystem {
@@ -515,6 +617,8 @@
             p.cloudflare_cloudflare
           ]))
         ];
+
+        shellHook = ". secret/credentials.sh";
       };
     };
 }

@@ -369,6 +369,11 @@ variable "oci_compartment_ocid" {
   default = ""
 }
 
+variable "oci_availability_domain" {
+  type    = string
+  default = "cgkF:US-ASHBURN-AD-2"
+}
+
 variable "oci_bootstrap_image_store_path" {
   type    = string
   default = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-oci-image"
@@ -424,14 +429,22 @@ resource "oci_objectstorage_object" "bootstrap_img_obj" {
   namespace    = data.oci_objectstorage_namespace.ns.namespace
   bucket       = oci_objectstorage_bucket.images.name
   object       = "${var.oci_bootstrap_image_store_path}/${var.oci_bootstrap_image_file_path}"
-  source       = var.oci_bootstrap_image_store_path
+  source       = "${var.oci_bootstrap_image_store_path}/${var.oci_bootstrap_image_file_path}"
   content_type = "application/octet-stream"
 }
 
 resource "oci_core_image" "bootstrap_img" {
   compartment_id = var.oci_compartment_ocid
   display_name   = "nixos-bootstrap-oci"
-  launch_mode    = "PARAVIRTUALIZED"
+  launch_mode = "PARAVIRTUALIZED"
+  #launch_mode    = "CUSTOM"
+  # launch_options {
+  #   boot_volume_type = "PARAVIRTUALIZED"
+  #   firmware = "UEFI_64"
+  #   #is_consistent_volume_naming_enabled = false
+  #   network_type = "PARAVIRTUALIZED"
+  #   remote_data_volume_type = "PARAVIRTUALIZED"
+  # }
 
   image_source_details {
     source_type       = "objectStorageTuple"
@@ -454,6 +467,50 @@ resource "oci_core_image" "bootstrap_img" {
       oci_objectstorage_object.bootstrap_img_obj
     ]
   }
+}
+
+data "oci_core_compute_global_image_capability_schemas" "global" {}
+
+data "oci_core_compute_global_image_capability_schemas_versions" "versions" {
+  compute_global_image_capability_schema_id = data.oci_core_compute_global_image_capability_schemas.global.compute_global_image_capability_schemas[0].id
+}
+
+locals {
+  global_schema_id      = data.oci_core_compute_global_image_capability_schemas.global.compute_global_image_capability_schemas[0].id
+  global_schema_version = data.oci_core_compute_global_image_capability_schemas_versions.versions.compute_global_image_capability_schema_versions[0].name
+}
+
+resource "oci_core_compute_image_capability_schema" "bootstrap_uefi" {
+  compartment_id                                      = var.oci_compartment_ocid
+  image_id                                            = oci_core_image.bootstrap_img.id
+  compute_global_image_capability_schema_version_name = local.global_schema_version
+  #compute_global_image_capability_schema_id           = local.global_schema_id
+
+  schema_data = {
+    "Compute.Firmware" = jsonencode({
+      descriptorType = "enumstring"
+      defaultValue   = "UEFI_64"
+      source         = "IMAGE"
+      values         = ["UEFI_64"]
+    })
+  }
+}
+
+# resource "oci_compute_image_capability_schema" "nixos_arm_uefi" {
+#   compartment_id                            = var.compartment_id
+#   image_id                                  = oci_core_image.nixos_arm.id
+#   compute_global_image_capability_schema_version_name = data.oci_compute_global_image_capability_schema.schema.current_version_name
+#   global_image_capability_schema_id         = data.oci_compute_global_image_capability_schema.schema.id
+
+#   schema_data {
+#     # you'll need to check the exact attribute shape here
+#   }
+# }
+
+resource "oci_core_shape_management" "bootstrap_shape" {
+  compartment_id = var.oci_compartment_ocid
+  image_id = oci_core_image.bootstrap_img.id
+  shape_name = "VM.Standard.A1.Flex"
 }
 
 # =============================================================================
@@ -508,6 +565,16 @@ resource "oci_core_security_list" "public_sl" {
     }
   }
 
+  ingress_security_rules {
+    protocol  = "6"
+    source    = "0.0.0.0/0"
+    stateless = false
+    tcp_options {
+      min = 25565
+      max = 25565
+    }
+  }
+
   # HTTP
   # ingress_security_rules {
   #   protocol  = "6"
@@ -555,16 +622,72 @@ resource "oci_core_subnet" "public" {
 
 resource "oci_core_instance" "prod" {
   compartment_id      = var.oci_compartment_ocid
-  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[1].name
+  availability_domain = var.oci_availability_domain
   display_name        = "littledevil-prod"
   #shape               = "VM.Standard.E2.1.Micro"
+  shape = "VM.Standard.A1.Flex"
+  #shape               = var.oci_instance_shape
+
+  # --- NEW: required for flex shapes, ignored for fixed shapes ---
+  shape_config {
+    ocpus         = 4
+    memory_in_gbs = 24
+  }
+
+  create_vnic_details {
+    subnet_id        = oci_core_subnet.public.id
+    assign_public_ip = true
+  }
+
+  source_details {
+    source_type             = "image"
+    source_id               = oci_core_image.bootstrap_img.id
+    boot_volume_size_in_gbs = 50
+  }
+
+  metadata = {
+    ssh_authorized_keys = var.ssh_public_key
+  }
+
+  freeform_tags = {
+    "tier" = "always-free"
+  }
+
+  # Automatically recreate instance when bootstrap image changes
+  lifecycle {
+    replace_triggered_by = [
+      oci_core_image.bootstrap_img
+    ]
+  }
+
+  depends_on = [
+    oci_core_shape_management.bootstrap_shape
+  ]
+
+  # wait for ssh before declaring the resource created
+  provisioner "remote-exec" {
+    connection {
+      type = "ssh"
+      host = self.public_ip
+      user = "root"
+      private_key = file("${var.ssh_private_key_path}")
+    }
+    inline = [ "true" ]
+  }
+}
+
+resource "oci_core_instance" "staging" {
+  compartment_id      = var.oci_compartment_ocid
+  availability_domain = var.oci_availability_domain
+  display_name        = "littledevil-staging"
+  shape               = "VM.Standard.E2.1.Micro"
   #shape = "VM.Standard.A1.Flex"
   #shape               = var.oci_instance_shape
 
   # --- NEW: required for flex shapes, ignored for fixed shapes ---
   #shape_config {
-  #  ocpus         = 4
-  #  memory_in_gbs = 24
+  #  ocpus         = 1
+  #  memory_in_gbs = 6
   #}
 
   create_vnic_details {
@@ -593,6 +716,10 @@ resource "oci_core_instance" "prod" {
     ]
   }
 
+  depends_on = [
+    oci_core_shape_management.bootstrap_shape
+  ]
+
   # wait for ssh before declaring the resource created
   provisioner "remote-exec" {
     connection {
@@ -608,7 +735,7 @@ resource "oci_core_instance" "prod" {
 # volume — never destroy
 resource "oci_core_volume" "prod_data" {
   compartment_id      = var.oci_compartment_ocid
-  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[1].name
+  availability_domain = var.oci_availability_domain
   display_name        = "littledevil-prod-data"
   size_in_gbs         = 50
 
@@ -638,6 +765,8 @@ resource "null_resource" "oci_prod_bootstrap" {
 
   triggers = {
     instance_id = oci_core_instance.prod.id
+    shape_id = oci_core_shape_management.bootstrap_shape.id
+    image_schema_id = oci_core_compute_image_capability_schema.bootstrap_uefi.id
   }
 }
 
@@ -666,6 +795,8 @@ resource "null_resource" "oci_prod_live" {
     deps = join(",", [
       oci_core_instance.prod.id,
       oci_core_security_list.public_sl.id,
+      oci_core_shape_management.bootstrap_shape.id,
+      oci_core_compute_image_capability_schema.bootstrap_uefi.id,
       var.oci_live_config_store_path,
       cloudflare_pages_project.www_club.id,
       cloudflare_pages_domain.www_club.id,

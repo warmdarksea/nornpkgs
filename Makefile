@@ -17,11 +17,7 @@ SSH_KEY_PATH  ?= ~/.ssh/id_clownpiece
 SSH_FLAGS     ?= -i $(SSH_KEY_PATH)
 
 TERRAFORM     ?= tofu
-#TOFU_VARS := -var="libvirt_uri=$(LIBVIRT_URI)" \
-#             -var="libvirt_pool_path=$(abspath $(POOL_DIR))" \
-#             -var="libvirt_ovmf_code=$(abspath $(BUILD_DIR)/ovmf-fd/FV/OVMF_CODE.fd)" \
-#             -var="libvirt_ovmf_vars=$(abspath $(BUILD_DIR)/ovmf-fd/FV/OVMF_VARS.fd)"
-TF_FLAGS      := $(TF_VARS) -state=$(STATE_DIR)/terraform.tfstate
+TF_FLAGS      := -state=$(STATE_DIR)/terraform.tfstate
 
 LIBVIRT_URI   := qemu:///system
 LIBVIRT_FLAGS := -c $(LIBVIRT_URI)
@@ -104,20 +100,25 @@ $(BUILD_DIR)/.oci-secret-deployed: $(OCI_SECRET_SRC)
 	scp -rp $(SECRET_DIR)/oci/* root@$(IP):/var/secret/
 	ssh $(SSH_FLAGS) root@$(IP) "chown -R root:root /var/secret"
 	ssh $(SSH_FLAGS) root@$(IP) "chmod -R 700 /var/secret"
+	ssh $(SSH_FLAGS) root@$(IP) "mkdir -p /var/secret/akkoma"
 	ssh $(SSH_FLAGS) root@$(IP) "chown -R akkoma:akkoma /var/secret/akkoma/"
-	ssh $(SSH_FLAGS) root@$(IP) "chmod 500 /var/secret/akkoma"
-	ssh $(SSH_FLAGS) root@$(IP) "chmod 400 /var/secret/akkoma/*"
+	ssh $(SSH_FLAGS) root@$(IP) "chmod 700 /var/secret/akkoma"
+	ssh $(SSH_FLAGS) root@$(IP) "chmod 700 /var/secret/akkoma/*"
 	ssh $(SSH_FLAGS) root@$(IP) "chmod 711 /var/secret" # -p should preserve perms but
 
 deploy_oci_secrets: $(BUILD_DIR)/.oci-secret-deployed
 
+$(BUILD_DIR/deployment-$(PLATFORM)-$(ENV).tfvars):
+	true
+
 deploy_oci_bootstrap: $(BUILD_DIR)/$(PLATFORM)-$(CONFIG)-$(ARCH)-img | $(STATE_DIR)
 	$(TERRAFORM) apply $(TF_FLAGS) \
 	  -var-file=secret/prod.tfvars \
-	  -var oci_bootstrap_image_store_path=$(realpath $</nixos-image-oci-x86_64-linux.qcow2) \
+	  -var oci_bootstrap_image_store_path=$(realpath $<) \
+	  -var oci_bootstrap_image_file_path=nixos-image-oci-$(ARCH)-linux.qcow2 \
 	  -var oci_live_config_store_path=$(realpath $(BUILD_DIR)/$(PLATFORM)-$(CONFIG)-$(ARCH)-drv) \
 	  -var my_ip=$(shell curl -s ifconfig.me) \
-	  -var "ssh_private_key_path=~/.ssh/id_clownpiece" \
+	  -var "ssh_private_key_path=$(SSH_KEY_PATH)" \
 	  -target null_resource.$(PLATFORM)_$(ENV)_bootstrap
 
 deploy_oci_live: $(BUILD_DIR)/$(PLATFORM)-bootstrap-$(ARCH)-img \
@@ -126,10 +127,11 @@ deploy_oci_live: $(BUILD_DIR)/$(PLATFORM)-bootstrap-$(ARCH)-img \
 		 $(BUILD_DIR)/.oci-secret-deployed | $(STATE_DIR)
 	$(TERRAFORM) apply $(TF_FLAGS) \
 	  -var-file=secret/prod.tfvars \
-	  -var oci_bootstrap_image_store_path=$(realpath $</nixos-image-oci-x86_64-linux.qcow2) \
+	  -var oci_bootstrap_image_store_path=$(realpath $<) \
+	  -var oci_bootstrap_image_file_path=nixos-image-oci-$(ARCH)-linux.qcow2 \
 	  -var oci_live_config_store_path=$(realpath $(BUILD_DIR)/$(PLATFORM)-$(CONFIG)-$(ARCH)-drv) \
 	  -var my_ip=$(shell curl -s ifconfig.me) \
-	  -var "ssh_private_key_path=~/.ssh/id_clownpiece" \
+	  -var "ssh_private_key_path=$(SSH_KEY_PATH)" \
 	  -target null_resource.$(PLATFORM)_$(ENV)_live
 
 destroy_oci: $(BUILD_DIR)/$(PLATFORM)-$(CONFIG)-$(ARCH)-img | $(STATE_DIR)
