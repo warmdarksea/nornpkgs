@@ -86,16 +86,16 @@ in rec {
 
   boot.blacklistedKernelModules = [ "dvb_usb_rtl28xxu" ];
 
-  boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+  #boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
 
   system.nixos.tags = [ "lts-kernel" ];
-  boot.kernelPackages = pkgs.linuxPackages;
+  boot.kernelPackages = lib.mkForce pkgs.linuxPackages;
   # at the time of writing, this is equal to zfs_unstable
   boot.zfs.package = pkgs.zfs_unstable;
 
   specialisation = {
     stable.configuration = {
-      boot.kernelPackages = lib.mkForce pkgs.linuxPackages_latest;
+      boot.kernelPackages = pkgs.linuxPackages_latest;
       system.nixos.tags = lib.mkForce [ "stable-kernel" ];
     };
   };
@@ -177,6 +177,15 @@ in rec {
   networking.firewall.allowedUDPPorts = [
     config.networking.wireguard.interfaces.wg-redacted.listenPort
   ];
+
+  networking.firewall.trustedInterfaces = [ "incusbr0" ];
+  # networking.firewall.interfaces.incusbr0 = {
+  #   allowedUDPPorts = [ 53 67 ];
+  # };
+  # networking.firewall.extraForwardRules = ''
+  #   iifname "incusbr0" accept
+  #   oifname "incusbr0" ct state established,related accept
+  # '';
 
   networking.nftables.enable = true;
 
@@ -335,6 +344,7 @@ in rec {
   hardware.nvidia-container-toolkit.enable = true;
   virtualisation.incus = {
     enable = true;
+    package = pkgs.incus;
     ui.enable = true;
   };
   virtualisation.podman = {
@@ -425,7 +435,18 @@ in rec {
   users.groups.games.gid = 382;
   users.groups.agent.gid = 384;
 
-  users.users.root.subUidRanges = lib.mkForce [{ startUid = 1000000; count = 16777216; }];
+  users.users.root.subUidRanges = lib.mkForce [
+    { startUid = 1000000; count = 1000000000; }
+    { startUid = config.users.users.clownpiece.uid; count = 1; }
+    { startUid = config.users.users.flandre.uid; count = 1; }
+  ];
+  users.users.root.subGidRanges = lib.mkForce [
+    { startGid = 1000000; count = 1000000000; }
+    { startGid = config.ids.gids.audio; count = 1; }
+    { startGid = config.ids.gids.video; count = 1; }
+    { startGid = config.ids.gids.render; count = 1; }
+    { startGid = config.users.groups.games.gid; count = 1; }
+  ];
   users.users.clownpiece = {
     uid = 1000;
     subUidRanges = [
@@ -441,7 +462,7 @@ in rec {
       { startGid = config.users.groups.games.gid; count = 1; }
       { startGid = config.users.users.clownpiece-audio.uid; count = 1; }
     ];
-    extraGroups = [ "magician" "wheel" "audio" "video" "sudo" "render" "networkmanager" "docker" "podman" "libvirtd" "wireshark" "lxd" "input" "games" "plugdev" "pipewire" "lp" "scanner" "adbusers" "kvm"];
+    extraGroups = [ "magician" "wheel" "audio" "video" "sudo" "render" "networkmanager" "docker" "podman" "libvirtd" "wireshark" "incus" "incus-admin" "input" "games" "plugdev" "pipewire" "lp" "scanner" "adbusers" "kvm"];
     isNormalUser = true;
   };
 
