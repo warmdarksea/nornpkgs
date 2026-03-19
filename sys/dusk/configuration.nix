@@ -3,7 +3,7 @@
 in {
   nixpkgs.config.allowlistedLicenses = with lib.licenses; [ bsl11 ];
 
-  networking.hostName = "dusk"; 
+  #networking.hostName = "dusk"; 
   networking.networkmanager.enable = true;
   networking.firewall.enable = true;
   networking.firewall.checkReversePath = "loose";
@@ -150,7 +150,7 @@ in {
 
   services.xrdp.enable = true;
   services.xrdp.audio.enable = true;
-  services.xrdp.port = "tcp://0.0.0.0:3389";
+  #services.xrdp.port = "tcp://0.0.0.0:3389"; <- this needs nixpkgs patch
   #services.xrdp.defaultWindowManager = "gnome-session";
   services.xrdp.extraConfDirCommands = ''
     substituteInPlace $out/sesman.ini \

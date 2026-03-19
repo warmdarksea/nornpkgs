@@ -95,7 +95,7 @@
   # networking.interfaces.wlp6s0.useDHCP = lib.mkDefault true;
   #networking.wireless.enable = lib.mkForce false;
   #networking.networkmanager.enable = true;
-  networking.hostId = "AAAAAAAA";
+  #networking.hostId = "AAAAAAAA";
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   hardware.cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;

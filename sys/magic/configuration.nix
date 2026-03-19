@@ -97,8 +97,8 @@
 
   nixpkgs.config.allowUnfree = true;
 
-  networking.hostName = "magic";
-  networking.hostId = "AAAAAAAA";
+  #networking.hostName = "magic";
+  #networking.hostId = "AAAAAAAA";
   networking.useDHCP = lib.mkDefault true;
   #networking.dhcpcd.enable = false;
   #networking.interfaces.enp6s0.ipv4.addresses = [

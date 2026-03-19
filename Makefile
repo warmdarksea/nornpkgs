@@ -42,8 +42,7 @@ $(BUILD_DIR):
 # every time
 .PHONY: $(BUILD_DIR)/sys-$(TARGET)
 $(BUILD_DIR)/sys-$(TARGET): flake.nix 	  	    \
-			    flake.lock 		    \
-			    sys/$(TARGET)/flake.nix
+			    flake.lock
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.$(TARGET).config.system.build.toplevel
 
 $(BUILD_DIR)/img-$(TARGET): flake.nix 	  	    \

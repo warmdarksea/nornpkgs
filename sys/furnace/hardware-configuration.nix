@@ -158,7 +158,7 @@
 
     swapDevices = [ ];
     networking.useDHCP = lib.mkDefault true;
-    networking.hostId = "AAAAAAAA";
+    #networking.hostId = "AAAAAAAA";
 
     nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
     hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;

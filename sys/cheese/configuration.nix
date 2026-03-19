@@ -8,8 +8,8 @@
     # ...
   };
 
-  networking.hostName = "cheese"; # Define your hostname.
-  networking.hostId = "AAAAAAAA";
+  #networking.hostName = "cheese"; # Define your hostname.
+  #networking.hostId = "AAAAAAAA";
   # Pick only one of the below networking options.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
   networking.networkmanager.enable = true;  # Easiest to use and most distros use this by default.
@@ -96,7 +96,7 @@
   #services.xserver.displayManager.setupCommands = ''
   #  xrandr -o right
   #'';
-  services.xserver.desktopManager.plasma5.enable = true;
+  services.xserver.desktopManager.plasma6.enable = true;
   
 
   # Configure keymap in X11

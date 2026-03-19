@@ -50,7 +50,7 @@
   # with explicit per-interface declarations with `networking.interfaces.<interface>.useDHCP`.
   networking.useDHCP = lib.mkDefault true;
   # networking.interfaces.enp0s13f0u1u4.useDHCP = lib.mkDefault true;
-  networking.hostId = "AAAAAAAA";
+  #networking.hostId = "AAAAAAAA";
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;

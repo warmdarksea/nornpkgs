@@ -1,8 +1,8 @@
 {
-  description = "A simple NixOS flake";
+  description = "flake for managing systems of *.gensokyo.internal";
 
   inputs = {
-    nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?ref=gensokyo-master";
+    nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs";
     nixos-hardware.url = "git+file:///home/clownpiece/src/nixos-hardware?ref=gensokyo-master";
 
     emacs-overlay = {
@@ -15,20 +15,23 @@
     };
     lanzaboote = {
       url = "github:nix-community/lanzaboote";
-      #url = "github:nix-community/lanzaboote/pull/487/head";
       inputs = {
         nixpkgs.follows = "nixpkgs";
-      #  rust-overlay.follows = "rust-overlay";
       };
     };
-    #rust-overlay = {
-    #  url = "github:oxalica/rust-overlay";
-    #  inputs.nixpkgs.follows = "nixpkgs";
-    #};
 
     nixpak = {
       url = "github:nixpak/nixpak";
       inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # some configuration options don't make sense to host publicly, even though
+    # they're not strictly "secret" in the sense that they don't directly
+    # contain credentials (e.g., knowledge of VPN endpoints could be used to
+    # correlate identities, etc). so, some options are stored in a local private
+    # git repo
+    gensokyo-infra-private = {
+      url = "git+file:///home/clownpiece/src/gensokyo-infra-private";
     };
 
     # more config
@@ -42,48 +45,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # systems
-    abandonedfactory = {
-      url = "path:./sys/abandonedfactory";
-
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.nix-gensokyo.follows = ""; # self-reference
-    };
-
-    cheese = {
-      url = "path:./sys/cheese";
-
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.nixos-hardware.follows = "nixos-hardware";
-      inputs.nix-gensokyo.follows = ""; # self-reference
-    };
-
-    furnace = {
-      url = "path:./sys/furnace";
-
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.lanzaboote.follows = "lanzaboote";
-      inputs.nix-gensokyo.follows = ""; # self-reference
-    };
-
-    hell = {
-      url = "path:./sys/hell";
-
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.nixos-hardware.follows = "nixos-hardware";
-      inputs.home-manager.follows = "home-manager";
-      inputs.lanzaboote.follows = "lanzaboote";
-      inputs.nix-gensokyo.follows = ""; # self-reference
-    };
-
-    magic = {
-      url = "path:./sys/magic";
-
-      inputs.nixpkgs.follows = "nixpkgs";
-      #inputs.home-manager.follows = "home-manager";
-      inputs.nix-gensokyo.follows = ""; # self-reference
-    };
-
     # installer/livecd derivations
     iso-minimal = {
       url = "path:./iso/minimal";
@@ -95,31 +56,32 @@
     };
   };
 
-  outputs = { self,
+  outputs = {
+    self,
+      
+    nixpkgs,
+    nixos-hardware,
 
-  nixpkgs,
-  nixos-hardware,
-  emacs-overlay,
-  home-manager,
-  lanzaboote,
-  nixpak,
+    emacs-overlay,
+    home-manager,
+    lanzaboote,
 
-  gensokyo-dotfiles,
-  nornpkgs,
-              
-  abandonedfactory,
-  cheese,
-  furnace,
-  hell,
-  magic,
+    nixpak,
 
-  iso-minimal,
-  iso-livecd,
-  ... }@inputs: let
-    overlay = { config, pkgs, lib, ... }: {
+    gensokyo-dotfiles,
+    nornpkgs,
+
+    iso-minimal,
+    iso-livecd,
+      ... }@inputs: let
+     lib = nixpkgs.lib;
+    in {
+    # nix modules
+
+    nixosModules.base = import lib/base.nix;
+    nixosModules.nvidia = import lib/nvidia.nix;
+    nixosModules.defaultOverlays = { config, pkgs, lib, ... }: {
       nixpkgs.overlays = [
-        # Overlay 1: Use `self` and `super` to express
-        # the inheritance relationship
         (self: super: {
           # ...
         })
@@ -127,12 +89,6 @@
         emacs-overlay.overlays.package
       ];
     };
-  in {
-    # nix modules
-
-    nixosModules.base = import lib/base.nix;
-    #nixosModules.gensokyo = import lib/gensokyo.nix;
-    nixosModules.nvidia = import lib/nvidia.nix;
 
     # home manager modules
 
@@ -150,105 +106,184 @@
     };
 
     # systems            
-    # nixosConfigurations.cheese = nixpkgs.lib.nixosSystem {
-    #   system = "x86_64-linux";
-    #   modules = [
-    #     nixos-hardware.nixosModules.gpd-pocket-3
-    #     ./sys/cheese/configuration.nix
-    #     ./sys/cheese/hardware-configuration.nix
-    #     home-manager.nixosModules.home-manager {
-    #       home-manager.useUserPackages = true;
-    #       home-manager.useGlobalPkgs = true;
-    #       #          home-manager.users."satori" = {};
-    #     }
-    #   ];
-    # };
-
-    nixosConfigurations.abandonedfactory = abandonedfactory.nixosConfigurations.abandonedfactory.extendModules { modules = [ ]; };
-
-    nixosConfigurations.cheese = cheese.nixosConfigurations.cheese.extendModules { modules = [ overlay ]; };
-
-    nixosConfigurations.chireiden = nixpkgs.lib.nixosSystem {
+    nixosConfigurations.abandonedfactory = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        {
+          networking.hostName = "abandonedfactory";
+        }
+        self.nixosModules.base
+        lanzaboote.nixosModules.lanzaboote
+        #"${nixpkgs}/nixos/modules/installer/sd-card/sd-image-x86_64.nix"
+        ./sys/abandonedfactory/hardware-configuration.nix
+        ./sys/abandonedfactory.nix
+      ];
+    };
+ 
+
+    nixosConfigurations.cheese = lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          {
+            networking.hostName = "cheese";
+            networking.hostId = "AAAAAAAA";
+          }
+          self.nixosModules.base
+          self.nixosModules.defaultOverlays
+          nixos-hardware.nixosModules.gpd-pocket-3
+          ./sys/cheese/configuration.nix
+          ./sys/cheese/hardware-configuration.nix
+          home-manager.nixosModules.home-manager {
+            home-manager.useUserPackages = true;
+            home-manager.useGlobalPkgs = true;
+            home-manager.users.nazrin = self.homeManagerModules.magician;
+          }
+        ];
+      };
+
+    nixosConfigurations.chireiden = lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        {
+          networking.hostName = "chireiden";
+          networking.hostId = "AAAAAAAA";
+        }
+        self.nixosModules.base
+        self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.lenovo-thinkpad-x13-amd
         ./sys/chireiden/configuration.nix
         ./sys/chireiden/hardware-configuration.nix
-        ./lib/base.nix
         home-manager.nixosModules.home-manager {
           home-manager.useUserPackages = true;
           home-manager.useGlobalPkgs = true;
-          home-manager.users."satori" = import ./home.nix;
+          home-manager.users."satori" = self.homeManagerModules.magician;
         }
       ];
     };
 
-    nixosConfigurations.dusk = nixpkgs.lib.nixosSystem {
+    nixosConfigurations.dusk = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        {
+          networking.hostName = "dusk";
+          networking.hostId = "AAAAAAAA";
+        }
+        self.nixosModules.base
+        self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
-        #        nixos-hardware.nixosModules.gpd-pocket-3
         ./sys/dusk/configuration.nix
         ./sys/dusk/hardware-configuration.nix
-        ./lib/base.nix
         home-manager.nixosModules.home-manager {
           home-manager.useUserPackages = true;
           home-manager.useGlobalPkgs = true;
-          #          home-manager.users."satori" = {};
-          home-manager.users."rumia" = import ./home.nix;
+          home-manager.users."rumia" = self.homeManagerModules.magician;
         }
       ];
     };
 
-    nixosConfigurations.furnace = furnace.nixosConfigurations.furnace.extendModules { modules = [ ]; };
-    nixosConfigurations.hell = hell.nixosConfigurations.hell.extendModules { modules = [ overlay ]; };
-    nixosConfigurations.magic = magic.nixosConfigurations.magic.extendModules { modules = [ ]; };
-
-    # nixosConfigurations.magic = nixpkgs.lib.nixosSystem {
-    #   system = "x86_64-linux";
-    #   modules = [
-    #     ./sys/magic/configuration.nix
-    #     ./sys/magic/hardware-configuration.nix
-    #     ./lib/base.nix
-    #   ];
-    # };
-
-    nixosConfigurations.mausoleum = nixpkgs.lib.nixosSystem {
+    nixosConfigurations.furnace = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        # lanzaboote.nixosModules.lanzaboote
-        #  nixos-hardware.nixosModules.gpd-pocket-3
-        ./mausoleum/configuration.nix
-        ./mausoleum/hardware-configuration.nix
-        ./base.nix
-        # home-manager.nixosModules.home-manager {
-          # home-manager.useUserPackages = true;
-          # home-manager.useGlobalPkgs = true;
-          # home-manager.users."satori" = {};
-          # home-manager.users."yoshika" = import ./home.nix;
-          # }
+        {
+          networking.hostName = "furnace";
+          networking.hostId = "AAAAAAAA";
+        }
+        self.nixosModules.base
+        lanzaboote.nixosModules.lanzaboote
+        ./sys/furnace/configuration.nix
+        ./sys/furnace/hardware-configuration.nix
       ];
     };
 
-    nixosConfigurations.sea = nixpkgs.lib.nixosSystem {
+    nixosConfigurations.hell = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        {
+          networking.hostName = "hell";
+          networking.hostId = "AAAAAAAA";
+        }
+        self.nixosModules.base
+        self.nixosModules.nvidia
+        self.nixosModules.defaultOverlays
+        lanzaboote.nixosModules.lanzaboote
+        nixos-hardware.nixosModules.asus-x13-flow
+        ./sys/hell/configuration.nix
+        ./sys/hell/hardware-configuration.nix
+        home-manager.nixosModules.home-manager {
+          home-manager.useUserPackages = true;
+          home-manager.useGlobalPkgs = true;
+
+          home-manager.users.clownpiece = self.homeManagerModules.magician;
+          home-manager.users.seiran = self.homeManagerModules.common;
+        }
+      ];
+    };
+
+    nixosConfigurations.magic = lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        {
+          networking.hostName = "magic";
+          networking.hostId = "AAAAAAAA";
+        }
+        self.nixosModules.base
+        self.nixosModules.defaultOverlays
+        lanzaboote.nixosModules.lanzaboote
+        ./sys/magic/configuration.nix
+        ./sys/magic/hardware-configuration.nix
+      ];
+    };
+
+    nixosConfigurations.mausoleum = lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        {
+          networking.hostName = "mausoleum";
+          networking.hostId = "AAAAAAAA";
+        }
+        self.nixosModules.base
+        ./mausoleum/configuration.nix
+        ./mausoleum/hardware-configuration.nix
+      ];
+    };
+
+    nixosConfigurations.sea = lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        {
+          networking.hostName = "sea";
+          networking.hostId = "AAAAAAAA";
+        }
+        self.nixosModules.base
+        self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.dell-xps-13-9310
         ./sys/sea/configuration.nix
         ./sys/sea/hardware-configuration.nix
-        ./lib/base.nix
         home-manager.nixosModules.home-manager {
           home-manager.useUserPackages = true;
           home-manager.useGlobalPkgs = true;
-          home-manager.users."seija" = import ../home/seija.nix;
+          home-manager.users."seija" = self.homeManagerModules.magician;
         }
       ];
     };
 
     # iso derivations
-    nixosConfigurations.iso-minimal = iso-minimal.nixosConfigurations.iso-minimal.extendModules {};
-    nixosConfigurations.iso-livecd = iso-livecd.nixosConfigurations.iso-livecd.extendModules {};
+    nixosConfigurations.iso-minimal = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
+        ./sys/minimal.nix
+      ];
+    };
+
+    nixosConfigurations.iso-livecd = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-graphical-gnome.nix"
+        ./sys/livecd.nix
+      ];
+    };
   };
 }

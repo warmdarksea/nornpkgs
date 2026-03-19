@@ -23,7 +23,7 @@ in rec {
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  networking.hostName = "furnace"; # Define your hostname.
+  #networking.hostName = "furnace"; # Define your hostname.
 
   # Configure network connections interactively with nmcli or nmtui.
   

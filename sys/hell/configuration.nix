@@ -156,7 +156,7 @@ in rec {
 
   # 
 
-  networking.hostName = "hell";
+  #networking.hostName = "hell";
 
   networking.extraHosts = ''
     0.0.0.0 ldtest.hell.gensokyo.internal
