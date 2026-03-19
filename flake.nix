@@ -2,9 +2,9 @@
   description = "A simple NixOS flake";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?ref=gensokyo-master";
+    nixos-hardware.url = "git+file:///home/clownpiece/src/nixos-hardware?ref=gensokyo-master";
 
-    nixos-hardware.url = "github:NixOS/nixos-hardware/master";
     emacs-overlay = {
       url = "github:nix-community/emacs-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -47,7 +47,6 @@
       url = "path:./sys/abandonedfactory";
 
       inputs.nixpkgs.follows = "nixpkgs";
-      #inputs.nixos-hardware.follows = "my-nixos-hardware";
       inputs.nix-gensokyo.follows = ""; # self-reference
     };
 
@@ -55,7 +54,7 @@
       url = "path:./sys/cheese";
 
       inputs.nixpkgs.follows = "nixpkgs";
-      inputs.nixos-hardware.follows = "my-nixos-hardware";
+      inputs.nixos-hardware.follows = "nixos-hardware";
       inputs.nix-gensokyo.follows = ""; # self-reference
     };
 
@@ -63,7 +62,6 @@
       url = "path:./sys/furnace";
 
       inputs.nixpkgs.follows = "nixpkgs";
-      #inputs.nixos-hardware.follows = "my-nixos-hardware";
       inputs.lanzaboote.follows = "lanzaboote";
       inputs.nix-gensokyo.follows = ""; # self-reference
     };
@@ -72,7 +70,7 @@
       url = "path:./sys/hell";
 
       inputs.nixpkgs.follows = "nixpkgs";
-      inputs.nixos-hardware.follows = "my-nixos-hardware";
+      inputs.nixos-hardware.follows = "nixos-hardware";
       inputs.home-manager.follows = "home-manager";
       inputs.lanzaboote.follows = "lanzaboote";
       inputs.nix-gensokyo.follows = ""; # self-reference
@@ -82,7 +80,6 @@
       url = "path:./sys/magic";
 
       inputs.nixpkgs.follows = "nixpkgs";
-      #inputs.nixos-hardware.follows = "my-nixos-hardware";
       #inputs.home-manager.follows = "home-manager";
       inputs.nix-gensokyo.follows = ""; # self-reference
     };
@@ -96,20 +93,6 @@
       url = "path:./iso/livecd";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    # fixup/overlay inputs
-    my-nixpkgs = {
-      url = "path:/home/clownpiece/src/nixpkgs";
-      flake = true;
-    };
-    my-nixos-hardware = {
-      url = "path:/home/clownpiece/src/nixos-hardware";
-      flake = true;
-      # inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    # example of specific nixpkgs commit
-    # fixpkgs_foo.url = "github:NixOS/nixpkgs/2af19cfb6aa40768c4bbefd801a136270e099191";
   };
 
   outputs = { self,
@@ -132,12 +115,6 @@
 
   iso-minimal,
   iso-livecd,
-
-  my-nixpkgs,
-  my-nixos-hardware,
-
-  # fixpkgs_foo,
-
   ... }@inputs: let
     overlay = { config, pkgs, lib, ... }: {
       nixpkgs.overlays = [
@@ -207,7 +184,7 @@
       ];
     };
 
-    nixosConfigurations.dusk = my-nixpkgs.lib.nixosSystem {
+    nixosConfigurations.dusk = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         lanzaboote.nixosModules.lanzaboote
@@ -237,7 +214,7 @@
     #   ];
     # };
 
-    nixosConfigurations.mausoleum = my-nixpkgs.lib.nixosSystem {
+    nixosConfigurations.mausoleum = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         # lanzaboote.nixosModules.lanzaboote

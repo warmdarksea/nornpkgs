@@ -57,7 +57,7 @@
     nix-prefetch-scripts
     nix-tree
     nmap
-    neofetch
+    fastfetch
   ];
 
   console = let 

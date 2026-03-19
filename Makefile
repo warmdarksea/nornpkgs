@@ -74,7 +74,7 @@ build_remote_sys_closure:
 	$(eval DRV_PATH := $(shell NIXPKGS_ALLOW_UNFREE=$$NIXPKGS_ALLOW_UNFREE nix build $(NIX_FLAGS) --dry-run --json .#nixosConfigurations.$(TARGET).config.system.build.toplevel | jq -r '.[].drvPath' | tail -n1))
 	@echo "Derivation path: $(DRV_PATH)"
 	nix copy "$(DRV_PATH)" --to "ssh://root@$(HOST)"
-	ssh "root@$(HOST)" -- systemd-run --uid=0 --property=StandardOutput=journal --property=StandardError=journal --service-type=oneshot --no-block --unit=nixbuild-$(TARGET) -- nix-store --realise "$(DRV_PATH)"
+	ssh "root@$(HOST)" -- systemd-run --uid=0 --property=StandardOutput=journal --property=StandardError=journal --service-type=oneshot --no-block --unit=nixbuild-$(TARGET) -- nix-store --realise -k "$(DRV_PATH)"
 
 .PHONY: check_build_logs
 check_build_logs:
