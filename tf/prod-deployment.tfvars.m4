@@ -1,0 +1,6 @@
+my_ip                          = "MY_IP"
+ssh_public_key                 = "SSH_PUBLIC_KEY"
+ssh_private_key_path           = "SSH_KEY_PATH"
+oci_bootstrap_image_store_path = "OCI_BOOTSTRAP_IMAGE_STORE_PATH"
+oci_bootstrap_image_file_path  = "OCI_BOOTSTRAP_IMAGE_FILE_PATH"
+oci_live_config_store_path     = "OCI_LIVE_CONFIG_STORE_PATH"
