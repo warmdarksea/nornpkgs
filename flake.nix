@@ -3,10 +3,10 @@
 
   inputs = {
     #nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    #nixpkgs.url = "path:/home/clownpiece/src/nixpkgs"
+    nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?ref=norn-cross-compile";
     #nixpkgs.url = "git+file:///workspace/littledevil/nixpkgs";
-    #nixpkgs.url = "path:/workspace/nix-cross/src/nixpkgs";
-    nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?ref=littledevil-prod";
+    #nixpkgs.url = "path:/home/clownpiece/src/littledevil-infra/src/nixpkgs2";
+    #nixpkgs.url = "git+file:///home/clownpiece/src/littledevil-infra/src/nixpkgs";
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
   };
 
@@ -59,18 +59,18 @@
           fsType = "ext4";
         };
 
-          services.nginx = {
-            enable = true;
-            virtualHosts."_" = {
-              listen = [{ addr = "0.0.0.0"; port = 4000; }];
-              locations."/" = {
-                return = ''200 "it works\n"'';
-                extraConfig = ''
+        services.nginx = {
+          enable = true;
+          virtualHosts."_" = {
+            listen = [{ addr = "0.0.0.0"; port = 4000; }];
+            locations."/" = {
+              return = ''200 "it works\n"'';
+              extraConfig = ''
                   default_type text/plain;
                 '';     
-              };
             };
           };
+        };
       };
 
       nixosModules.live = { config, pkgs, lib, ... }: {
@@ -147,18 +147,18 @@
           frontends = {};
           extraStatic = {
             "index.html" = pkgs.writeText "index.html" ''
-            <html>backend is working</html>
+              <html>backend is working</html>
             '';
           };
 
           config = lib.recursiveUpdate {
             ":pleroma" = {
               ":instance" = rec {
-                name = "little devil club";
-                description = "this is (currently) a single-person instance operated by @norn@littledevil.club";
-                #short_description = description;
+                name = "littledevil club";
+                description = "just a little bit evil";
                 email = "norn@littledevil.org";
-                registration_open = false;
+                registrations_open = false;
+                invites_enabled = true;
               };
 
               ":http".proxy_url = "http://0.0.0.0:40000";
@@ -226,54 +226,90 @@
         networking.firewall.allowedTCPPorts = [ 80 ];
       };
 
-      nixosModules.prod = { config, pkgs, lib, ... }: let
-        # Your Grafana Cloud Loki user ID (the number, not your email)
-        grafanaUser = "1500402";
+      nixosModules.prod = { config, pkgs, lib, ... }: {
+        boot.supportedFilesystems = [ "zfs" ];
 
-        # Grafana Cloud Loki push endpoint
-        lokiEndpoint = "https://logs-prod-042.grafana.net";
-      in {
+        networking.hostId = "AAAAAAAA";
+        networking.hostName = "littledevil-prod";
+        
         fileSystems."/data" = {
-          device = "/dev/disk/by-label/REDACTED";
-          fsType = "ext4";
+          device = "comb";
+          fsType = "zfs";
+          options = [ "nofail" ];
         };
-
+        fileSystems."/data/postgres" = {
+          device = "comb/postgres";
+          fsType = "zfs";
+          options = [ "nofail" ];
+        };
+        fileSystems."/data/minecraft" = {
+          device = "comb/minecraft";
+          fsType = "zfs";
+          options = [ "nofail" ];
+        };
+        
         services.postgresql.dataDir = "/data/postgres/postgres${config.services.postgresql.package.psqlSchema}";
 
-        services.vector = {
+        # services.vector = {
+        #   enable = true;
+        #   journaldAccess = true;
+        #   validateConfig = false;
+
+        #   settings = {
+        #     sources.journal = {
+        #       type = "journald";
+        #     };
+
+        #     sinks.grafana_loki = {
+        #       type = "loki";
+        #       inputs = [ "journal" ];
+        #       endpoint = "\${LOKI_ENDPOINT}";
+        #       encoding.codec = "json";
+
+        #       auth = {
+        #         strategy = "basic";
+        #         user = "\${GRAFANA_USER}";
+        #         password = "\${GRAFANA_LOKI_KEY}";
+        #       };
+
+        #       labels = {
+        #         host = "littledevil-prod";
+        #         service_name = "{{ SYSLOG_IDENTIFIER }}";
+        #       };
+        #     };
+        #   };
+        # };
+
+        # # Load the API key from your secrets file into the Vector service
+        # systemd.services.vector.serviceConfig.EnvironmentFile = [
+        #   "/var/secret/grafana/env"
+        # ];
+
+        services.alloy = {
           enable = true;
-          journaldAccess = true;
-          validateConfig = false;
-
-          settings = {
-            sources.journal = {
-              type = "journald";
-            };
-
-            sinks.grafana_loki = {
-              type = "loki";
-              inputs = [ "journal" ];
-              endpoint = lokiEndpoint;
-              encoding.codec = "json";
-
-              auth = {
-                strategy = "basic";
-                user = grafanaUser;
-                password = "\${GRAFANA_LOKI_KEY}";
-              };
-
-              labels = {
-                host = "littledevil-prod";
-                service_name = "{{ SYSLOG_IDENTIFIER }}";
-              };
-            };
-          };
+          environmentFile = "/var/secret/grafana/env";
         };
 
-        # Load the API key from your secrets file into the Vector service
-        systemd.services.vector.serviceConfig.EnvironmentFile = [
-          "/var/secret/grafana/env"
-        ];
+        environment.etc."alloy/config.alloy".text = ''
+          loki.write "grafana" {
+            endpoint {
+              url = env("LOKI_ENDPOINT") + "/loki/api/v1/push"
+
+              basic_auth {
+                username = env("GRAFANA_USER")
+                password = env("GRAFANA_LOKI_KEY")
+              }
+            }
+          }
+
+          loki.source.journal "journal" {
+          forward_to = [loki.write.grafana.receiver]
+          labels     = { host = "littledevil-prod" }
+          }
+        '';
+        systemd.services.alloy.serviceConfig = {
+          SupplementaryGroups = [ "systemd-journal" ];
+        };
 
         nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
           "cloudflare-warp"
@@ -327,7 +363,7 @@
             jvmOpts = "-Xmx4G -Xms2G";
 
             # Specify the custom minecraft server package
-            package = nix-minecraft.packages.aarch64-linux.vanilla-server;
+            package = nix-minecraft.packages.${system}.vanilla-server;
           };
         };
       };
@@ -477,8 +513,6 @@
           nixosModules.prod
           nixosModules.bootstrap
           {
-            #nixpkgs.buildPlatform = "${system}-linux";
-            #nixpkgs.hostPlatform = "aarch64-linux";
             nixpkgs.localSystem.system = "${system}";
             nixpkgs.crossSystem.system = "aarch64-linux";
           }
@@ -487,114 +521,16 @@
             oci.efi = lib.mkForce true;
             boot.loader.grub.enable = lib.mkForce false;
             boot.loader.systemd-boot.enable = true;
+            boot.loader.efi.canTouchEfiVariables = lib.mkForce true;
           }
         ];
       };
 
-      # packages.aarch64.nixosConfigurations.base-bootstrap = nixpkgs.lib.nixosSystem {
-      #   inherit system;
-      #   modules = [
-      #     nixosModules.bootstrap
-      #     {
-      #       #nixpkgs.buildPlatform = "${system}-linux";
-      #       #nixpkgs.crossSystem.system = "aarch64-linux";
-      #       #nixpkgs.hostPlatform = "aarch64-linux";
-      #     }
-      #   ];
-      # };
-
-      #
-
-      packages.x86_64-linux = {
-        akkoma-fe = pkgs.akkoma-fe;
-        # akkoma-fe = pkgs.akkoma-fe.overrideAttrs (old: {
-        #   postPatch = (old.postPatch or "") + ''
-        #     cp ${./config/akkoma-fe.local.json} config/local.json
-        #   '';
-        # });
-        ovmf = pkgs.OVMF.fd;
-      };
-      packages.aarch64-linux = {
-        akkoma-fe = pkgs.akkoma-fe;
-        # akkoma-fe = pkgs.akkoma-fe.overrideAttrs (old: {
-        #   postPatch = (old.postPatch or "") + ''
-        #     cp ${./config/akkoma-fe.local.json} config/local.json
-        #   '';
-        # });
-        ovmf = pkgs.OVMF.fd;
-        erlang = let
-          crossPkgs = import nixpkgs {
-            localSystem.system = "x86_64-linux";
-            crossSystem.system = "aarch64-linux";
-          };
-          erlang = crossPkgs.beamMinimal26Packages.erlang;
-        in erlang;
-        #pkgs.pkgsCross.aarch64-multiplatform.beam.packages.erlang_26.erlang;
-        akkoma = crossPkgs.akkoma;
-        webkit = crossPkgs.gtk3;
-        erlang28 = crossPkgs.erlang;
-        rebar3 = crossPkgs.beamMinimal26Packages.rebar3;
-      };
       nixosConfigurations = {
-        # bootstrap = nixpkgs.lib.nixosSystem {
-        #   inherit system;
-        #   modules = [ nixosModules.bootstrap ];
-        # };
-        # bootstrap-aarch64 = nixpkgs.lib.nixosSystem {
-        #   inherit system;
-        #   modules = [
-        #     nixosModules.bootstrap
-        #     {
-        #       nixpkgs.crossSystem.system = "aarch64-linux";
-        #     }
-        #   ];
-        # };
-        # live = nixpkgs.lib.nixosSystem {
-        #   inherit system;
-        #   modules = [ bootstrap-module live-module ];
-        # };
-        # libvirt-bootstrap = nixpkgs.lib.nixosSystem {
-        #   inherit system;
-        #   modules = [ bootstrap-module libvirt-module ];
-        # };
-        # libvirt-live = nixpkgs.lib.nixosSystem {
-        #   inherit system;
-        #   modules = [ bootstrap-module live-module libvirt-module ];
-        # };
-        # oci-bootstrap = nixpkgs.lib.nixosSystem {
-        #   inherit system;
-        #   modules = [ "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix" bootstrap-module oci-module ];
-        # };
-        # oci-bootstrap-aarch64 = nixpkgs.lib.nixosSystem {
-        #   #system = "aarch64-linux";
-        #   inherit system;
-        #   modules = [
-        #     "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"
-        #     bootstrap-module
-        #     {
-        #     nixpkgs.buildPlatform = "x86_64-linux";
-        #     nixpkgs.hostPlatform = "aarch64-linux";
-        #   }
-        #     {
-        #       oci.efi = lib.mkForce true;
-        #       system.nixos.label = "oci";
-
-        #       boot.isContainer = lib.mkForce false;
-
-        #       # ---------- Boot / kernel ----------
-        #       boot.kernelParams = [
-        #         #"console=ttyS0" # enable serial console
-        #         #"console=tty1"
-        #       ];
-        #       services.cloud-init.enable = true;
-        #     }
-        #   ];
-        # };
-        # oci-live = nixpkgs.lib.nixosSystem {
-        #   inherit system;
-        #   modules = [ "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix" bootstrap-module live-module oci-module ];
-        # };
+        prod-bootstrap = packages.aarch64.nixosConfigurations.oci-bootstrap;
+        prod-live = packages.aarch64.nixosConfigurations.oci-live;
       };
+
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [
           #aliyun-cli
@@ -602,6 +538,7 @@
           #azure-cli
           bruno
           libvirt
+          m4
           oci-cli
           wireshark
           wrangler

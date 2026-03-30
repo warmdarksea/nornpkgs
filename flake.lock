@@ -23,11 +23,11 @@
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1772592046,
-        "narHash": "sha256-+Lyl+mGVd0t2nlR6ODK/gvUHzMtF5qLlbTK+x5tCenU=",
+        "lastModified": 1774666183,
+        "narHash": "sha256-3DNpGXzkyuIu3/gXNtLvB2oSqKY5z1QP5ajy3VZjVV0=",
         "owner": "Infinidoge",
         "repo": "nix-minecraft",
-        "rev": "483abf9ad6aeac1d61f2a5419ded2879f0c4795e",
+        "rev": "7bcbe84d765e7fce5e267c569c718d8246336f3b",
         "type": "github"
       },
       "original": {
@@ -54,16 +54,16 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1773683014,
-        "narHash": "sha256-ObGy22cHvvYOAZQ4FExOlBBJe4iZo6RJCL4f7Gra6E0=",
-        "ref": "littledevil-prod",
-        "rev": "392f7126bff330e994ab37421c3b43000dfd2026",
-        "revCount": 947774,
+        "lastModified": 1774831748,
+        "narHash": "sha256-sbIxhbt3ZKfVfvOzdZpcUnJtQfEk7o0p3a+KxLZf4rk=",
+        "ref": "norn-cross-compile",
+        "rev": "3e286575db83a542b440599b408bd9e3e62dfcb6",
+        "revCount": 947775,
         "type": "git",
         "url": "file:///home/clownpiece/src/nixpkgs"
       },
       "original": {
-        "ref": "littledevil-prod",
+        "ref": "norn-cross-compile",
         "type": "git",
         "url": "file:///home/clownpiece/src/nixpkgs"
       }

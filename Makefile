@@ -94,7 +94,7 @@ deploy_oci_sql_secret:
 	  printf "ALTER USER %s WITH PASSWORD \'%s\';" "$$i" "$$(cat $(SECRET_DIR)/oci/$$i/dbpassword)" | ssh $(SSH_FLAGS) root@$(IP) -- sudo -u postgres psql; \
 	done
 
-$(BUILD_DIR)/.oci-secret-deployed: $(OCI_SECRET_SRC)
+$(BUILD_DIR)/.oci-secret-deployed: Makefile $(OCI_SECRET_SRC)
 	$(eval IP := $(shell $(TERRAFORM) output $(TF_FLAGS) -raw oci_public_ip))
 	ssh $(SSH_FLAGS) root@$(IP) "mkdir -p /var/secret && chmod 700 /var/secret"
 	scp -rp $(SECRET_DIR)/oci/* root@$(IP):/var/secret/
@@ -105,39 +105,45 @@ $(BUILD_DIR)/.oci-secret-deployed: $(OCI_SECRET_SRC)
 	ssh $(SSH_FLAGS) root@$(IP) "chmod 700 /var/secret/akkoma"
 	ssh $(SSH_FLAGS) root@$(IP) "chmod 700 /var/secret/akkoma/*"
 	ssh $(SSH_FLAGS) root@$(IP) "chmod 711 /var/secret" # -p should preserve perms but
+	touch $@
 
+.PHONY: deploy_oci_secrets
 deploy_oci_secrets: $(BUILD_DIR)/.oci-secret-deployed
 
-$(BUILD_DIR/deployment-$(PLATFORM)-$(ENV).tfvars):
-	true
+$(BUILD_DIR)/prod-deployment.tfvars: tf/prod-deployment.tfvars.m4 \
+	$(BUILD_DIR)/$(PLATFORM)-bootstrap-$(ARCH)-img \
+	$(BUILD_DIR)/$(PLATFORM)-live-$(ARCH)-drv | $(BUILD_DIR)
+	m4 \
+	  -DMY_IP='$(shell curl -s ifconfig.me)' \
+	  -D"SSH_PUBLIC_KEY=$(shell cat $(SSH_KEY_PATH).pub)" \
+	  -DSSH_KEY_PATH='$(SSH_KEY_PATH)' \
+	  -DOCI_BOOTSTRAP_IMAGE_STORE_PATH='$(realpath $(word 2,$^))' \
+	  -DOCI_BOOTSTRAP_IMAGE_FILE_PATH='nixos-image-oci-$(ARCH)-linux.qcow2' \
+	  -DOCI_LIVE_CONFIG_STORE_PATH='$(realpath $(word 3,$^))' \
+	  $< > $@
+
+$(BUILD_DIR)/prod-deployment.tfplan: main.tf \
+	$(BUILD_DIR)/prod-deployment.tfvars \
+	$(BUILD_DIR)/.www-club-deployed \
+	$(BUILD_DIR)/.oci-secret-deployed | $(STATE_DIR)
+	$(TERRAFORM) plan $(TF_FLAGS) \
+	  -var-file=$(word 2,$^) \
+	  -out=$@ \
+	  -target null_resource.$(PLATFORM)_$(ENV)_live
 
 deploy_oci_bootstrap: $(BUILD_DIR)/$(PLATFORM)-$(CONFIG)-$(ARCH)-img | $(STATE_DIR)
-	$(TERRAFORM) apply $(TF_FLAGS) \
-	  -var-file=secret/prod.tfvars \
-	  -var oci_bootstrap_image_store_path=$(realpath $<) \
-	  -var oci_bootstrap_image_file_path=nixos-image-oci-$(ARCH)-linux.qcow2 \
-	  -var oci_live_config_store_path=$(realpath $(BUILD_DIR)/$(PLATFORM)-$(CONFIG)-$(ARCH)-drv) \
-	  -var my_ip=$(shell curl -s ifconfig.me) \
-	  -var "ssh_private_key_path=$(SSH_KEY_PATH)" \
-	  -target null_resource.$(PLATFORM)_$(ENV)_bootstrap
+	$(TERRAFORM) apply $(TF_FLAGS) -target null_resource.$(PLATFORM)_$(ENV)_bootstrap
 
-deploy_oci_live: $(BUILD_DIR)/$(PLATFORM)-bootstrap-$(ARCH)-img \
-		 $(BUILD_DIR)/$(PLATFORM)-live-$(ARCH)-drv \
-	         $(BUILD_DIR)/.www-club-deployed \
-		 $(BUILD_DIR)/.oci-secret-deployed | $(STATE_DIR)
+plan_oci_live: $(BUILD_DIR)/prod-deployment.tfplan
+
+deploy_oci_live: $(BUILD_DIR)/prod-deployment.tfplan | $(STATE_DIR)
 	$(TERRAFORM) apply $(TF_FLAGS) \
-	  -var-file=secret/prod.tfvars \
-	  -var oci_bootstrap_image_store_path=$(realpath $<) \
-	  -var oci_bootstrap_image_file_path=nixos-image-oci-$(ARCH)-linux.qcow2 \
-	  -var oci_live_config_store_path=$(realpath $(BUILD_DIR)/$(PLATFORM)-$(CONFIG)-$(ARCH)-drv) \
-	  -var my_ip=$(shell curl -s ifconfig.me) \
-	  -var "ssh_private_key_path=$(SSH_KEY_PATH)" \
-	  -target null_resource.$(PLATFORM)_$(ENV)_live
+	  -var-file=$(BUILD_DIR)/prod-deployment.tfvars \
+	  $<
 
 destroy_oci: $(BUILD_DIR)/$(PLATFORM)-$(CONFIG)-$(ARCH)-img | $(STATE_DIR)
 	$(TERRAFORM) destroy $(TF_FLAGS) \
-	  -var-file=secret/prod.tfvars \
-	  -var oci_bootstrap_image_store_path=$(realpath $</nixos-image-oci-x86_64-linux.qcow2) \
+	  -var-file=$(BUILD_DIR)/prod-deployment.tfvars \
 	  -target null_resource.$(PLATFORM)_$(ENV) \
 	  -target oci_core_instance.prod
 
@@ -146,7 +152,7 @@ ssh_oci:
 	$(SSH) $(SSH_FLAGS) root@$(IP)
 
 ssh_ts:
-	$(SSH) $(SSH_FLAGS) root@0.0.0.0
+	$(SSH) $(SSH_FLAGS) root@littledevil-prod.tail3b43e6.ts.net
 
 log_oci:
 	$(eval IP := $(shell $(TERRAFORM) output $(TF_FLAGS) -raw oci_public_ip 2>/dev/null))
@@ -161,7 +167,6 @@ wireshark_oci:
 	$(SSH) $(SSH_FLAGS) root@$(IP) -- "tcpdump $(TCPDUMP_FLAGS) -s0 -w - '$(NET_FILTER)'" | wireshark -k -i -
 
 #
-
 
 
 #.PHONY: deploy

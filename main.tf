@@ -25,7 +25,6 @@ variable "my_ip" {
 
 variable "ssh_public_key" {
   type    = string
-  default = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA redacted"
 }
 
 variable "ssh_private_key_path" {
@@ -620,6 +619,24 @@ resource "oci_core_subnet" "public" {
 # OCI — Compute
 # =============================================================================
 
+# resource "oci_core_boot_volume" "prod" {
+#   compartment_id      = var.oci_compartment_ocid
+#   availability_domain = var.oci_availability_domain
+#   # match your current volume's size/vpus
+#   #size_in_gbs         = 50
+#   #vpus_per_gb         = 10
+
+#   lifecycle {
+#     prevent_destroy = true
+#   }
+# }
+
+# resource "oci_core_boot_volume_attachment" "prod" {
+#   boot_volume_id = oci_core_boot_volume.prod.id
+#   instance_id    = oci_core_instance.prod.id
+#   display_name   = "prod-boot"
+# }
+
 resource "oci_core_instance" "prod" {
   compartment_id      = var.oci_compartment_ocid
   availability_domain = var.oci_availability_domain
@@ -655,9 +672,10 @@ resource "oci_core_instance" "prod" {
 
   # Automatically recreate instance when bootstrap image changes
   lifecycle {
-    replace_triggered_by = [
-      oci_core_image.bootstrap_img
-    ]
+    #replace_triggered_by = [
+    #  oci_core_image.bootstrap_img
+    #]
+    ignore_changes  = [source_details]
   }
 
   depends_on = [
@@ -826,7 +844,10 @@ resource "null_resource" "oci_prod_live" {
       user        = "root"
       private_key = file("${var.ssh_private_key_path}")
     }
-    inline = ["${var.oci_live_config_store_path}/bin/switch-to-configuration switch"]
+    inline = [
+      "nix-env --profile /nix/var/nix/profiles/system --set ${var.oci_live_config_store_path}",
+      "${var.oci_live_config_store_path}/bin/switch-to-configuration switch"
+    ]
   }
 }
 
