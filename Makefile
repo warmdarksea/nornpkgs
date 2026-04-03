@@ -148,7 +148,7 @@ plan_oci_live: $(BUILD_DIR)/prod-deployment.tfplan
 deploy_oci_live: $(BUILD_DIR)/prod-deployment.tfplan | $(STATE_DIR)
 	@echo "Terraform plan:"
 	$(TERRAFORM) show $<
-	read -p "Apply? Type 'yes' to confirm: " ans; [ "$ans" != "yes" ] && exit 1
+	read -p "Apply? Type 'yes' to confirm: " ans; [ "$$ans" = "yes" ] || exit 1
 	$(TERRAFORM) apply $(TF_FLAGS) \
 	  -var-file=$(BUILD_DIR)/prod-deployment.tfvars \
 	  $<
