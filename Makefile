@@ -153,6 +153,9 @@ deploy_oci_live: $(BUILD_DIR)/prod-deployment.tfplan | $(STATE_DIR)
 	  -var-file=$(BUILD_DIR)/prod-deployment.tfvars \
 	  $<
 
+gc_oci:
+	$(SSH) $(SSH_FLAGS) root@littledevil-prod.tail3b43e6.ts.net nix-collect-garbage -d
+
 destroy_oci: $(BUILD_DIR)/$(PLATFORM)-$(CONFIG)-$(ARCH)-img | $(STATE_DIR)
 	$(TERRAFORM) destroy $(TF_FLAGS) \
 	  -var-file=$(BUILD_DIR)/prod-deployment.tfvars \
