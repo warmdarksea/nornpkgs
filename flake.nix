@@ -3,10 +3,10 @@
 
   inputs = {
     #nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?ref=norn-cross-compile";
+    #nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?ref=norn-cross-compile";
     #nixpkgs.url = "git+file:///workspace/littledevil/nixpkgs";
     #nixpkgs.url = "path:/home/clownpiece/src/littledevil-infra/src/nixpkgs2";
-    #nixpkgs.url = "git+file:///home/clownpiece/src/littledevil-infra/src/nixpkgs";
+    nixpkgs.url = "git+file:///home/clownpiece/src/littledevil-infra/src/nixpkgs";
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
   };
 
