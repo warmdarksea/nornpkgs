@@ -144,12 +144,18 @@
           #initDb.password = {
           #  _secret = "/var/secret/akkoma/dbpassword";
           #};
-          frontends = {};
-          extraStatic = {
-            "index.html" = pkgs.writeText "index.html" ''
-              <html>backend is working</html>
-            '';
+          frontends = {
+            primary = {
+              package = pkgs.buildPackages.akkoma-fe;
+              name = "akkoma-fe";
+              ref = "stable";
+            };
           };
+          #extraStatic = {
+          #  "index.html" = pkgs.writeText "index.html" ''
+          #    <html>backend is working</html>
+          #  '';
+          #};
 
           config = lib.recursiveUpdate {
             ":pleroma" = {
