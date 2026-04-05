@@ -17,6 +17,9 @@ INSTALL_PATH=/nonexistant
 
 #
 
+SUDO=pkexec
+SUDO_FLAGS=--user root
+
 DTACH_FLAGS=-n
 
 #
@@ -64,7 +67,7 @@ build_sys_closure: $(BUILD_DIR)/sys-$(TARGET)
 build_img: $(BUILD_DIR)/img-$(TARGET)
 
 .PHONY: build_iso_closure
-build_iso: $(BUILD_DIR)/iso-$(ISO_FLAVOR)
+build_iso: $(BUILD_DIR)/iso-$(ISO_FLavor)
 
 #
 
@@ -118,13 +121,11 @@ push_closure_to: $(BUILD_DIR)/sys-$(TARGET)
 
 .PHONY: set_local_active_closure
 set_local_active_closure: $(BUILD_DIR)/sys-$(TARGET)
-	sudo nix-env --profile /nix/var/nix/profiles/system --set $(shell realpath "$<")
-	sudo /nix/var/nix/profiles/system/bin/switch-to-configuration switch
+	$(SUDO) $(SUDO_FLAGS) bash -c 'nix-env --profile /nix/var/nix/profiles/system --set $(shell realpath "$<") && /nix/var/nix/profiles/system/bin/switch-to-configuration switch'
 
 .PHONY: set_local_boot_closure
 set_local_boot_closure: $(BUILD_DIR)/sys-$(TARGET)
-	sudo nix-env --profile /nix/var/nix/profiles/system --set $(shell realpath "$<")
-	sudo /nix/var/nix/profiles/system/bin/switch-to-configuration boot
+	$(SUDO) $(SUDO_FLAGS) bash -c 'nix-env --profile /nix/var/nix/profiles/system --set $(shell realpath "$<") && /nix/var/nix/profiles/system/bin/switch-to-configuration boot'
 
 .PHONY: set_remote_active_closure
 set_remote_active_closure: $(BUILD_DIR)/sys-$(TARGET)
@@ -166,7 +167,7 @@ deploy_remote_boot_closure:	   \
 
 .PHONY: install_closure_to_path
 install_closure_to_path: $(BUILD_DIR)/sys-$(TARGET)
-	sudo nixos-install --no-root-password --root "$(INSTALL_PATH)" --system "$<"
+	$(SUDO) $(SUDO_FLAGS) nixos-install --no-root-password --root "$(INSTALL_PATH)" --system "$<"
 
 # make remote_install_closure_to_path SSH_FLAGS="-i ~/.ssh/id_satori -o StrictHostKeyChecking=false" HOST=furnace REMOTE_STORE_PATH=/mnt INSTALL_PATH=/mnt TARGET=furnace
 .PHONY: remote_install_closure_to_path
@@ -184,7 +185,7 @@ clean:
 
 .PHONY: collect_garbage
 collect_garbage:
-	sudo nix-collect-garbage -d
+	$(SUDO) $(SUDO_FLAGS) nix-collect-garbage -d
 
 # delete references to all generations in between the boot generation and the
 # current generation, exclusive (so skip the boot and current, obviously)
@@ -192,7 +193,7 @@ collect_garbage:
 .PHONY: cleanup_system_generations
 cleanup_system_generations:
 	bash bin/nix-cleanup-generations.sh
-	sudo /nix/var/nix/profiles/system/bin/switch-to-configuration boot
+	$(SUDO) $(SUDO_FLAGS) /nix/var/nix/profiles/system/bin/switch-to-configuration boot
 
 #
 
