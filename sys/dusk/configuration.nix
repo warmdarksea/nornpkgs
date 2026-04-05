@@ -148,16 +148,16 @@ in {
   services.xserver.desktopManager.gnome.enable = true;
   programs.dconf.enable = true;
 
-  services.xrdp.enable = true;
-  services.xrdp.audio.enable = true;
+  #services.xrdp.enable = true;
+  #services.xrdp.audio.enable = true;
   #services.xrdp.port = "tcp://0.0.0.0:3389"; <- this needs nixpkgs patch
   #services.xrdp.defaultWindowManager = "gnome-session";
-  services.xrdp.extraConfDirCommands = ''
-    substituteInPlace $out/sesman.ini \
-      --replace AllowRootLogin=true AllowRootLogin=false \
-      --replace RestrictOutboundClipboard=none RestrictOutboundClipboard=all \
-      --replace RestrictInboundClipboard=none RestrictInboundClipboard=all
-  '';
+  #services.xrdp.extraConfDirCommands = ''
+  #  substituteInPlace $out/sesman.ini \
+  #    --replace AllowRootLogin=true AllowRootLogin=false \
+  #    --replace RestrictOutboundClipboard=none RestrictOutboundClipboard=all \
+  #    --replace RestrictInboundClipboard=none RestrictInboundClipboard=all
+  #'';
   services.avahi.enable = false;
 
   # Configure keymap in X11

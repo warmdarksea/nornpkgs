@@ -18,21 +18,21 @@ let
     "NVidia OptiX EULA"
   ];
 in {
-  nixpkgs.config = {
-    cudaSupport = true;
+  # nixpkgs.config = {
+  #   cudaSupport = true;
 
-    # allowUnfreePredicate = _: true;
+  #   # allowUnfreePredicate = _: true;
 
-    allowUnfreePredicate = let
-      nvidiaNamePred = pkg: (builtins.elem (lib.getName pkg) nvidiaPkgNames);
-      nvidiaLicensePred = pkg: let
-        pkgLicenses = if builtins.isList pkg.meta.license
-                      then pkg.meta.license
-                      else [ pkg.meta.license ];
-      in builtins.all (license:
-        license.free || builtins.elem license.shortName nvidiaLicenses) pkgLicenses;
-    in pkg: (nvidiaNamePred pkg) || (nvidiaLicensePred pkg);
-  };
+  #   allowUnfreePredicate = let
+  #     nvidiaNamePred = pkg: (builtins.elem (lib.getName pkg) nvidiaPkgNames);
+  #     nvidiaLicensePred = pkg: let
+  #       pkgLicenses = if builtins.isList pkg.meta.license
+  #                     then pkg.meta.license
+  #                     else [ pkg.meta.license ];
+  #     in builtins.all (license:
+  #       license.free || builtins.elem license.shortName nvidiaLicenses) pkgLicenses;
+  #   in pkg: (nvidiaNamePred pkg) || (nvidiaLicensePred pkg);
+  # };
 
   hardware.nvidia = {
     # Modesetting is required.

@@ -22,6 +22,8 @@
     ]
   ) (if builtins.isList pkg.meta.license then pkg.meta.license else [ pkg.meta.license ]));
 
+  nix.settings.keep-failed = true;
+
   boot.loader.efi.efiSysMountPoint = "/boot/EFI";
   boot.loader.grub.efiSupport = true;
   boot.loader.grub.efiInstallAsRemovable = true;
