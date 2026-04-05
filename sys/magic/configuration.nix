@@ -22,6 +22,8 @@
     ]
   ) (if builtins.isList pkg.meta.license then pkg.meta.license else [ pkg.meta.license ]));
 
+  nix.settings.keep-failed = true;
+
   boot.loader.efi.efiSysMountPoint = "/boot/EFI";
   boot.loader.grub.efiSupport = true;
   boot.loader.grub.efiInstallAsRemovable = true;
@@ -97,8 +99,8 @@
 
   nixpkgs.config.allowUnfree = true;
 
-  networking.hostName = "magic";
-  networking.hostId = "AAAAAAAA";
+  #networking.hostName = "magic";
+  #networking.hostId = "AAAAAAAA";
   networking.useDHCP = lib.mkDefault true;
   #networking.dhcpcd.enable = false;
   #networking.interfaces.enp6s0.ipv4.addresses = [

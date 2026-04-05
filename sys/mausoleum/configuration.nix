@@ -8,7 +8,7 @@ in {
   #boot.loader.grub.device = "/dev/disk/by-uuid/REDACTED";
   boot.loader.efi.canTouchEfiVariables = true;
 
-  networking.hostName = "mausoleum"; 
+  #networking.hostName = "mausoleum"; 
   networking.networkmanager.enable = true;
   networking.firewall.enable = true;
 

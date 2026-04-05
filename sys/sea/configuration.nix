@@ -16,7 +16,7 @@
   # automatically in hardware-configuration.nix.
   #fileSystems."/".device = "/dev/disk/by-label/REDACTED";
 
-  networking.hostName = "sea";
+  #networking.hostName = "sea";
 
   # Enable the OpenSSH server.
   services.sshd.enable = true;

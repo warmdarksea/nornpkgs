@@ -274,7 +274,13 @@
     ];
   in lib.concatLists [nix_thirdparty base_pkgs desktop_pkgs dev_pkgs local_pkgs shell_scripts];
 
-  programs.bash.enable = true;
+  programs.bash = {
+    enable = true;
+    
+    initExtra = ''
+      PROMPT_COMMAND='printf "\e]0;%s@%s: %s\a" "$USER" "$HOSTNAME" "''${PWD/#$HOME/\~}"'
+    '';
+  };
 
   # shellAliases = {
   #   example = "true";
@@ -338,13 +344,19 @@
       (epkgs.callPackage lean4-mode {})
       epkgs.terraform-mode
       pkgs.tofu-ls
+      epkgs.claude-code
+      epkgs.gptel
+      epkgs.ibuffer-sidebar
+      epkgs.dap-mode
     ];
 
     # i do not recall what problem this was intended to fix...
     extraConfig = ''
+      (add-to-list 'load-path "${./../etc/emacs}")
       (when (not (boundp 'site-lisp-config))
-        (setq site-lisp-config "${dotfiles}/emacs/config.el"))
+        (setq site-lisp-config "${./../etc/emacs/site-config.el}"))
       (load-file site-lisp-config)
+      (load "~/.emacs" t)
     '';
   };
 

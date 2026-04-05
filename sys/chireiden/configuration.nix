@@ -16,7 +16,7 @@
   # automatically in hardware-configuration.nix.
   #fileSystems."/".device = "/dev/disk/by-label/REDACTED";
 
-  networking.hostName = "chireiden";
+  #networking.hostName = "chireiden";
 
   # Enable the OpenSSH server.
   services.sshd.enable = true;
@@ -138,7 +138,7 @@
     systemWide = true;
   };
 
-  virtualisation.lxd.enable = true;
+  #virtualisation.lxd.enable = true;
   virtualisation.podman.enable = true;
   virtualisation.docker.storageDriver = "zfs";
   virtualisation.docker = {
@@ -154,13 +154,13 @@
       package = pkgs.qemu_kvm;
       runAsRoot = true;
       swtpm.enable = true;
-      ovmf = {
-        enable = true;
-        packages = [(pkgs.OVMF.override {
-          secureBoot = true;
-          tpmSupport = true;
-        }).fd];
-      };
+      # ovmf = {
+      #   enable = true;
+      #   packages = [(pkgs.OVMF.override {
+      #     secureBoot = true;
+      #     tpmSupport = true;
+      #   }).fd];
+      # };
     };
   };
 
@@ -180,7 +180,7 @@
     ntfs3g
   ];
 
-  services.udev.packages = with pkgs; [ gnome.gnome-settings-daemon ];
+  services.udev.packages = with pkgs; [ gnome-settings-daemon ];
 
   users.users.satori = {
     uid = 1000;

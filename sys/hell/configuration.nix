@@ -4,7 +4,9 @@
     "vcv-rack"
     # fixme: i don't actually want this directly in the system derivation... i
     # only want the sandbox launcher in the system derivation
+    "bitwig-studio"
     "bitwig-studio-unwrapped"
+    "bitwig-studio-unwrapped-6.0"
   ];
 
   # fixme: is there really no clean way to modularize this
@@ -89,13 +91,15 @@ in rec {
   #boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
 
   system.nixos.tags = [ "lts-kernel" ];
-  boot.kernelPackages = pkgs.linuxPackages;
+  # linuxPackages refers to latest lts kernel
+  boot.kernelPackages = lib.mkForce pkgs.linuxPackages;
   # at the time of writing, this is equal to zfs_unstable
   boot.zfs.package = pkgs.zfs_unstable;
 
   specialisation = {
+    # stable refers to latest (per nixpkgs) stable branch kernel
     stable.configuration = {
-      boot.kernelPackages = lib.mkForce pkgs.linuxPackages_latest;
+      boot.kernelPackages = pkgs.linuxPackages_latest;
       system.nixos.tags = lib.mkForce [ "stable-kernel" ];
     };
   };
@@ -111,7 +115,7 @@ in rec {
 
   nix.settings.experimental-features = [ "nix-command" "flakes" "cgroups" ];
   nix.settings.use-cgroups = true;
-  nix.settings.trusted-users = [ "clownpiece" ];
+  nix.settings.trusted-users = [ "clownpiece" "seiran" ];
 
   # Disable swap for the root slice (all other processes)
   # systemd-run --slice=swap-allowed.slice --scope -p "MemorySwapMax=infinity" your-command
@@ -156,7 +160,7 @@ in rec {
 
   # 
 
-  networking.hostName = "hell";
+  #networking.hostName = "hell";
 
   networking.extraHosts = ''
     0.0.0.0 ldtest.hell.gensokyo.internal
@@ -177,6 +181,15 @@ in rec {
   networking.firewall.allowedUDPPorts = [
     config.networking.wireguard.interfaces.wg-redacted.listenPort
   ];
+
+  networking.firewall.trustedInterfaces = [ "incusbr0" ];
+  # networking.firewall.interfaces.incusbr0 = {
+  #   allowedUDPPorts = [ 53 67 ];
+  # };
+  # networking.firewall.extraForwardRules = ''
+  #   iifname "incusbr0" accept
+  #   oifname "incusbr0" ct state established,related accept
+  # '';
 
   networking.nftables.enable = true;
 
@@ -322,6 +335,27 @@ in rec {
     proggyfonts
     # nerdfonts
     corefonts
+    ultimate-oldschool-pc-font-pack
+  ];
+
+  fonts.fontconfig.localConf = ''
+    <match target="font">
+      <test name="family" compare="contains"><string>IBM VGA</string></test>
+      <edit name="antialias" mode="assign"><bool>false</bool></edit>
+      <edit name="hinting" mode="assign"><bool>false</bool></edit>
+    </match>
+  '';
+
+  security.auditd.enable = true;
+  security.audit.enable = true;
+  security.auditd.plugins = {
+      syslog = {
+        path = lib.getExe' config.security.auditd.package "audisp-syslog";
+        args = [ "LOG_INFO" ];
+      };
+  };
+  security.audit.rules = [
+    "-a always,exit -F arch=b64 -S execve -F uid=${builtins.toString config.users.users.claude.uid} -k claude-exec"
   ];
 
   security.pam.loginLimits = [
@@ -335,6 +369,7 @@ in rec {
   hardware.nvidia-container-toolkit.enable = true;
   virtualisation.incus = {
     enable = true;
+    package = pkgs.incus;
     ui.enable = true;
   };
   virtualisation.podman = {
@@ -363,6 +398,20 @@ in rec {
       swtpm.enable = true;
     };
   };
+
+  services.sanoid = {
+    enable = true;
+    datasets."bell/workspace/miu" = {
+      autosnap = true;
+      autoprune = true;
+      frequently = 4;
+      frequent_period = 15;
+      hourly = 36;
+      daily = 30;
+      monthly = 3;
+    };
+  };
+
   environment.systemPackages = with pkgs; [
     #      gcc
     #      libsForQt5.bismuth
@@ -419,29 +468,45 @@ in rec {
     element-desktop
     android-tools
     tor-browser
+    ghostty
+    foot
   ];
 
   users.groups.magician.gid = 381;
   users.groups.games.gid = 382;
   users.groups.agent.gid = 384;
 
-  users.users.root.subUidRanges = lib.mkForce [{ startUid = 1000000; count = 16777216; }];
+  users.users.root.subUidRanges = lib.mkForce [
+    { startUid = 1000000; count = 1000000000; }
+    { startUid = config.users.users.clownpiece.uid; count = 1; }
+    { startUid = config.users.users.flandre.uid; count = 1; }
+  ];
+  users.users.root.subGidRanges = lib.mkForce [
+    { startGid = 1000000; count = 1000000000; }
+    { startGid = config.ids.gids.audio; count = 1; }
+    { startGid = config.ids.gids.video; count = 1; }
+    { startGid = config.ids.gids.render; count = 1; }
+    { startGid = config.users.groups.agent.gid; count = 1; }
+    { startGid = config.users.groups.games.gid; count = 1; }
+  ];
   users.users.clownpiece = {
     uid = 1000;
     subUidRanges = [
       { startUid = 100000; count = 16777216; }
-      { startUid = 4204; count = 1; }
       { startUid = config.users.users.clownpiece-audio.uid; count = 1; }
+      { startUid = config.users.users.flandre.uid; count = 1; }
+      { startUid = config.users.users.claude.uid; count = 1; }
     ];
     subGidRanges = [
       { startGid = 100000; count = 16777216; }  # Default range
       { startGid = config.ids.gids.audio; count = 1; }
       { startGid = config.ids.gids.video; count = 1; }
       { startGid = config.ids.gids.render; count = 1; }
+      { startGid = config.users.groups.agent.gid; count = 1; }
       { startGid = config.users.groups.games.gid; count = 1; }
       { startGid = config.users.users.clownpiece-audio.uid; count = 1; }
     ];
-    extraGroups = [ "magician" "wheel" "audio" "video" "sudo" "render" "networkmanager" "docker" "podman" "libvirtd" "wireshark" "lxd" "input" "games" "plugdev" "pipewire" "lp" "scanner" "adbusers" "kvm"];
+    extraGroups = [ "magician" "wheel" "audio" "video" "sudo" "render" "networkmanager" "docker" "podman" "libvirtd" "wireshark" "incus" "incus-admin" "input" "games" "plugdev" "pipewire" "lp" "scanner" "adbusers" "kvm"];
     isNormalUser = true;
   };
 
@@ -471,6 +536,8 @@ in rec {
     extraGroups = config.users.users.clownpiece.extraGroups;
     isNormalUser = true;
   };
+
+  nix.settings.allowed-users = [ "claude" ];
 
   system.stateVersion = "24.11"; # Did you read the comment?
 }

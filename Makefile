@@ -17,6 +17,9 @@ INSTALL_PATH=/nonexistant
 
 #
 
+SUDO=pkexec
+SUDO_FLAGS=--user root
+
 DTACH_FLAGS=-n
 
 #
@@ -42,8 +45,7 @@ $(BUILD_DIR):
 # every time
 .PHONY: $(BUILD_DIR)/sys-$(TARGET)
 $(BUILD_DIR)/sys-$(TARGET): flake.nix 	  	    \
-			    flake.lock 		    \
-			    sys/$(TARGET)/flake.nix
+			    flake.lock
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.$(TARGET).config.system.build.toplevel
 
 $(BUILD_DIR)/img-$(TARGET): flake.nix 	  	    \
@@ -65,7 +67,7 @@ build_sys_closure: $(BUILD_DIR)/sys-$(TARGET)
 build_img: $(BUILD_DIR)/img-$(TARGET)
 
 .PHONY: build_iso_closure
-build_iso: $(BUILD_DIR)/iso-$(ISO_FLAVOR)
+build_iso: $(BUILD_DIR)/iso-$(ISO_FLavor)
 
 #
 
@@ -74,7 +76,7 @@ build_remote_sys_closure:
 	$(eval DRV_PATH := $(shell NIXPKGS_ALLOW_UNFREE=$$NIXPKGS_ALLOW_UNFREE nix build $(NIX_FLAGS) --dry-run --json .#nixosConfigurations.$(TARGET).config.system.build.toplevel | jq -r '.[].drvPath' | tail -n1))
 	@echo "Derivation path: $(DRV_PATH)"
 	nix copy "$(DRV_PATH)" --to "ssh://root@$(HOST)"
-	ssh "root@$(HOST)" -- systemd-run --uid=0 --property=StandardOutput=journal --property=StandardError=journal --service-type=oneshot --no-block --unit=nixbuild-$(TARGET) -- nix-store --realise "$(DRV_PATH)"
+	ssh "root@$(HOST)" -- systemd-run --uid=0 --property=StandardOutput=journal --property=StandardError=journal --service-type=oneshot --no-block --unit=nixbuild-$(TARGET) -- nix-store --realise -k "$(DRV_PATH)"
 
 .PHONY: check_build_logs
 check_build_logs:
@@ -119,13 +121,11 @@ push_closure_to: $(BUILD_DIR)/sys-$(TARGET)
 
 .PHONY: set_local_active_closure
 set_local_active_closure: $(BUILD_DIR)/sys-$(TARGET)
-	sudo nix-env --profile /nix/var/nix/profiles/system --set $(shell realpath "$<")
-	sudo /nix/var/nix/profiles/system/bin/switch-to-configuration switch
+	$(SUDO) $(SUDO_FLAGS) bash -c 'nix-env --profile /nix/var/nix/profiles/system --set $(shell realpath "$<") && /nix/var/nix/profiles/system/bin/switch-to-configuration switch'
 
 .PHONY: set_local_boot_closure
 set_local_boot_closure: $(BUILD_DIR)/sys-$(TARGET)
-	sudo nix-env --profile /nix/var/nix/profiles/system --set $(shell realpath "$<")
-	sudo /nix/var/nix/profiles/system/bin/switch-to-configuration boot
+	$(SUDO) $(SUDO_FLAGS) bash -c 'nix-env --profile /nix/var/nix/profiles/system --set $(shell realpath "$<") && /nix/var/nix/profiles/system/bin/switch-to-configuration boot'
 
 .PHONY: set_remote_active_closure
 set_remote_active_closure: $(BUILD_DIR)/sys-$(TARGET)
@@ -167,7 +167,7 @@ deploy_remote_boot_closure:	   \
 
 .PHONY: install_closure_to_path
 install_closure_to_path: $(BUILD_DIR)/sys-$(TARGET)
-	sudo nixos-install --no-root-password --root "$(INSTALL_PATH)" --system "$<"
+	$(SUDO) $(SUDO_FLAGS) nixos-install --no-root-password --root "$(INSTALL_PATH)" --system "$<"
 
 # make remote_install_closure_to_path SSH_FLAGS="-i ~/.ssh/id_satori -o StrictHostKeyChecking=false" HOST=furnace REMOTE_STORE_PATH=/mnt INSTALL_PATH=/mnt TARGET=furnace
 .PHONY: remote_install_closure_to_path
@@ -185,7 +185,7 @@ clean:
 
 .PHONY: collect_garbage
 collect_garbage:
-	sudo nix-collect-garbage -d
+	$(SUDO) $(SUDO_FLAGS) nix-collect-garbage -d
 
 # delete references to all generations in between the boot generation and the
 # current generation, exclusive (so skip the boot and current, obviously)
@@ -193,7 +193,7 @@ collect_garbage:
 .PHONY: cleanup_system_generations
 cleanup_system_generations:
 	bash bin/nix-cleanup-generations.sh
-	sudo /nix/var/nix/profiles/system/bin/switch-to-configuration boot
+	$(SUDO) $(SUDO_FLAGS) /nix/var/nix/profiles/system/bin/switch-to-configuration boot
 
 #
 

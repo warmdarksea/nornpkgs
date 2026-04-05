@@ -43,7 +43,7 @@
       fsType = "vfat";
     };
 
-  networking.hostId = "AAAAAAAA";
+  #networking.hostId = "AAAAAAAA";
   swapDevices = [ ];
 
   # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
