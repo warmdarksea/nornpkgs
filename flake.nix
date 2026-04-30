@@ -3,7 +3,8 @@
 
   inputs = {
     #nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?ref=gensokyo-master&rev=90a81b8f3db208bfc05c90f2061969706d71fe89";
-    nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?rev=bfc1b8a4574108ceef22f02bafcf6611380c100d";
+    #nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?rev=bfc1b8a4574108ceef22f02bafcf6611380c100d";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     nixos-hardware.url = "git+file:///home/clownpiece/src/nixos-hardware?ref=gensokyo-master";
 
     emacs-overlay = {
@@ -45,16 +46,6 @@
       url = "path:/home/clownpiece/src/nornpkgs";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    # installer/livecd derivations
-    iso-minimal = {
-      url = "path:./iso/minimal";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    iso-livecd = {
-      url = "path:./iso/livecd";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs = {
@@ -71,9 +62,6 @@
 
     gensokyo-dotfiles,
     nornpkgs,
-
-    iso-minimal,
-    iso-livecd,
       ... }@inputs: let
      lib = nixpkgs.lib;
     in {

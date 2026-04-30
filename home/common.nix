@@ -360,16 +360,16 @@
     '';
   };
 
-  programs.neovim = {
-    enable = true;
-    plugins = with pkgs.vimPlugins; [
-      nvim-tree-lua
-      nvim-web-devicons
-      nvim-lspconfig
-      lean-nvim
-    ];
-    extraPackages = with pkgs; [ lean4 ];
-  };
+  # programs.neovim = {
+  #   enable = true;
+  #   plugins = with pkgs.vimPlugins; [
+  #     nvim-tree-lua
+  #     nvim-web-devicons
+  #     nvim-lspconfig
+  #     lean-nvim
+  #   ];
+  #   extraPackages = with pkgs; [ lean4 ];
+  # };
 
   programs.firefox = {
     enable = true;
