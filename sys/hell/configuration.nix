@@ -273,6 +273,10 @@ in rec {
   services.desktopManager.gnome.enable = true;
 
   programs.hyprland.enable = true;
+  xdg.portal = {
+    enable = true;
+    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
+  };
 
   services.displayManager.defaultSession = "gnome";
   services.displayManager.autoLogin = {
@@ -470,6 +474,7 @@ in rec {
     tor-browser
     ghostty
     foot
+    xorg.xauth
   ];
 
   users.groups.magician.gid = 381;

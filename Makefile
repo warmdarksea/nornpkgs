@@ -179,13 +179,21 @@ remote_install_closure_to_path: $(BUILD_DIR)/sys-$(TARGET) \
 
 #
 
+update_hell:
+	incus exec basement -- /bin/bash -c -- 'pacman -Syu --noconfirm'
+
+#
+
 .PHONY: clean
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: collect_garbage
-collect_garbage:
+.PHONY: gc gc_local gc_remote
+gc: gc_local
+gc_local:
 	$(SUDO) $(SUDO_FLAGS) nix-collect-garbage -d
+gc_remote: remote_assert
+	ssh "root@$(HOST)" -- nix-collect-garbage -d
 
 # delete references to all generations in between the boot generation and the
 # current generation, exclusive (so skip the boot and current, obviously)

@@ -146,7 +146,7 @@
       #lxappearance
       #filezilla
       #firefox-wayland
-      firefox
+      #firefox
       #cdrkit
       #cuetools
       flac
@@ -369,6 +369,15 @@
       lean-nvim
     ];
     extraPackages = with pkgs; [ lean4 ];
+  };
+
+  programs.firefox = {
+    enable = true;
+    policies = {
+      Certificates = {
+        ImportEnterpriseRoots = true;
+      };
+    };
   };
 
   # programs.vscode = {

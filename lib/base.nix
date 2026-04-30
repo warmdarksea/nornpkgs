@@ -31,6 +31,8 @@
     ../etc/certs/gensokyo.internal.ca.pem
   ];
 
+  environment.etc."pki/ca-trust/source/anchors/gensokyo.internal.ca.pem".source = ../etc/certs/gensokyo.internal.ca.pem;
+
   services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = false;
   services.openssh.settings.PermitRootLogin = "prohibit-password";

@@ -2,7 +2,8 @@
   description = "flake for managing systems of *.gensokyo.internal";
 
   inputs = {
-    nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs";
+    #nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?ref=gensokyo-master&rev=90a81b8f3db208bfc05c90f2061969706d71fe89";
+    nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?rev=bfc1b8a4574108ceef22f02bafcf6611380c100d";
     nixos-hardware.url = "git+file:///home/clownpiece/src/nixos-hardware?ref=gensokyo-master";
 
     emacs-overlay = {
@@ -171,6 +172,26 @@
       modules = [
         {
           networking.hostName = "dusk";
+          networking.hostId = "AAAAAAAA";
+        }
+        self.nixosModules.base
+        self.nixosModules.defaultOverlays
+        lanzaboote.nixosModules.lanzaboote
+        ./sys/dusk/configuration.nix
+        ./sys/dusk/hardware-configuration.nix
+        home-manager.nixosModules.home-manager {
+          home-manager.useUserPackages = true;
+          home-manager.useGlobalPkgs = true;
+          home-manager.users."rumia" = self.homeManagerModules.magician;
+        }
+      ];
+    };
+
+    nixosConfigurations.eientei = lib.nixosSystem {
+      system = "i686-linux";
+      modules = [
+        {
+          networking.hostName = "eientei";
           networking.hostId = "AAAAAAAA";
         }
         self.nixosModules.base
