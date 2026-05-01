@@ -18,7 +18,7 @@ INSTALL_PATH=/nonexistant
 #
 
 SUDO=pkexec
-SUDO_FLAGS=--user root
+SUDO_FLAGS=
 
 DTACH_FLAGS=-n
 
@@ -43,19 +43,20 @@ $(BUILD_DIR):
 
 # can't be bothered figuring out all of the dependencies, just build it again
 # every time
-.PHONY: $(BUILD_DIR)/sys-$(TARGET)
-$(BUILD_DIR)/sys-$(TARGET): flake.nix 	  	    \
-			    flake.lock
-	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.$(TARGET).config.system.build.toplevel
+.PHONY: $(BUILD_DIR)/sys-%.drv
+$(BUILD_DIR)/sys-%.drv:
+	nix build $(NIX_FLAGS) --dry-run --json .#nixosConfigurations.$*.config.system.build.toplevel | jq -r '.[].drvPath' | tail -n1 | xargs -I{} ln -sfn {} $@
+
+.PHONY: $(BUILD_DIR)/sys-%
+$(BUILD_DIR)/sys-%:
+	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.$*.config.system.build.toplevel
 
 $(BUILD_DIR)/img-$(TARGET): flake.nix 	  	    \
-			    flake.lock 		    \
-			    sys/$(TARGET)/flake.nix
+			    flake.lock
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.$(TARGET).config.system.build.sdImage
 
 $(BUILD_DIR)/iso-$(ISO_FLAVOR): flake.nix 	  	    \
-				flake.lock 		    \
-				iso/$(ISO_FLAVOR)/flake.nix
+				flake.lock
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.iso-$(ISO_FLAVOR).config.system.build.isoImage
 
 #
@@ -67,41 +68,36 @@ build_sys_closure: $(BUILD_DIR)/sys-$(TARGET)
 build_img: $(BUILD_DIR)/img-$(TARGET)
 
 .PHONY: build_iso_closure
-build_iso: $(BUILD_DIR)/iso-$(ISO_FLavor)
+build_iso: $(BUILD_DIR)/iso-$(ISO_FLAVOR)
 
-#
+# remote building
+.PHONY: remote_build_sys_closure remote_build_reset remote_build_log remote_build_status remote_build_check remote_pull_sys_closure
 
-.PHONY: build_remote_sys_closure
-build_remote_sys_closure:
-	$(eval DRV_PATH := $(shell NIXPKGS_ALLOW_UNFREE=$$NIXPKGS_ALLOW_UNFREE NIXPKGS_ALLOW_INSECURE=$$NIXPKGS_ALLOW_INSECURE nix build $(NIX_FLAGS) --dry-run --json .#nixosConfigurations.$(TARGET).config.system.build.toplevel | jq -r '.[].drvPath' | tail -n1))
-	@echo "Derivation path: $(DRV_PATH)"
-	nix copy "$(DRV_PATH)" --to "ssh://root@$(HOST)"
-	ssh "root@$(HOST)" -- systemd-run --uid=0 --property=StandardOutput=journal --property=StandardError=journal --service-type=oneshot --no-block --unit=nixbuild-$(TARGET) -- nix-store --realise -k "$(DRV_PATH)"
+.PHONY: $(BUILD_DIR)/remote-sys-%
+$(BUILD_DIR)/remote-sys-%:
+	nix build $(NIX_FLAGS) --dry-run --json .#nixosConfigurations.$*.config.system.build.toplevel | jq -r '.[].outputs.out' | tail -n1 | xargs -I{} ln -sfn {} $@
 
-.PHONY: check_build_logs
-check_build_logs:
-	ssh "root@$(HOST)" 'journalctl -u nixbuild-$(TARGET) -f'
+remote_build_sys_closure: $(BUILD_DIR)/sys-$(TARGET).drv
+	@echo "Derivation path: $(shell realpath $<)"
+	nix copy "$(shell realpath $<)" --to "ssh://root@$(HOST)"
+	ssh "root@$(HOST)" -- systemd-run --uid=0 --property=StandardOutput=journal --property=StandardError=journal --service-type=oneshot --no-block --unit=nixbuild-$(TARGET) -- nix-store --realise -k "$(shell realpath $<)"
 
-.PHONY: check_build_status
-check_build_status:
-	ssh "root@$(HOST)" 'systemctl status nixbuild-$(TARGET)'
-
-.PHONY: reset_build
-reset_build:
+remote_build_reset:
 	ssh "root@$(HOST)" 'systemctl reset-failed nixbuild-$(TARGET)'
 
-.PHONY: pull_remote_sys_closure
-pull_remote_sys_closure:
-	$(eval OUTPUT_PATH := $(shell NIXPKGS_ALLOW_UNFREE=$$NIXPKGS_ALLOW_UNFREE nix build $(NIX_FLAGS) --dry-run --json .#nixosConfigurations.$(TARGET).config.system.build.toplevel | jq -r '.[].outputs.out'))
-	@echo "Pulling $(OUTPUT_PATH) from $(HOST)"
-	nix copy --no-check-sigs --from "ssh://root@$(HOST)" "$(OUTPUT_PATH)"
-	rm -f $(BUILD_DIR)/sys-$(TARGET)
-	ln -s $(OUTPUT_PATH) $(BUILD_DIR)/sys-$(TARGET)
+remote_build_log:
+	ssh "root@$(HOST)" 'journalctl -u nixbuild-$(TARGET) -f'
 
-.PHONY: check_remote_sys_closure
-check_remote_sys_closure:
-	$(eval OUTPUT_PATH := $(shell NIXPKGS_ALLOW_UNFREE=$$NIXPKGS_ALLOW_UNFREE nix build $(NIX_FLAGS) --dry-run --json .#nixosConfigurations.$(TARGET).config.system.build.toplevel | jq -r '.[].outputs.out'))
-	ssh "root@$(HOST)" -- ls -d "$(OUTPUT_PATH)"
+remote_build_status:
+	ssh "root@$(HOST)" 'systemctl status nixbuild-$(TARGET)'
+
+remote_build_check: $(BUILD_DIR)/remote-sys-$(TARGET)
+	ssh "root@$(HOST)" -- ls -d "$(shell realpath $<)"
+
+remote_pull_sys_closure: $(BUILD_DIR)/remote-sys-$(TARGET)
+	@echo "Pulling $(shell realpath $<) from $(HOST)"
+	nix copy --no-check-sigs --from "ssh://root@$(HOST)" "$(shell realpath $<)"
+	ln -sfn $(shell realpath $<) $(BUILD_DIR)/sys-$(TARGET)
 
 #
 
@@ -164,6 +160,19 @@ deploy_remote_boot_closure:	   \
 	$(BUILD_DIR)/sys-$(TARGET) \
 	push_closure		   \
 	set_remote_boot_closure
+
+# gcs all but boot/current closures (that's the 'a') then deploys the next
+# closure (the 'b' closure). furnace can hold about 4 generations at once in its
+# EFI partition, so it's useful for constrained systems
+.PHONY: remote_gc_ab
+remote_gc_ab: remote_assert
+	ssh "root@$(HOST)" -- bash -s < bin/nix-gc-ab.sh
+	ssh "root@$(HOST)" -- /nix/var/nix/profiles/system/bin/switch-to-configuration boot
+
+.PHONY: deploy_remote_ab_closure
+deploy_remote_ab_closure:          \
+	remote_gc_ab               \
+	deploy_remote_boot_closure
 
 .PHONY: install_closure_to_path
 install_closure_to_path: $(BUILD_DIR)/sys-$(TARGET)
