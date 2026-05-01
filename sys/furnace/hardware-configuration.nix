@@ -38,49 +38,45 @@
       pkiBundle = "/var/secret/secureboot";
     };
 
-    systemd.services."serial-getty@ttyUSB0".enable = true;
+    #systemd.services."serial-getty@ttyUSB0".enable = true;
 
     boot.supportedFilesystems = [ "vfat" ];
-    boot.initrd.luks.reusePassphrases = true;
     boot.zfs.requestEncryptionCredentials = false;
-
-    boot.initrd.postDeviceCommands = pkgs.lib.mkBefore ''
-      mkdir -p /boot
-      mount /dev/disk/by-uuid/REDACTED /boot
-    '';
 
     boot.initrd.luks.devices = {
       fern0 = {
         device = "/dev/disk/by-id/REDACTED";
         header = "/boot/crypt/fern0.h";
-        preLVM = false;
       };
       fern1 = {
         device = "/dev/disk/by-id/REDACTED";
         header = "/boot/crypt/fern1.h";
-        preLVM = false;
       };
     };
 
-    #   systemd.services.decrypt-yet = {
-      #   description = "Decrypt additional LUKS device";
-      #   after = [ "local-fs.target" ];  # wait for filesystems to be mounted
-      #   wantedBy = [ "multi-user.target" ];
-      #   path = with pkgs; [cryptsetup];
-      #   #BindReadOnlyPaths = [
-        #   #  "/var/secret/yet"                    # Your key file
-        #   #];
-        #   serviceConfig = {
-          #     Type = "oneshot";
-          #     #ProtectSystem = false;       # Need filesystem access
-          #     ExecStart = [
-            #       ""
-            #       "${pkgs.cryptsetup}/bin/cryptsetup luksOpen --header /var/secret/yet/yet0.h -d /var/secret/yet/yet0.k /dev/disk/by-id/REDACTED yet0"
-            #       "${pkgs.cryptsetup}/bin/cryptsetup luksOpen --header /var/secret/yet/yet1.h -d /var/secret/yet/yet1.k /dev/disk/by-id/REDACTED yet1"
-            #     ];
-            #     RemainAfterExit = true;
-            #   };
-            # };
+    boot.initrd.systemd.services.mount-boot = {
+      description = "Mount /boot for LUKS headers";
+      before = [
+        "systemd-cryptsetup@fern0.service"
+        "systemd-cryptsetup@fern1.service"
+      ];
+      requiredBy = [
+        "systemd-cryptsetup@fern0.service"
+        "systemd-cryptsetup@fern1.service"
+      ];
+      unitConfig = {
+        DefaultDependencies = false;
+      };
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p /boot";
+        ExecStart = "${pkgs.util-linux}/bin/mount -t vfat /dev/disk/by-uuid/REDACTED /boot";
+        #ExecStop = "${pkgs.util-linux}/bin/umount /boot";
+      };
+    };
+
+    boot.initrd.systemd.storePaths = [ "${pkgs.util-linux}/bin/mount" "${pkgs.util-linux}/bin/umount" "${pkgs.coreutils}/bin/mkdir" ];
 
     fileSystems."/" = {
       device = "fern";
@@ -90,6 +86,7 @@
     fileSystems."/boot" = {
       device = "/dev/disk/by-uuid/REDACTED";
       fsType = "vfat";
+      neededForBoot = true;
       options = [ "fmask=0022" "dmask=0022" ];
     };
 
