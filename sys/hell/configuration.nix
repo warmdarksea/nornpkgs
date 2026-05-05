@@ -350,6 +350,8 @@ in rec {
     </match>
   '';
 
+  fonts.fontDir.enable = true;
+
   security.auditd.enable = true;
   security.audit.enable = true;
   security.auditd.plugins = {
@@ -375,6 +377,7 @@ in rec {
     enable = true;
     package = pkgs.incus;
     ui.enable = true;
+    bucketSupport = false;
   };
   virtualisation.podman = {
     enable = true;

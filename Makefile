@@ -171,6 +171,8 @@ remote_gc_ab: remote_assert
 
 .PHONY: deploy_remote_ab_closure
 deploy_remote_ab_closure:          \
+	remote_assert              \
+	$(BUILD_DIR)/sys-$TARGET   \
 	remote_gc_ab               \
 	deploy_remote_boot_closure
 
