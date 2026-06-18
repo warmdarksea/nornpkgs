@@ -5,6 +5,7 @@
     #nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?ref=gensokyo-master&rev=90a81b8f3db208bfc05c90f2061969706d71fe89";
     #nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?rev=bfc1b8a4574108ceef22f02bafcf6611380c100d";
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    #nixpkgs.url = "github:nixos/nixpkgs/26f079d4265d403f27f164336c7e20d774d91393";
     nixos-hardware.url = "git+file:///home/clownpiece/src/nixos-hardware?ref=gensokyo-master";
 
     emacs-overlay = {
@@ -289,6 +290,13 @@
         "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
         self.nixosModules.base
         ./sys/minimal.nix
+        {
+          hostName = "gensokyo-installer";
+          # ISO image configuration
+          isoImage.makeEfiBootable = true;
+          isoImage.makeUsbBootable = true;
+          isoImage.compressImage = true;
+        }
       ];
     };
 
@@ -300,5 +308,22 @@
         ./sys/livecd.nix
       ];
     };
-  };
+
+    nixosConfigurations.gensokyo-recovery = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        {
+          networking.hostName = "gensokyo-recovery";
+          networking.hostId = "AAAAAAAA";
+        }
+        self.nixosModules.base
+        ./sys/minimal.nix
+        ./sys/recovery.nix   # the new module
+      ];
+    };
+
+    # and, mirroring your existing packages.<arch>.images.<name> pattern:
+    images.gensokyo-recovery =
+      self.nixosConfigurations.gensokyo-recovery.config.system.build.image;
+    };
 }

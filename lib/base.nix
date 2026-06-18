@@ -60,6 +60,9 @@
     nix-tree
     nmap
     fastfetch
+    tpm2-tools
+    gptfdisk
+    e2fsprogs
   ];
 
   console = let 
