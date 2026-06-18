@@ -108,7 +108,7 @@ in rec {
   hardware.sensor.iio.enable = true;
   hardware.rtl-sdr.enable = true;
   hardware.nvidia = {
-    package = config.boot.kernelPackages.nvidiaPackages.beta;
+    package = config.boot.kernelPackages.nvidiaPackages.stable;
     prime.amdgpuBusId = "PCI:1:0:0";
     prime.nvidiaBusId = "PCI:105:0:0";
   };
@@ -377,7 +377,7 @@ in rec {
     enable = true;
     package = pkgs.incus;
     ui.enable = true;
-    bucketSupport = false;
+    #bucketSupport = false;
   };
   virtualisation.podman = {
     enable = true;
