@@ -48,16 +48,16 @@ $(BUILD_DIR)/sys-%.drv:
 	nix build $(NIX_FLAGS) --dry-run --json .#nixosConfigurations.$*.config.system.build.toplevel | jq -r '.[].drvPath' | tail -n1 | xargs -I{} ln -sfn {} $@
 
 .PHONY: $(BUILD_DIR)/sys-%
-$(BUILD_DIR)/sys-%:
+$(BUILD_DIR)/sys-%: flake.nix flake.lock
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.$*.config.system.build.toplevel
 
-$(BUILD_DIR)/img-$(TARGET): flake.nix 	  	    \
+$(BUILD_DIR)/img-%: flake.nix 	  	    \
 			    flake.lock
-	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.$(TARGET).config.system.build.sdImage
+	nix build $(NIX_FLAGS) -o "$@" .#images.$*
 
-$(BUILD_DIR)/iso-$(ISO_FLAVOR): flake.nix 	  	    \
+$(BUILD_DIR)/iso-%: flake.nix 	  	    \
 				flake.lock
-	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.iso-$(ISO_FLAVOR).config.system.build.isoImage
+	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.iso-$*.config.system.build.isoImage
 
 #
 
@@ -98,6 +98,68 @@ remote_pull_sys_closure: $(BUILD_DIR)/remote-sys-$(TARGET)
 	@echo "Pulling $(shell realpath $<) from $(HOST)"
 	nix copy --no-check-sigs --from "ssh://root@$(HOST)" "$(shell realpath $<)"
 	ln -sfn $(shell realpath $<) $(BUILD_DIR)/sys-$(TARGET)
+
+#
+
+# remote package building (arbitrary flake refs, not system closures)
+#
+# usage:
+#   make remote_build_pkg PKG=nixpkgs#leanPackages.mathlib HOST=magic.gensokyo.internal
+#   make remote_build_pkg_log    PKG=... HOST=...
+#   make remote_build_pkg_status PKG=... HOST=...
+#   make remote_pull_pkg         PKG=... HOST=...
+
+PKG ?=
+# PKG_NAME is derived from PKG for use in unit/file names. override if ugly.
+PKG_NAME ?= $(shell echo '$(PKG)' | sed 's/[^a-zA-Z0-9]/-/g')
+
+.PHONY: remote_build_pkg remote_build_pkg_log remote_build_pkg_status \
+        remote_build_pkg_reset remote_build_pkg_check remote_pull_pkg
+
+# always re-resolve the .drv (flake.lock or source may have changed)
+.PHONY: $(BUILD_DIR)/pkg-$(PKG_NAME).drv
+$(BUILD_DIR)/pkg-$(PKG_NAME).drv:
+	@test -n "$(PKG)" || { echo "PKG must be set, e.g. PKG=nixpkgs#leanPackages.mathlib"; exit 1; }
+	nix build $(NIX_FLAGS) --dry-run --json '$(PKG)' | jq -r '.[].drvPath' | tail -n1 | xargs -I{} ln -sfn {} $@
+
+.PHONY: $(BUILD_DIR)/remote-pkg-$(PKG_NAME)
+$(BUILD_DIR)/remote-pkg-$(PKG_NAME):
+	@test -n "$(PKG)" || { echo "PKG must be set"; exit 1; }
+	nix build $(NIX_FLAGS) --dry-run --json '$(PKG)' | jq -r '.[].outputs.out' | tail -n1 | xargs -I{} ln -sfn {} $@
+
+remote_build_pkg: $(BUILD_DIR)/pkg-$(PKG_NAME).drv
+	@echo "Building $(PKG)"
+	@echo "  drv:  $(shell realpath $<)"
+	@echo "  on:   $(HOST)"
+	nix copy "$(shell realpath $<)" --to "ssh://root@$(HOST)"
+	ssh "root@$(HOST)" -- systemd-run \
+	  --uid=0 \
+	  --property=StandardOutput=journal \
+	  --property=StandardError=journal \
+	  --service-type=oneshot \
+	  --no-block \
+	  --unit=nixbuild-pkg-$(PKG_NAME) \
+	  -- nix-store --realise -k "$(shell realpath $<)"
+	@echo
+	@echo "started. monitor with:"
+	@echo "  make remote_build_pkg_log PKG='$(PKG)' HOST=$(HOST)"
+
+remote_build_pkg_log:
+	ssh "root@$(HOST)" 'journalctl -u nixbuild-pkg-$(PKG_NAME) -f'
+
+remote_build_pkg_status:
+	ssh "root@$(HOST)" 'systemctl status nixbuild-pkg-$(PKG_NAME)'
+
+remote_build_pkg_reset:
+	ssh "root@$(HOST)" 'systemctl reset-failed nixbuild-pkg-$(PKG_NAME)'
+
+remote_build_pkg_check: $(BUILD_DIR)/remote-pkg-$(PKG_NAME)
+	ssh "root@$(HOST)" -- ls -d "$(shell realpath $<)"
+
+remote_pull_pkg: $(BUILD_DIR)/remote-pkg-$(PKG_NAME)
+	@echo "pulling $(shell realpath $<) from $(HOST)"
+	nix copy --no-check-sigs --from "ssh://root@$(HOST)" "$(shell realpath $<)"
+	ln -sfn $(shell realpath $<) $(BUILD_DIR)/pkg-$(PKG_NAME)
 
 #
 
