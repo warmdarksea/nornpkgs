@@ -51,12 +51,10 @@ $(BUILD_DIR)/sys-%.drv:
 $(BUILD_DIR)/sys-%: flake.nix flake.lock
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.$*.config.system.build.toplevel
 
-$(BUILD_DIR)/img-%: flake.nix 	  	    \
-			    flake.lock
+$(BUILD_DIR)/img-%:
 	nix build $(NIX_FLAGS) -o "$@" .#images.$*
 
-$(BUILD_DIR)/iso-%: flake.nix 	  	    \
-				flake.lock
+$(BUILD_DIR)/iso-%:
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.iso-$*.config.system.build.isoImage
 
 #
