@@ -11,6 +11,22 @@ RUN npm install -g @anthropic-ai/claude-code
 
 RUN groupadd -g 384 agent && useradd -u 4738 -g 384 -m -s /bin/bash claude
 
+ARG DEV_GROUP=kvm
+ARG DEV_GID=302
+
+RUN set -eux; \
+    if existing="$(getent group "${DEV_GID}" | cut -d: -f1)"; [ -n "${existing}" ]; then \
+        echo "GID ${DEV_GID} already held by '${existing}' — reusing it"; \
+        target="${existing}"; \
+    elif getent group "${DEV_GROUP}" >/dev/null 2>&1; then \
+        groupmod -g "${DEV_GID}" "${DEV_GROUP}"; \
+        target="${DEV_GROUP}"; \
+    else \
+        groupadd -r -g "${DEV_GID}" "${DEV_GROUP}"; \
+        target="${DEV_GROUP}"; \
+    fi; \
+    usermod -aG "${target}" claude
+
 ENV GIT_AUTHOR_NAME="Claude"
 ENV GIT_AUTHOR_EMAIL="claude@anthropic.com"
 ENV PATH="/nix/var/nix/profiles/default/bin:${PATH}"

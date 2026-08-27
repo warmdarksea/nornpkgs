@@ -304,9 +304,9 @@
   };
 in {
   home.packages = [
-    sandboxed-hydrus.config.script
+    #sandboxed-hydrus.config.script
     #bitwig-sandboxed
-    my-bitwig-studio6
+    #my-bitwig-studio6
   ];
   # xdg.desktopEntries =  {
   #   hydrus = {

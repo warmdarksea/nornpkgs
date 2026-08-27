@@ -65,7 +65,8 @@
     gensokyo-dotfiles,
     nornpkgs,
       ... }@inputs: let
-     lib = nixpkgs.lib;
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        lib = nixpkgs.lib;
     in {
     # nix modules
 
@@ -235,6 +236,21 @@
       ];
     };
 
+    nixosConfigurations.library = lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        {
+          networking.hostName = "library";
+          networking.hostId = "AAAAAAAA";
+        }
+        self.nixosModules.base
+        self.nixosModules.defaultOverlays
+        lanzaboote.nixosModules.lanzaboote
+        ./sys/library/configuration.nix
+        #./sys/library/hardware-configuration.nix
+      ];
+    };
+
     nixosConfigurations.magic = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
@@ -321,6 +337,11 @@
         ./sys/minimal.nix
         ./sys/recovery.nix   # the new module
       ];
+    };
+
+    packages.x86_64-linux.claude-env = pkgs.buildEnv {
+      name = "claude-env";
+      paths = with pkgs; [ nix gitMinimal bash coreutils ];
     };
 
     # and, mirroring your existing packages.<arch>.images.<name> pattern:

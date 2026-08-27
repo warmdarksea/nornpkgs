@@ -57,6 +57,9 @@ $(BUILD_DIR)/img-%:
 $(BUILD_DIR)/iso-%:
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.iso-$*.config.system.build.isoImage
 
+$(BUILD_DIR)/env-%:
+	nix build $(NIX_FLAGS) -o "$@" .#packages.x86_64-linux.$*
+
 #
 
 .PHONY: build_sys_closure

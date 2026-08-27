@@ -511,6 +511,7 @@ in rec {
       { startGid = config.ids.gids.video; count = 1; }
       { startGid = config.ids.gids.render; count = 1; }
       { startGid = config.users.groups.agent.gid; count = 1; }
+      { startGid = config.users.groups.kvm.gid; count = 1; }
       { startGid = config.users.groups.games.gid; count = 1; }
       { startGid = config.users.users.clownpiece-audio.uid; count = 1; }
     ];
@@ -535,7 +536,7 @@ in rec {
   users.users.claude = {
     uid = 4738; # i asked him
     group = "agent";
-    extraGroups = [ ];
+    extraGroups = [ "kvm" ];
     isNormalUser = true;
   };
 

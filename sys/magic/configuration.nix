@@ -32,42 +32,52 @@
   boot.initrd.kernelModules = [ ];
   boot.extraModulePackages = [ ];
 
-  boot.initrd.secrets = {
-    "/alloy.h" = /boot/alloy.h;
-  };
-
-  boot.initrd.luks.devices = {
-    crypted = {
-      device = "/dev/disk/by-id/REDACTED";
-      header = "/alloy.h";
-      preLVM = true;
-    };
-  };
-
-  fileSystems."/" =
-    { device = "alloy";
-      fsType = "zfs";
-    };
-
-  fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/REDACTED";
-      fsType = "ext4";
-    };
-
-  fileSystems."/boot/EFI" =
-    { device = "/dev/disk/by-uuid/REDACTED";
-      fsType = "vfat";
-    };
-
-  fileSystems."/home" =
-    { device = "alloy/home";
+    fileSystems."/" =
+    { device = "story";
       fsType = "zfs";
     };
 
   fileSystems."/nix" =
-    { device = "alloy/nix";
+    { device = "story/nix";
       fsType = "zfs";
     };
+
+  # boot.initrd.secrets = {
+  #   "/alloy.h" = /boot/alloy.h;
+  # };
+
+  # boot.initrd.luks.devices = {
+  #   crypted = {
+  #     device = "/dev/disk/by-id/REDACTED";
+  #     header = "/alloy.h";
+  #     preLVM = true;
+  #   };
+  # };
+
+  # fileSystems."/" =
+  #   { device = "alloy";
+  #     fsType = "zfs";
+  #   };
+
+  # fileSystems."/boot" =
+  #   { device = "/dev/disk/by-uuid/REDACTED";
+  #     fsType = "ext4";
+  #   };
+
+  # fileSystems."/boot/EFI" =
+  #   { device = "/dev/disk/by-uuid/REDACTED";
+  #     fsType = "vfat";
+  #   };
+
+  # fileSystems."/home" =
+  #   { device = "alloy/home";
+  #     fsType = "zfs";
+  #   };
+
+  # fileSystems."/nix" =
+  #   { device = "alloy/nix";
+  #     fsType = "zfs";
+  #   };
 
   #     fileSystems."/mnt/oft" =
   #       { device = "oft";
@@ -109,16 +119,16 @@
   #networking.defaultGateway = "0.0.0.0";
   #networking.nameservers = ["0.0.0.0"];
 
-  virtualisation.docker = {
-    enable = true;
-    enableNvidia = true;
+  # virtualisation.docker = {
+  #   enable = true;
+  #   enableNvidia = true;
 
-    # overlayfs backed by zfs is broken, you need to use zfs proper for it to work
-    storageDriver = "zfs";
-    daemon.settings = {
-      storage-opts = [ "zfs.fsname=alloy/docker" ];
-    };
-  };
+  #   # overlayfs backed by zfs is broken, you need to use zfs proper for it to work
+  #   storageDriver = "zfs";
+  #   daemon.settings = {
+  #     storage-opts = [ "zfs.fsname=alloy/docker" ];
+  #   };
+  # };
 
   users.users.marisa = {
     isNormalUser = true;
