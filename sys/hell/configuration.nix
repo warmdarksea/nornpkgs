@@ -226,9 +226,12 @@ in rec {
   #  "ja_JP.SJIS"
   #];
 
-  security.pki.certificateFiles = [
-    ../../etc/certs/gensokyo.internal.ca.pem
-  ];
+  # the internal CA cert lives in gensokyo-private.nixosModules.hell
+  # (public keys are private, and the redacted stand-in in etc/certs
+  # isn't valid DER, which breaks the nss-cacert build)
+  #security.pki.certificateFiles = [
+  #  ../../etc/certs/gensokyo.internal.ca.pem
+  #];
 
   services.resolved.llmnr = "false";
 
