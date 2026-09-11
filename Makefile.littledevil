@@ -28,7 +28,7 @@ LIBVIRT_FLAGS := -c $(LIBVIRT_URI)
 
 LIBVIRT_HOST  := ldtest.hell.gensokyo.internal
 
-OCI_SECRETS_SRC := $(shell find $(SECRET_DIR) -type f)
+OCI_SECRETS_SRC := $(shell find $(SECRET_DIR) -type f 2>/dev/null)
 
 WWW_CLUB_SRC := $(shell find www/littledevil.club -type f)
 WWW_ORG_SRC := $(shell find www/littledevil.org -type f)

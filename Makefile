@@ -295,6 +295,11 @@ run_vm_closure: \
 query_config:
 	nix-instantiate --eval sys/$(TARGET).nix -A $(OPTION)
 
+#
+
+# littledevil (akkoma on oracle cloud) targets
+include Makefile.littledevil
+
 .PHONY: why_depends_sys
 why_depends_sys:
 	nix why-depends -I nixos-config=sys/$(TARGET).nix $(NIX_FLAGS) --attr system sys/$(TARGET).nix
