@@ -34,8 +34,11 @@
     # contain credentials (e.g., knowledge of VPN endpoints could be used to
     # correlate identities, etc). so, some options are stored in a local private
     # git repo
+    # the public branch is a stub whose per-host modules are all empty; when
+    # building locally, override this input to the private branch:
+    #   make ... PRIVATE_FLAKE='git+file:///home/clownpiece/src/gensokyo-private?ref=private'
     gensokyo-private = {
-      url = "git+file:///home/clownpiece/src/gensokyo-private";
+      url = "github:warmdarksea/gensokyo-private/public";
     };
   };
 
@@ -94,6 +97,7 @@
           networking.hostName = "abandonedfactory";
         }
         self.nixosModules.base
+        (gensokyo-private.nixosModules.abandonedfactory or {})
         lanzaboote.nixosModules.lanzaboote
         #"${nixpkgs}/nixos/modules/installer/sd-card/sd-image-x86_64.nix"
         ./sys/abandonedfactory/hardware-configuration.nix
@@ -107,9 +111,10 @@
         modules = [
           {
             networking.hostName = "cheese";
-            networking.hostId = "AAAAAAAA";
+            networking.hostId = lib.mkDefault "00000000";
           }
           self.nixosModules.base
+          (gensokyo-private.nixosModules.cheese or {})
           self.nixosModules.defaultOverlays
           nixos-hardware.nixosModules.gpd-pocket-3
           ./sys/cheese/configuration.nix
@@ -127,9 +132,10 @@
       modules = [
         {
           networking.hostName = "chireiden";
-          networking.hostId = "AAAAAAAA";
+          networking.hostId = lib.mkDefault "00000000";
         }
         self.nixosModules.base
+        (gensokyo-private.nixosModules.chireiden or {})
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.lenovo-thinkpad-x13-amd
@@ -148,9 +154,10 @@
       modules = [
         {
           networking.hostName = "dusk";
-          networking.hostId = "AAAAAAAA";
+          networking.hostId = lib.mkDefault "00000000";
         }
         self.nixosModules.base
+        (gensokyo-private.nixosModules.dusk or {})
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         ./sys/dusk/configuration.nix
@@ -168,9 +175,10 @@
       modules = [
         {
           networking.hostName = "eientei";
-          networking.hostId = "AAAAAAAA";
+          networking.hostId = lib.mkDefault "00000000";
         }
         self.nixosModules.base
+        (gensokyo-private.nixosModules.eientei or {})
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         ./sys/dusk/configuration.nix
@@ -202,9 +210,10 @@
       modules = [
         {
           networking.hostName = "hell";
-          networking.hostId = "AAAAAAAA";
+          networking.hostId = lib.mkDefault "00000000";
         }
         self.nixosModules.base
+        (gensokyo-private.nixosModules.hell or {})
         self.nixosModules.nvidia
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
@@ -226,9 +235,10 @@
       modules = [
         {
           networking.hostName = "library";
-          networking.hostId = "AAAAAAAA";
+          networking.hostId = lib.mkDefault "00000000";
         }
         self.nixosModules.base
+        (gensokyo-private.nixosModules.library or {})
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         ./sys/library/configuration.nix
@@ -241,9 +251,10 @@
       modules = [
         {
           networking.hostName = "magic";
-          networking.hostId = "AAAAAAAA";
+          networking.hostId = lib.mkDefault "00000000";
         }
         self.nixosModules.base
+        (gensokyo-private.nixosModules.magic or {})
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         ./sys/magic/configuration.nix
@@ -256,9 +267,10 @@
       modules = [
         {
           networking.hostName = "mausoleum";
-          networking.hostId = "AAAAAAAA";
+          networking.hostId = lib.mkDefault "00000000";
         }
         self.nixosModules.base
+        (gensokyo-private.nixosModules.mausoleum or {})
         ./mausoleum/configuration.nix
         ./mausoleum/hardware-configuration.nix
       ];
@@ -269,9 +281,10 @@
       modules = [
         {
           networking.hostName = "sea";
-          networking.hostId = "AAAAAAAA";
+          networking.hostId = lib.mkDefault "00000000";
         }
         self.nixosModules.base
+        (gensokyo-private.nixosModules.sea or {})
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.dell-xps-13-9310
@@ -316,7 +329,7 @@
       modules = [
         {
           networking.hostName = "gensokyo-recovery";
-          networking.hostId = "AAAAAAAA";
+          networking.hostId = lib.mkDefault "00000000";
         }
         self.nixosModules.base
         ./sys/minimal.nix
