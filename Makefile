@@ -7,6 +7,13 @@ HOST=$(TARGET).$(DOMAIN)
 
 BUILD_DIR=build
 
+# point at a checkout of gensokyo-private's private branch to build with the
+# real private config instead of the public stub, e.g.
+#   make build_sys_closure TARGET=hell \
+#     PRIVATE_FLAKE='git+file:///home/clownpiece/src/gensokyo-private?ref=private'
+PRIVATE_FLAKE=
+NIX_FLAGS+=$(if $(PRIVATE_FLAKE),--override-input gensokyo-private '$(PRIVATE_FLAKE)' --no-write-lock-file)
+
 #
 
 TARGET=nonexistant
