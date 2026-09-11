@@ -1,4 +1,4 @@
-{ lib, pkgs, dotfiles, ... }: {
+{ lib, pkgs, ... }: {
 #let
   # myEmacs = (pkgs.emacsWithPackagesFromUsePackage {
   #   package = pkgs.emacs29-pgtk;  # replace with pkgs.emacsPgtk, or another version if desired.
@@ -267,10 +267,10 @@
       retroarch-free
       #prismlauncher
     ];
-    shell_scripts = with pkgs; [
-      (writeShellScriptBin "mktemp_home" (builtins.readFile "${dotfiles}/bin/mktemp_home.sh"))
-      (writeShellScriptBin "random_passwd" (builtins.readFile "${dotfiles}/bin/random_passwd.sh"))
-      (writeShellScriptBin "random_hex" (builtins.readFile "${dotfiles}/bin/random_hex.sh"))
+    shell_scripts = [
+      # fixme: mktemp_home / random_passwd / random_hex lived in the old
+      # gensokyo-dotfiles repo, which is no longer an input. inline the
+      # scripts here (bin/) if they're still wanted.
     ];
   in lib.concatLists [nix_thirdparty base_pkgs desktop_pkgs dev_pkgs local_pkgs shell_scripts];
 

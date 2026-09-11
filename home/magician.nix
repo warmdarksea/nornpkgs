@@ -1,6 +1,9 @@
-{ lib, pkgs, nornpkgs, nixpak, ... }: let
-  inherit (nornpkgs.lib) mkShell;
-  inherit (nornpkgs.lib.nixpak) mkNixPakApplication nixpak-desktop-wrap;
+{ lib, pkgs, nixpak, ... }: let
+  # fixme: mkShell / mkNixPakApplication / nixpak-desktop-wrap lived in the
+  # old nornpkgs repo, which is no longer an input. re-wire the bitwig
+  # sandbox via home/nixpak/bitwig.nix + the nixpak input when needed.
+  # inherit (nornpkgs.lib) mkShell;
+  # inherit (nornpkgs.lib.nixpak) mkNixPakApplication nixpak-desktop-wrap;
 
   # mkNixPak = nixpak.lib.nixpak {
   #   inherit (pkgs) lib;
@@ -217,7 +220,7 @@
   #   };
   # };
 
-  my-bitwig-studio6 = nornpkgs.nixpakApplications.x86_64-linux.bitwig-studio6;
+  # my-bitwig-studio6 = nornpkgs.nixpakApplications.x86_64-linux.bitwig-studio6;
 
   #   .override (old: {
   #   #pkgOverride = old: {
