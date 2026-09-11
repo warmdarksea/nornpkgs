@@ -32,7 +32,8 @@
   # Enable the X11 windowing system.
   # services.xserver.enable = true;
   services.xserver.enable = true;
-  services.xserver.videoDrivers = ["iris"];
+  # "iris" is a mesa driver, not an X11 driver; modesetting is the right one
+  services.xserver.videoDrivers = ["modesetting"];
   services.xserver.layout = "us";
   services.xserver.displayManager.sddm.enable = true;
   hardware.opengl.driSupport32Bit = true;

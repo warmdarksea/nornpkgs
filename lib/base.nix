@@ -16,7 +16,7 @@
     "kernel.dmesg_restrict" = 1;
   };
 
-  time.timeZone = "America/New_York";
+  time.timeZone = lib.mkDefault "America/New_York";
 
   networking.domain = "gensokyo.internal";
 
@@ -37,7 +37,8 @@
 
   services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = false;
-  services.openssh.settings.PermitRootLogin = "prohibit-password";
+  # mkDefault so the installer images (which force "no") don't conflict
+  services.openssh.settings.PermitRootLogin = lib.mkDefault "prohibit-password";
 
   documentation.dev.enable = true;
   documentation.man.generateCaches = true;

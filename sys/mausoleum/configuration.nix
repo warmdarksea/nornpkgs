@@ -101,7 +101,7 @@ in {
 
   services.xrdp.enable = true;
   services.xrdp.audio.enable = true;
-  services.xrdp.port = "tcp://0.0.0.0:3389";
+  services.xrdp.port = 3389;
   #services.xrdp.defaultWindowManager = "gnome-session";
   services.xrdp.extraConfDirCommands = ''
     substituteInPlace $out/sesman.ini \

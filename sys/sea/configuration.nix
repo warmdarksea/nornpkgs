@@ -66,15 +66,15 @@
 
   fonts.packages = with pkgs; [
     noto-fonts
-    noto-fonts-cjk
-    noto-fonts-emoji
+    noto-fonts-cjk-sans
+    noto-fonts-color-emoji
     liberation_ttf
     fira-code
     fira-code-symbols
     mplus-outline-fonts.githubRelease
     dina-font
     proggyfonts
-    nerdfonts
+    # nerdfonts split into per-font packages (nerd-fonts.*); pick one if wanted
   ];
 
   gtk.iconCache.enable = true;
@@ -146,7 +146,8 @@
     systemWide = true;
   };
 
-  virtualisation.lxd.enable = true;
+  # lxd was removed from nixpkgs (unmaintained); incus is the successor
+  #virtualisation.lxd.enable = true;
   virtualisation.podman.enable = true;
   virtualisation.docker.storageDriver = "zfs";
   virtualisation.docker = {
@@ -162,13 +163,8 @@
       package = pkgs.qemu_kvm;
       runAsRoot = true;
       swtpm.enable = true;
-      ovmf = {
-        enable = true;
-        packages = [(pkgs.OVMF.override {
-          secureBoot = true;
-          tpmSupport = true;
-        }).fd];
-      };
+      # the virtualisation.libvirtd.qemu.ovmf submodule was removed from
+      # nixpkgs; all OVMF images distributed with QEMU are available by default
     };
   };
 
@@ -188,7 +184,7 @@
     ntfs3g
   ];
 
-  services.udev.packages = with pkgs; [ gnome.gnome-settings-daemon ];
+  services.udev.packages = with pkgs; [ gnome-settings-daemon ];
 
   users.users.seija = {
     uid = 1000;

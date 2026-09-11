@@ -18,14 +18,15 @@
     wget
     curl
     htop
-    neofetch
+    fastfetch
     networkmanager
   ];
 
   # Customize networking
   networking = {
     networkmanager.enable = true;
-    wireless.enable = false; # NetworkManager handles this
+    # the graphical installer image force-enables wpa_supplicant, hence mkForce
+    wireless.enable = lib.mkForce false; # NetworkManager handles this
     firewall.enable = true;
   };
 

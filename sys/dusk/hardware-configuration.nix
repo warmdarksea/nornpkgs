@@ -19,7 +19,8 @@
 
   #powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";
 
-  services.xserver.videoDrivers = ["i915"];
+  # "i915" is a kernel driver, not an X11 driver; modesetting is the right one
+  services.xserver.videoDrivers = ["modesetting"];
 
   boot.initrd.availableKernelModules = [ "xhci_pci" "usb_storage" "usbhid" "sd_mod" "sdhci_pci" ];
   boot.initrd.kernelModules = [ ];
