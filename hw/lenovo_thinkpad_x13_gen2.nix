@@ -1,20 +1,20 @@
 { config, lib, pkgs, modulesPath, ... }:
 
+# thinkpad x13 gen2 amd. used together with
+# nixos-hardware.nixosModules.lenovo-thinkpad-x13-amd; this is just the
+# machine scan.
 {
-  imports = [
-    ./amd.nix
-    ./amdgpu.nix
-    ./uhk.nix
-  ];
+  boot.initrd.availableKernelModules = [ "nvme" "ehci_pci" "xhci_pci" "usbhid" "usb_storage" "uas" "sd_mod" ];
+  boot.kernelModules = [ "kvm-amd" ];
 
+  hardware.enableRedistributableFirmware = lib.mkDefault true;
+  hardware.cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
+
+  # dormant experiments from the pre-refactor version of this file; opt back
+  # in if the backlight/keyboard bits are still wanted:
+  # imports = [ ./amdgpu.nix ./uhk.nix ];
   # ty https://discourse.nixos.org/t/creating-a-bootable-usb-with-custom-firmware-support/15343
-  # boot.kernelParams = ["amdgpu.backlight=0" "acpi_backlight=none"];
-  boot.kernelParams = ["acpi_backlight=native"];
-  boot.extraModulePackages = with config.boot.kernelPackages; [ acpi_call ];
-  boot.kernelModules = ["acpi_call"];
-  hardware.enableRedistributableFirmware = true;
-
-  boot.initrd.availableKernelModules = [ "nvme" "xhci_pci" "usb_storage" "sd_mod" ];
-
-  #hardware.video.hidpi.enable = true;
+  # boot.kernelParams = ["acpi_backlight=native"];
+  # boot.extraModulePackages = with config.boot.kernelPackages; [ acpi_call ];
+  # boot.kernelModules = ["acpi_call"];
 }

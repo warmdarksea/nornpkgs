@@ -1,15 +1,10 @@
-{ config, lib, pkgs, modulesPath, ... }:
+{ config, lib, pkgs, ... }:
 
+# mausoleum: amd desktop (with an mptsas hba)
 {
-  imports = [
-    ./amd.nix
-  ];
+  boot.initrd.availableKernelModules = [ "nvme" "xhci_pci" "ahci" "mptsas" "usb_storage" "sd_mod" ];
+  boot.kernelModules = [ "kvm-amd" ];
 
-  boot.kernelParams = ["nomodeset"];
-  #boot.initrd.availableKernelModules = [ "uhci_hcd" "ehci_pci" "ahci" "pata_jmicron" "mptsas" "usb_storage" "usbhid" "floppy" "sd_mod" "adiantum" "chacha_generic" "poly1305_generic" "nhpoly1305" ];
-  boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "mptsas" "usb_storage" "usbhid" "sd_mod" "pata_jmicron" "adiantum" "chacha_generic" "poly1305_generic" "nhpoly1305" ];
-
-  hardware.enableRedistributableFirmware = true;
-
-  nix.settings.max-jobs = lib.mkDefault 12;
+  hardware.enableRedistributableFirmware = lib.mkDefault true;
+  hardware.cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 }

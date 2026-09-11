@@ -1,4 +1,4 @@
 {
   imports = [ ./gpubase.nix ];
-  services.xserver.videoDrivers = ["intel"];
+  services.xserver.videoDrivers = ["modesetting"];
 }

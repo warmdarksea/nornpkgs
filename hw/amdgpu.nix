@@ -9,14 +9,11 @@
     options amdgpu          gpu_recovery=1
   '';
   services.xserver.videoDrivers = ["amdgpu"];
-  hardware.opengl.package = pkgs.mesa.drivers;
-  hardware.opengl.package32 = pkgs.pkgsi686Linux.mesa.drivers;
   systemd.tmpfiles.rules = [
     "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}"
   ];
-  hardware.opengl.extraPackages = with pkgs; [
-    rocm-opencl-icd
-    rocm-opencl-runtime
+  hardware.graphics.extraPackages = with pkgs; [
+    rocmPackages.clr.icd
   ];
   environment.systemPackages = with pkgs; [ rocmPackages.clr ];
 }
