@@ -50,10 +50,10 @@ $(POOL_DIR):
 #
 
 $(BUILD_DIR)/$(PLATFORM)-$(CONFIG)-$(ARCH)-drv: flake.nix | $(BUILD_DIR)
-	NIXPKGS_ALLOW_UNFREE=1 nix build $(NIX_FLAGS) --impure .#packages.$(ARCH).nixosConfigurations.$(PLATFORM)-$(CONFIG).config.system.build.toplevel -o $@
+	NIXPKGS_ALLOW_UNFREE=1 nix build $(NIX_FLAGS) --impure .#littledevil.$(ARCH).nixosConfigurations.$(PLATFORM)-$(CONFIG).config.system.build.toplevel -o $@
 
 $(BUILD_DIR)/$(PLATFORM)-$(CONFIG)-$(ARCH)-img: flake.nix | $(BUILD_DIR)
-	NIXPKGS_ALLOW_UNFREE=1 nix build $(NIX_FLAGS) --impure .#packages.$(ARCH).images.$(PLATFORM)-$(CONFIG) -o $@
+	NIXPKGS_ALLOW_UNFREE=1 nix build $(NIX_FLAGS) --impure .#littledevil.$(ARCH).images.$(PLATFORM)-$(CONFIG) -o $@
 
 #
 # cloudflare

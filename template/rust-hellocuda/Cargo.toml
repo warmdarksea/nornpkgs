@@ -1,0 +1,14 @@
+[package]
+name = "rust-hellocuda"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# cuda-13020 matches nixpkgs cudaPackages_13 (13.2) pinned in flake.nix.
+cudarc = { version = "0.19", default-features = false, features = [
+  "std",
+  "driver",
+  "nvrtc",
+  "cuda-13020",
+  "fallback-dynamic-loading",
+] }

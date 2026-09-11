@@ -352,7 +352,7 @@
     # littledevil (oracle cloud VM.Standard.A1.Flex + local test variants)
 
     # base
-    packages.aarch64.nixosConfigurations.base-bootstrap = nixpkgs.lib.nixosSystem {
+    littledevil.aarch64.nixosConfigurations.base-bootstrap = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         ldModules.bootstrap
@@ -361,7 +361,7 @@
       ];
     };
 
-    packages.x86_64.nixosConfigurations.base-bootstrap = nixpkgs.lib.nixosSystem {
+    littledevil.x86_64.nixosConfigurations.base-bootstrap = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         ldModules.bootstrap
@@ -369,7 +369,7 @@
       ];
     };
 
-    packages.aarch64.nixosConfigurations.base-live = nixpkgs.lib.nixosSystem {
+    littledevil.aarch64.nixosConfigurations.base-live = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         ldModules.live
@@ -379,7 +379,7 @@
       ];
     };
 
-    packages.x86_64.nixosConfigurations.base-live = nixpkgs.lib.nixosSystem {
+    littledevil.x86_64.nixosConfigurations.base-live = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         ldModules.bootstrap
@@ -389,10 +389,10 @@
     };
 
     # oci
-    packages.aarch64.images.oci-bootstrap = self.packages.aarch64.nixosConfigurations.oci-bootstrap.config.system.build.OCIImage;
-    packages.x86_64.images.oci-bootstrap = self.packages.x86_64.nixosConfigurations.oci-bootstrap.config.system.build.OCIImage;
+    littledevil.aarch64.images.oci-bootstrap = self.littledevil.aarch64.nixosConfigurations.oci-bootstrap.config.system.build.OCIImage;
+    littledevil.x86_64.images.oci-bootstrap = self.littledevil.x86_64.nixosConfigurations.oci-bootstrap.config.system.build.OCIImage;
 
-    packages.aarch64.nixosConfigurations.oci-bootstrap = nixpkgs.lib.nixosSystem {
+    littledevil.aarch64.nixosConfigurations.oci-bootstrap = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         ./hw/oci_a1flex.nix
@@ -409,7 +409,7 @@
       ];
     };
 
-    packages.x86_64.nixosConfigurations.oci-bootstrap = nixpkgs.lib.nixosSystem {
+    littledevil.x86_64.nixosConfigurations.oci-bootstrap = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         ldModules.oci
@@ -422,7 +422,7 @@
       ];
     };
 
-    packages.x86_64.nixosConfigurations.oci-live = nixpkgs.lib.nixosSystem {
+    littledevil.x86_64.nixosConfigurations.oci-live = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         ldModules.oci
@@ -441,7 +441,7 @@
       ];
     };
 
-    packages.aarch64.nixosConfigurations.oci-live = nixpkgs.lib.nixosSystem {
+    littledevil.aarch64.nixosConfigurations.oci-live = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         ./hw/oci_a1flex.nix
@@ -467,8 +467,8 @@
     };
 
     # what actually runs on the oracle instance
-    nixosConfigurations.littledevil-prod-bootstrap = self.packages.aarch64.nixosConfigurations.oci-bootstrap;
-    nixosConfigurations.littledevil-prod = self.packages.aarch64.nixosConfigurations.oci-live;
+    nixosConfigurations.littledevil-prod-bootstrap = self.littledevil.aarch64.nixosConfigurations.oci-bootstrap;
+    nixosConfigurations.littledevil-prod = self.littledevil.aarch64.nixosConfigurations.oci-live;
 
     devShells.x86_64-linux.littledevil = pkgs.mkShell {
       packages = with pkgs; [
@@ -534,6 +534,44 @@
         ./sys/minimal.nix
         ./sys/recovery.nix   # the new module
       ];
+    };
+
+    # flake templates: nix flake init -t github:warmdarksea/nornpkgs#rust-hello
+
+    templates.lean4-hello = {
+      path = ./template/lean4-hello;
+      description = "lean 4 hello world (nix build + lean devshell)";
+      welcomeText = "# lean4-hello\nbuild: make build  run: make run  test: make test";
+    };
+
+    templates.lean4-hellomath = {
+      path = ./template/lean4-hellomath;
+      description = "lean 4 proofs with mathlib; building type-checks them";
+      welcomeText = "# lean4-hellomath\nbuild (= check the proofs): make build";
+    };
+
+    templates.py-hello = {
+      path = ./template/py-hello;
+      description = "python hello world (nix build + pytest devshell)";
+      welcomeText = "# py-hello\nbuild: make build  run: make run  test: make test";
+    };
+
+    templates.py-hellotorch = {
+      path = ./template/py-hellotorch;
+      description = "python + torch gpu matmul (builds without a gpu; running needs one)";
+      welcomeText = "# py-hellotorch\nbuild: make build  run (needs gpu): make run  test: make test";
+    };
+
+    templates.rust-hello = {
+      path = ./template/rust-hello;
+      description = "rust hello world (nix build + rust devshell)";
+      welcomeText = "# rust-hello\nbuild: make build  run: make run  test: make test";
+    };
+
+    templates.rust-hellocuda = {
+      path = ./template/rust-hellocuda;
+      description = "rust + cuda saxpy via runtime nvrtc (builds without a gpu; running needs one)";
+      welcomeText = "# rust-hellocuda\nbuild: make build  run (needs gpu): make run  test: make test";
     };
 
     packages.x86_64-linux.claude-env = pkgs.buildEnv {
