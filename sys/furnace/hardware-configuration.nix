@@ -4,13 +4,10 @@
 { config, lib, pkgs, modulesPath, ... }:
 
 {
-  imports =
-    [ (modulesPath + "/installer/scan/not-detected.nix")
-    ];
+  # machine specs live in hw/ugreen_dxp2800.nix
 
     #boot.kernelParams = ["console=tty0" "console=ttyUSB0" "earlyprintk=serial,ttyUSB0" "rootdelay=10"];
     boot.kernelParams = [];
-    boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usbhid" "usb_storage" "sd_mod" "sdhci_pci" ];
     boot.initrd.kernelModules = [
       # for mounting ESP partition
       "vfat"
@@ -28,8 +25,6 @@
       # "pl2303"        # Prolific PL2303 chips
       # "cdc_acm"       # USB CDC ACM (modem) devices
     ];
-    boot.kernelModules = [ "kvm-intel" ];
-    boot.extraModulePackages = [ ];
 
     boot.loader.systemd-boot.enable = lib.mkForce false;
 
@@ -158,5 +153,4 @@
     #networking.hostId = "AAAAAAAA";
 
     nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-    hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 }

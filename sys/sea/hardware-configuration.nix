@@ -4,15 +4,8 @@
 { config, lib, pkgs, modulesPath, ... }:
 
 {
-  imports =
-    [ (modulesPath + "/installer/scan/not-detected.nix")
-    ];
+  # machine specs live in hw/dell_xps_13_9310.nix
 
-  boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "vmd" "nvme" "uas" "usb_storage" "sd_mod" ];
-  boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "kvm-intel" ];
-  boot.extraModulePackages = [ ];
-  
   boot.initrd.luks.devices.cryptstorage.device =
     config.gensokyo.disks.cryptstorage or "/dev/disk/by-label/sea-cryptstorage";
 
@@ -54,5 +47,4 @@
   #networking.hostId = "AAAAAAAA";
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-  hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 }

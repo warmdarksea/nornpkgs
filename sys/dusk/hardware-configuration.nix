@@ -4,27 +4,8 @@
 { config, lib, pkgs, modulesPath, ... }:
 
 {
-  hardware.opengl.enable = true;
-  #hardware.opengl.driSupport = true;
-  #hardware.opengl.driSupport32Bit = true;
-  #hardware.opengl.setLdLibraryPath = true;
-  # hardware.cpu.intel.updateMicrocode = true;
-  boot.kernelModules = [ "kvm-intel" ];
-  #services.xserver.videoDrivers = ["intel"];
-  console.font = "latarcyrheb-sun32";
+  # machine specs live in hw/gpd_pocket_2.nix
 
-  # hardware.enableAllFirmware = true;
-  hardware.enableRedistributableFirmware = true;
-  hardware.firmware = [ pkgs.wireless-regdb ]; # is this necessary?
-
-  #powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";
-
-  # "i915" is a kernel driver, not an X11 driver; modesetting is the right one
-  services.xserver.videoDrivers = ["modesetting"];
-
-  boot.initrd.availableKernelModules = [ "xhci_pci" "usb_storage" "usbhid" "sd_mod" "sdhci_pci" ];
-  boot.initrd.kernelModules = [ ];
-  boot.extraModulePackages = [ ];
   boot.supportedFilesystems = ["zfs"];
 
   fileSystems."/" =
@@ -56,8 +37,6 @@
   # networking.interfaces.wlp1s0.useDHCP = lib.mkDefault true;
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-  powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";
-  hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 
   # Use the systemd-boot EFI boot loader.
   # boot.loader.systemd-boot.enable = lib.mkForce false;
@@ -82,7 +61,7 @@
   # for now.
   boot.loader.systemd-boot.enable = lib.mkForce false;
 
-  boot.kernelParams = ["boot.shell_on_fail" "video=efifb" "fbcon=rotate:1"];
+  # console rotation lives in hw/gpd_pocket_2.nix; boot.shell_on_fail in base
 
   boot.initrd.secrets = {"/form.h" = /var/secret/crypt/form.h;};
 

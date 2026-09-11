@@ -4,14 +4,7 @@
 { config, lib, pkgs, modulesPath, ... }:
 
 {
-  imports =
-    [ (modulesPath + "/installer/scan/not-detected.nix")
-    ];
-
-  boot.initrd.availableKernelModules = [ "nvme" "ehci_pci" "xhci_pci" "usbhid" "usb_storage" "uas" "sd_mod" ];
-  boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "kvm-amd" ];
-  boot.extraModulePackages = [ ];
+  # machine specs live in hw/lenovo_thinkpad_x13_gen2.nix
 
   boot.initrd.luks.devices.cryptstorage.device =
     config.gensokyo.disks.cryptstorage or "/dev/disk/by-label/chireiden-cryptstorage";
@@ -63,5 +56,4 @@
   #networking.hostId = "AAAAAAAA";
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-  hardware.cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 }

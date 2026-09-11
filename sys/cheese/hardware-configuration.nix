@@ -1,10 +1,7 @@
 { config, lib, pkgs, modulesPath, ... }:
 
 {
-  boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "nvme" "usbhid" "usb_storage" "sd_mod" ];
-  boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "kvm-intel" ];
-  boot.extraModulePackages = [ ];
+  # machine specs live in hw/gpd_pocket_3.nix
 
   fileSystems."/" =
     { device = "splice";
@@ -43,9 +40,6 @@
   # networking.interfaces.wlp174s0.useDHCP = lib.mkDefault true;
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-  powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";
-  hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
-
 
   # Use the systemd-boot EFI boot loader.
   #boot.loader.systemd-boot.enable = true;

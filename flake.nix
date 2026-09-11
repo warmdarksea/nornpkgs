@@ -7,7 +7,7 @@
     # nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?rev=bfc1b8a4574108ceef22f02bafcf6611380c100d";
     # nixpkgs.url = "github:nixos/nixpkgs/26f079d4265d403f27f164336c7e20d774d91393";
 
-    nixos-hardware.url = "git+file:///home/clownpiece/src/nixos-hardware?ref=gensokyo-master";
+    nixos-hardware.url = "github:NixOS/nixos-hardware";
 
     emacs-overlay = {
       url = "github:nix-community/emacs-overlay";
@@ -136,6 +136,7 @@
         (gensokyo-private.nixosModules.abandonedfactory or {})
         lanzaboote.nixosModules.lanzaboote
         #"${nixpkgs}/nixos/modules/installer/sd-card/sd-image-x86_64.nix"
+        ./hw/lattepanda_v1.nix
         ./sys/abandonedfactory/hardware-configuration.nix
         ./sys/abandonedfactory.nix
       ];
@@ -153,6 +154,7 @@
           (gensokyo-private.nixosModules.cheese or {})
           self.nixosModules.defaultOverlays
           nixos-hardware.nixosModules.gpd-pocket-3
+          ./hw/gpd_pocket_3.nix
           ./sys/cheese/configuration.nix
           ./sys/cheese/hardware-configuration.nix
           home-manager.nixosModules.home-manager {
@@ -175,6 +177,7 @@
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.lenovo-thinkpad-x13-amd
+        ./hw/lenovo_thinkpad_x13_gen2.nix
         ./sys/chireiden/configuration.nix
         ./sys/chireiden/hardware-configuration.nix
         home-manager.nixosModules.home-manager {
@@ -196,6 +199,7 @@
         (gensokyo-private.nixosModules.dusk or {})
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
+        ./hw/gpd_pocket_2.nix
         ./sys/dusk/configuration.nix
         ./sys/dusk/hardware-configuration.nix
         home-manager.nixosModules.home-manager {
@@ -216,14 +220,8 @@
         self.nixosModules.base
         (gensokyo-private.nixosModules.eientei or {})
         self.nixosModules.defaultOverlays
-        lanzaboote.nixosModules.lanzaboote
-        ./sys/dusk/configuration.nix
-        ./sys/dusk/hardware-configuration.nix
-        home-manager.nixosModules.home-manager {
-          home-manager.useUserPackages = true;
-          home-manager.useGlobalPkgs = true;
-          home-manager.users."rumia" = self.homeManagerModules.magician;
-        }
+        ./hw/eeepc.nix
+        ./sys/eientei.nix
       ];
     };
 
@@ -237,6 +235,7 @@
         self.nixosModules.base
         lanzaboote.nixosModules.lanzaboote
         (gensokyo-private.nixosModules.furnace or {})
+        ./hw/ugreen_dxp2800.nix
         ./sys/furnace/configuration.nix
         ./sys/furnace/hardware-configuration.nix
       ];
@@ -254,7 +253,12 @@
         self.nixosModules.nvidia
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
-        nixos-hardware.nixosModules.asus-x13-flow
+        nixos-hardware.nixosModules.common-cpu-amd
+        nixos-hardware.nixosModules.common-cpu-amd-pstate
+        nixos-hardware.nixosModules.common-gpu-amd
+        nixos-hardware.nixosModules.common-pc-laptop
+        nixos-hardware.nixosModules.common-pc-laptop-ssd
+        ./hw/asus_x13_flow.nix
         ./sys/hell/configuration.nix
         ./sys/hell/hardware-configuration.nix
         home-manager.nixosModules.home-manager {
@@ -278,8 +282,8 @@
         (gensokyo-private.nixosModules.library or {})
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
+        ./hw/library.nix
         ./sys/library/configuration.nix
-        #./sys/library/hardware-configuration.nix
       ];
     };
 
@@ -294,8 +298,8 @@
         (gensokyo-private.nixosModules.magic or {})
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
+        ./hw/magic.nix
         ./sys/magic/configuration.nix
-        ./sys/magic/hardware-configuration.nix
       ];
     };
 
@@ -308,6 +312,7 @@
         }
         self.nixosModules.base
         (gensokyo-private.nixosModules.mausoleum or {})
+        ./hw/mausoleum.nix
         ./sys/mausoleum/configuration.nix
         ./sys/mausoleum/hardware-configuration.nix
       ];
@@ -325,6 +330,7 @@
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.dell-xps-13-9310
+        ./hw/dell_xps_13_9310.nix
         ./sys/sea/configuration.nix
         ./sys/sea/hardware-configuration.nix
         home-manager.nixosModules.home-manager {
@@ -377,6 +383,7 @@
     packages.aarch64.nixosConfigurations.oci-bootstrap = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        ./hw/oci_a1flex.nix
         ldModules.oci
         ldModules.bootstrap
         { nixpkgs.crossSystem.system = "aarch64-linux"; }
@@ -422,6 +429,7 @@
     packages.aarch64.nixosConfigurations.oci-live = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        ./hw/oci_a1flex.nix
         ldModules.oci
         ldModules.live
         ldModules.minecraft
