@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Projects</title>
+    <style>
+      body { font-family: sans-serif; max-width: 60em; margin: 2em auto; padding: 0 1em; }
+      h2 { margin-top: 2em; }
+      table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+      th, td { text-align: left; padding: .4em .6em; vertical-align: top; overflow-wrap: anywhere; }
+      thead th { border-bottom: 2px solid #000; }
+      tr.meta td { border-top: 1px solid #ccc; }
+      tr.body td { padding-top: 0; padding-bottom: 1em; }
+      tr.work td:first-child { border-left: 3px solid #b8860b; }
+      tr.work.meta td { background: #fdf8ea; }
+      tr.work.body td { background: #fdf8ea; }
+      .badge { font-size: .75em; padding: 0 .35em; border: 1px solid #b8860b; border-radius: .25em; color: #b8860b; vertical-align: middle; }
+
+      /* fold */
+      summary { cursor: pointer; list-style: none; }
+      summary::-webkit-details-marker { display: none; }
+      summary::before { content: "\25B8\00a0"; }            /* ▸ */
+      details[open] > summary::before { content: "\25BE\00a0"; } /* ▾ */
+      /* closed: show only the first two lines of the summary paragraph */
+      details:not([open]) > summary { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+      /* embedded gists etc: scroll sideways instead of widening the table */
+      details.embed { margin: .5em 0; }
+      details.embed > summary { font-size: .9em; color: #555; }
+      .embed-box { max-width: 100%; overflow-x: auto; }
+
+      details img { max-width: 100%; display: block; margin: .5em 0; }
+      code { background: #eee; padding: 0 .2em; }
+    </style>
+  </head>
+  <body>
+
+    <h1>Projects</h1>
+
+    here are some projects of mine
+
+    <br><br>
+    this is my personal web site, so the tone is a bit colloquial. all prose here is written by me, without any assistance by LLMs (except, sometimes, to use as a thesaurus or basic proofreading), although the html structure itself was LLM-generated.
+
+    <br><br>
+    most of this is random hobbyist coding surrounding various interests but i did write a fair amount of tooling when i worked as a pentester, so i guess you could say i've also written code professionally - these projects are indicated with <span class="badge">work</span>
+
+    <br><br>
+    my strongest languages are probably c & haskell but i've used python, go, rust, & others in the past as well as professionally & find it easy to pick up new languages.
+
+    <h2>Featured</h2>
+
+    nearly all of these projects are in a complete working state & are interesting enough to put on display
+
+    <table>
+      <colgroup>
+        <col style="width: 10%">
+        <col style="width: 26%">
+        <col style="width: 20%">
+        <col style="width: 26%">
+        <col style="width: 18%">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Project</th>
+          <th>Language</th>
+          <th>Tags</th>
+          <th>AI-assisted</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- one project = two rows: .meta (the table columns) + .body (the fold) -->
+
+        <tr class="meta">
+          <td>2026</td>
+          <td><a href="https://github.com/warmdarksea/miupkgs">miupkgs</a></td>
+          <td>nix</td>
+          <td><code>compiler</code> <code>bootstrapping</code> <code>linux</code></td>
+          <td>yes, heavily</td>
+        </tr>
+        <tr class="body">
+          <td colspan="5">
+              statically-linked/llvm/musl reimagining of nixpkgs, bootstrapped from scratch (~300 byte seed binary, no flake dependencies) with an emphasis on portability & simplicity. it aims to support every architecture in the intersection of QEMU, LLVM, musl libc, and the Linux kernel.
+          </td>
+        </tr>
+
+        <tr class="meta">
+          <td>2026</td>
+          <td><a href="https://github.com/warmdarksea/nornpkgs">littledevil-infra</a></td>
+          <td>nix</td>
+          <td><code>infra</code> <code>devops</code> <code>terraform</code> <code>linux</code></td>
+          <td>some AI assistance</td>
+        </tr>
+        <tr class="body">
+          <td colspan="5">
+              my digital life/personal infrastructure repo, 7-8 machines with nix & a server on oracle oci that hosts an elixir/postgres application with terraform & nix
+          </td>
+        </tr>
+
+        <tr class="meta">
+          <td>2023</td>
+          <td><a href="https://blog.littledevil.org/post/bluetooth-volume-fix/">blog post about bluetooth headphone reverse engineering</a></td>
+          <td>N/A</td>
+          <td><code>reverse engineering</code> <code>android</code> <code>java</code> <code>jvm</code></td>
+          <td>no</td>
+        </tr>
+        <tr class="body">
+          <td colspan="5">
+            some earbuds i bought were too loud, so i reverse-engineered the firmware to make the built-in sounds quieter
+          </td>
+        </tr>
+
+        <tr class="meta">
+          <td>2022- 2023</td>
+          <td>SessionMan <span class="badge">work</span></td>
+          <td>Python (under Jython interpreter)</td>
+          <td><code>burp suite</code> <code>internal tooling</code> <code>pentesting</code> <code>algorithms</code></td>
+          <td>no</td>
+        </tr>
+        <tr class="body">
+          <td colspan="5">
+            Burp Suite extension for keeping fuzzing sessions alive during scanning
+          </td>
+        </tr>
+
+        <tr class="meta">
+          <td>2021- 2023</td>
+          <td>network scan automation tooling <span class="badge">work</span></td>
+          <td>Go</td>
+          <td><code>internal tooling</code> <code>pentesting</code> <code>sql</code></td>
+          <td>no</td>
+        </tr>
+        <tr class="body">
+          <td colspan="5">
+            automation tooling written for my then-employer for various kinds of network scans. no link, obviously
+          </td>
+        </tr>
+
+        <tr class="meta">
+          <td>2019</td>
+          <td><a href="https://github.com/warmdarksea/nctctrl">nctctrl</a></td>
+          <td>C</td>
+          <td><code>usb</code> <code>pulseaudio</code> <code>linux</code> <code>algorithms</code></td>
+          <td>no (pre-AI)</td>
+        </tr>        
+        <tr class="body">
+          <td colspan="5">
+            hooks up a novation nocturn USB MIDI control surface so it controls PulseAudio application volumes & lets you use the buttons to control mpd
+          </td>
+        </tr>
+
+        <tr class="meta">
+          <td>2019</td>
+          <td><a href="https://github.com/warmdarksea/libnocturn">libnocturn</a></td>
+          <td>C</td>
+          <td><code>reverse engineering</code> <code>usb</code></td>
+          <td>no (pre-AI)</td>
+        </tr>
+        <tr class="body">
+          <td colspan="5">
+            library for interacting with the novation nocturn via libusb
+          </td>
+        </tr>
+
+        <tr class="meta">
+          <td>2015</td>
+          <td><a href="https://github.com/warmdarksea/WHILE">WHILE</a></td>
+          <td>Haskell</td>
+          <td><code>algorithms</code> <code>compiler</code> <code>assembly</code> <code>x86</code></td>
+          <td>no</td>
+        </tr>
+        <tr class="body">
+          <td colspan="5">
+            compiler for simple toy language called "WHILE" into x86. does register allocation via greedy graph coloring algorithm
+          </td>
+        </tr>
+
+      </tbody>
+    </table>
+
+    <h2>odds & ends</h2>
+    <p>these projects are complete & working, but are not necessarily interesting enough to showcase</p>
+
+    <table>
+      <colgroup>
+        <col style="width: 10%">
+        <col style="width: 26%">
+        <col style="width: 20%">
+        <col style="width: 26%">
+        <col style="width: 18%">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Project</th>
+          <th>Language</th>
+          <th>Tags</th>
+          <th>AI-assisted</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <tr class="meta">
+          <td>2026</td>
+          <td><a href="https://github.com/NixOS/nixpkgs/compare/master...warmdarksea:nixpkgs:norn-cross-compile">miscellaneous nixpkgs cross-compiling work</a></td>
+          <td>nix</td>
+          <td><code>compiler</code> <code>assembly</code> <code>x86</code></td>
+          <td>some (surprisingly unhelpful for this)</td>
+        </tr>
+        <tr class="body">
+          <td colspan="5">
+              as part of deploying an elixir/beam application to one of Oracle Cloud's free aarch64 instances, i had to port the relevant nix build recipes so they would cross-compile from amd64 to aarch64
+          </td>
+        </tr>
+
+        <tr class="meta">
+          <td>2023</td>
+          <td><a href="https://gist.github.com/warmdarksea/af4e826d95e93aef6ac97fa996f43fd3">buddy allocator</a></td>
+          <td>C</td>
+          <td><code>compiler</code> <code>assembly</code> <code>x86</code></td>
+          <td>no</td>
+        </tr>
+        <tr class="body">
+          <td colspan="5">
+              physical memory allocator, implements donald knuth's "binary buddies" algorithm for O(log n) time complexity
+            
+          </td>
+        </tr>
+
+        <tr class="meta">
+          <td>2022</td>
+          <td><a href="https://blog.littledevil.org/post/android-haxm-workaround/">blog post abt android studio bug</a></td>
+          <td>N/A</td>
+          <td><code>reverse engineering</code> <code>java</code> <code>jvm</code></td>
+          <td>no</td>
+        </tr>
+        <tr class="body">
+          <td colspan="5">            
+            you can't (or couldn't, at the time) actually compile android-studio, despite it being open-source, so i did some reverse engineering to figure out how to patch the binary as a workaround for a bug i was experiencing with it
+          </td>
+        </tr>
+
+        <tr class="meta">
+          <td>2019</td>
+          <td><a href="https://dwm.suckless.org/patches/awesomebar/">awesomebar</a></td>
+          <td>C</td>
+          <td><code>X11</code></td>
+          <td>no</td>
+        </tr>
+        <tr class="body">
+          <td colspan="5">
+            
+              dwm patch that implements a top-bar like awesome (another X11 window manager). i wrote the initial version, it has since been lovingly improved upon by a number of other people in the dwm community, bless their hearts.
+            
+          </td>
+        </tr>
+
+        <tr class="meta">
+          <td>2018</td>
+          <td><a href="https://gist.github.com/warmdarksea/c1e9022618acdfe056503b9ae7ca6063">torrent client</a></td>
+          <td>rust</td>
+          <td><code>algorithms</code></td>
+          <td>no</td>
+        </tr>
+        <tr class="body">
+          <td colspan="5">
+            
+              simple torrent client written in rust. only downloads, no seeding
+            
+          </td>
+        </tr>
+
+        <tr class="meta">
+          <td>2018</td>
+          <td>"software foundations" exercises</td>
+          <td>Coq</td>
+          <td><code>formal methods</code> <code>functional programming</code></td>
+          <td>no</td>
+        </tr>
+        <tr class="body">
+          <td colspan="5">
+            
+              i worked through the book "software foundations" by Benjamin Pierce & did all the proofs. it was very fun. no link, because you're not supposed to post the solutions online.
+            
+          </td>
+        </tr>
+        <tr class="meta">
+          <td>2014</td>
+          <td><a href="https://gist.github.com/warmdarksea/46be27f575a0f089a6abe70c493f37d2">mastermind.rkt</a></td>
+          <td>Racket (a lisp)</td>
+          <td><code>algorithms</code></td>
+          <td>no</td>
+        </tr>
+        <tr class="body">
+          <td colspan="5">
+            
+              SAT-based solver for "mastermind" (a puzzle game, if you've never heard of it). written on a pleasant vacation.
+          </td>
+        </tr>
+
+      </tbody>
+    </table>
+
+    <h2>Project Graveyard</h2>
+    <p>projects that are unfinished, abandoned, abortive, etc</p>
+
+    <table>
+      <colgroup>
+        <col style="width: 10%">
+        <col style="width: 26%">
+        <col style="width: 20%">
+        <col style="width: 26%">
+        <col style="width: 18%">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Project</th>
+          <th>Language</th>
+          <th>Tags</th>
+          <th>AI-assisted</th>
+        </tr>
+      </thead>
+      <tbody>
+        working on it... will add some things here when i get time to go through my old backups...
+      </tbody>
+    </table>
+
+  </body>
+</html>

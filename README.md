@@ -1,12 +1,11 @@
 # nornpkgs
 
-nix flake for the systems of `*.gensokyo.internal` (and the littledevil
-cloud infrastructure). formerly known as gensokyo-infra.
+repository for managing my digital life. mostly nix, some terraform/cloudflare stuff, orchestrated with gmake. partially written by claude because that's the only way to make working with nix bearable
 
-* `flake.nix` — one `nixosConfigurations.<host>` per machine, plus the
+* `flake.nix` — self-explanatory
   littledevil image builds under `packages.<arch>`
-* `hw/` — per-machine hardware modules (cpu/gpu/initrd/microcode)
-* `sys/` — per-host system config; filesystems & bootloaders live here
+* `hw/` — per-machine hardware modules
+* `sys/` — per-host system config
 * `lib/` — `base`, `desktop`, `server` role modules & the
   `gensokyo.disks` option
 * `home/` — home-manager modules
@@ -14,13 +13,3 @@ cloud infrastructure). formerly known as gensokyo-infra.
   github:warmdarksea/nornpkgs#rust-hello`)
 * `Makefile` — build/deploy driver (`Makefile.littledevil` for the
   cloud targets)
-
-identifiers i consider private (disk uuids, vpn endpoints, host ids,
-public keys) live in the
-[gensokyo-private](https://github.com/warmdarksea/gensokyo-private)
-flake input: the github branch is an empty stub that lets everything
-here evaluate & build; the real values only exist on the private branch
-on my machines. override the input to build with them:
-
-    make build_sys_closure TARGET=hell \
-      PRIVATE_FLAKE='git+file:///path/to/gensokyo-private?ref=private'
