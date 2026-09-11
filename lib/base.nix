@@ -20,14 +20,20 @@
 
   networking.domain = "gensokyo.internal";
 
-  services.resolved.enable = true;
-  #services.resolved.extraConfig = ''
-  #[Resolve]
-  #DNS=0.0.0.0
-  #Domains=~gensokyo.internal
-  #'';
-  # the DNS server list lives in gensokyo-private per-host modules
-  services.resolved.settings.Resolve.Domains = [ "~gensokyo.internal" ];
+  services.resolved = {
+    enable = true;
+
+    llmnr = "false";
+
+    #services.resolved.extraConfig = ''
+    #[Resolve]
+    #DNS=0.0.0.0
+    #Domains=~gensokyo.internal
+    #'';
+
+    settings.Resolve.DNS = [ "10.217.37.1" ];
+    settings.Resolve.Domains = [ "~gensokyo.internal" ];
+  };
 
   #security.pki.certificateFiles = [
   #  ../etc/certs/gensokyo.internal.ca.pem

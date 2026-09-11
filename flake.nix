@@ -251,10 +251,9 @@
       modules = [
         {
           networking.hostName = "hell";
-          networking.hostId = lib.mkDefault "00000000";
         }
         self.nixosModules.base
-        (gensokyo-private.nixosModules.hell or {})
+        gensokyo-private.nixosModules.hell
         self.nixosModules.desktop
         self.nixosModules.nvidia
         self.nixosModules.defaultOverlays

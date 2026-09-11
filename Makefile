@@ -7,12 +7,17 @@ HOST=$(TARGET).$(DOMAIN)
 
 BUILD_DIR=build
 
+#
+
+include Makefile.private
+include Makefile.littledevil
+
 # point at a checkout of gensokyo-private's private branch to build with the
 # real private config instead of the public stub, e.g.
 #   make build_sys_closure TARGET=hell \
 #     PRIVATE_FLAKE='git+file:///home/clownpiece/src/gensokyo-private?ref=private'
-PRIVATE_FLAKE=
-NIX_FLAGS+=$(if $(PRIVATE_FLAKE),--override-input gensokyo-private '$(PRIVATE_FLAKE)' --no-write-lock-file)
+PRIVATE_FLAKE?=
+override NIX_FLAGS+=$(if $(PRIVATE_FLAKE),--override-input gensokyo-private '$(PRIVATE_FLAKE)' --no-write-lock-file)
 
 #
 
@@ -296,9 +301,6 @@ query_config:
 	nix-instantiate --eval sys/$(TARGET).nix -A $(OPTION)
 
 #
-
-# littledevil (akkoma on oracle cloud) targets
-include Makefile.littledevil
 
 .PHONY: why_depends_sys
 why_depends_sys:

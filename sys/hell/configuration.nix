@@ -89,19 +89,19 @@ in rec {
 
   #boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
 
-  system.nixos.tags = [ "lts-kernel" ];
+  #system.nixos.tags = [ "lts-kernel" ];
   # linuxPackages refers to latest lts kernel
-  boot.kernelPackages = lib.mkForce pkgs.linuxPackages;
+  boot.kernelPackages = pkgs.linuxPackages;
   # at the time of writing, this is equal to zfs_unstable
   boot.zfs.package = pkgs.zfs_unstable;
 
-  specialisation = {
+  #specialisation = {
     # stable refers to latest (per nixpkgs) stable branch kernel
-    stable.configuration = {
-      boot.kernelPackages = pkgs.linuxPackages_latest;
-      system.nixos.tags = lib.mkForce [ "stable-kernel" ];
-    };
-  };
+    #stable.configuration = {
+      #boot.kernelPackages = pkgs.linuxPackages_latest;
+      #system.nixos.tags = lib.mkForce [ "stable-kernel" ];
+    #};
+  #};
 
   # hardware.bluetooth lives in lib/desktop.nix
   hardware.sensor.iio.enable = true;
@@ -159,28 +159,6 @@ in rec {
 
   # 
 
-  #networking.hostName = "hell";
-
-  networking.extraHosts = ''
-    0.0.0.0 ldtest.hell.gensokyo.internal
-    0.0.0.0 iplz.ldtest.hell.gensokyo.internal
-    0.0.0.0 hello.ldtest.hell.gensokyo.internal
-    0.0.0.0 akkoma.ldtest.hell.gensokyo.internal
-    0.0.0.0 synapse.ldtest.hell.gensokyo.internal
-    0.0.0.0 foo.ldtest.hell.gensokyo.internal
-    0.0.0.0 ap.ldtest.hell.gensokyo.internal
-    0.0.0.0 lddn0.ldtest.hell.gensokyo.internal
-    0.0.0.0 lddn1.ldtest.hell.gensokyo.internal
-    0.0.0.0 element.ldtest.hell.gensokyo.internal
-  '';
-
-  # some networking notes
-  # we will want to use the wgN device with one or possibly multiple network namespaces, but it can only be in one at a time. so instead we keep it in the default namespace and create a bridge, and make veth pairs for each additional network namespace we want to use.
-  # we also may not want to have any routing table rules in the default network namespace, because the interface may be for testing or other weird stuff. instead, we... wait, what do we do? it looks like we create a new routing table with the weird "multiple routing table" thingie, in the default netns. why do we need that... can't we just have the routing table in the namespace with the veth pair? what routing even happens in the default network namespace? in fact, i kind of specifically want there to not be any routing for wgN in the default netns, it will conflict with at least one other wgN (for the DNS server)
-  networking.firewall.allowedUDPPorts = [
-    config.networking.wireguard.interfaces.wg-redacted.listenPort
-  ];
-
   networking.firewall.trustedInterfaces = [ "incusbr0" ];
   # networking.firewall.interfaces.incusbr0 = {
   #   allowedUDPPorts = [ 53 67 ];
@@ -202,38 +180,11 @@ in rec {
   networking.firewall.checkReversePath = "loose";
   networking.firewall.rejectPackets = true;
 
-  networking.wireguard.interfaces = {
-    wg-redacted = {
-      # remember to open the port for this in allowedUDPPorts
-      listenPort = 51820;
-
-      # make sure this is a string, not a file path, or it'll end up in the
-      # store
-      privateKeyFile = "/var/secret/wg/redacted/privkey";
-
-      # we need to set route weights, so do it manually
-      allowedIPsAsRoutes = false;
-
-      # ips, peers & routes (VPN-internal addressing, peer public keys,
-      # endpoints) live in gensokyo-private.nixosModules.hell, along with
-      # the matching localCommands ip rule
-    };
-  };
-
   #i18n.supportedLocales = [
   #  "en_US.UTF-8/UTF-8"
   #  "ja_JP.UTF-8/UTF-8"
   #  "ja_JP.SJIS"
   #];
-
-  # the internal CA cert lives in gensokyo-private.nixosModules.hell
-  # (public keys are private, and the redacted stand-in in etc/certs
-  # isn't valid DER, which breaks the nss-cacert build)
-  #security.pki.certificateFiles = [
-  #  ../../etc/certs/gensokyo.internal.ca.pem
-  #];
-
-  services.resolved.llmnr = "false";
 
   # Enable the OpenSSH server.
   services.sshd.enable = true;
@@ -414,7 +365,7 @@ in rec {
     iotop
     smem
     gnome-tweaks
-    memtree
+    #memtree
     sqlite
     sqlitebrowser
     zotero
