@@ -272,8 +272,8 @@
         }
         self.nixosModules.base
         (gensokyo-private.nixosModules.mausoleum or {})
-        ./mausoleum/configuration.nix
-        ./mausoleum/hardware-configuration.nix
+        ./sys/mausoleum/configuration.nix
+        ./sys/mausoleum/hardware-configuration.nix
       ];
     };
 
@@ -307,7 +307,7 @@
         self.nixosModules.base
         ./sys/minimal.nix
         {
-          hostName = "gensokyo-installer";
+          networking.hostName = "gensokyo-installer";
           # ISO image configuration
           isoImage.makeEfiBootable = true;
           isoImage.makeUsbBootable = true;
