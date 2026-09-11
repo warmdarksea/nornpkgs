@@ -27,11 +27,11 @@
   services.resolved.settings.Resolve.DNS = [ "0.0.0.0" ];
   services.resolved.settings.Resolve.Domains = [ "~gensokyo.internal" ];
 
-  security.pki.certificateFiles = [
-    ../etc/certs/gensokyo.internal.ca.pem
-  ];
+  #security.pki.certificateFiles = [
+  #  ../etc/certs/gensokyo.internal.ca.pem
+  #];
 
-  environment.etc."pki/ca-trust/source/anchors/gensokyo.internal.ca.pem".source = ../etc/certs/gensokyo.internal.ca.pem;
+  #environment.etc."pki/ca-trust/source/anchors/gensokyo.internal.ca.pem".source = ../etc/certs/gensokyo.internal.ca.pem;
 
   services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = false;

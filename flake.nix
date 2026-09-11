@@ -34,19 +34,8 @@
     # contain credentials (e.g., knowledge of VPN endpoints could be used to
     # correlate identities, etc). so, some options are stored in a local private
     # git repo
-    gensokyo-infra-private = {
-      url = "git+file:///home/clownpiece/src/gensokyo-infra-private";
-    };
-
-    # more config
-    gensokyo-dotfiles = {
-      url = "path:/home/clownpiece/src/gensokyo-dotfiles";
-      flake = false;
-    };
-
-    nornpkgs = {
-      url = "path:/home/clownpiece/src/nornpkgs";
-      inputs.nixpkgs.follows = "nixpkgs";
+    gensokyo-private = {
+      url = "git+file:///home/clownpiece/src/gensokyo-private";
     };
   };
 
@@ -62,8 +51,7 @@
 
     nixpak,
 
-    gensokyo-dotfiles,
-    nornpkgs,
+    gensokyo-private,
       ... }@inputs: let
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         lib = nixpkgs.lib;
@@ -90,14 +78,11 @@
 
     homeManagerModules.common = { config, lib, pkgs, ... }: {
       imports = [ ./home/common.nix ];
-      _module.args.dotfiles = gensokyo-dotfiles;
     };
     homeManagerModules.magician = { config, lib, pkgs, ... }: {
       imports = [ ./home/common.nix ./home/magician.nix ];
       _module.args = {
-        dotfiles = gensokyo-dotfiles;
         nixpak = nixpak;
-        nornpkgs = nornpkgs;
       };
     };
 
@@ -203,10 +188,10 @@
       modules = [
         {
           networking.hostName = "furnace";
-          networking.hostId = "AAAAAAAA";
         }
         self.nixosModules.base
         lanzaboote.nixosModules.lanzaboote
+        (gensokyo-private.nixosModules.furnace or {})
         ./sys/furnace/configuration.nix
         ./sys/furnace/hardware-configuration.nix
       ];
