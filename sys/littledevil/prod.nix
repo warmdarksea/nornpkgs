@@ -111,7 +111,8 @@
     authKeyFile = "/var/secret/tailscale/authkey";
   };
 
-  services.minecraft-servers.dataDir = "/data/minecraft";
+  # note: services.minecraft-servers.dataDir is set in the minecraft module
+  # (only the aarch64 oci-live imports nix-minecraft, which declares it)
 
   systemd.tmpfiles.rules = [
     #"d /data 0755 root root -"

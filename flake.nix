@@ -83,6 +83,7 @@
               enable = true;
               eula = true;
               openFirewall = true;
+              dataDir = "/data/minecraft";
               servers.vanilla = {
                 enable = true;
                 jvmOpts = "-Xmx4G -Xms2G";
