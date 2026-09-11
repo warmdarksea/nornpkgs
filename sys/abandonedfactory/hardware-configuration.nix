@@ -19,12 +19,12 @@
     };
 
   boot.initrd.luks.devices."fright0" = {
-    device = "/dev/disk/by-uuid/REDACTED";
+    device = config.gensokyo.disks.fright0 or "/dev/disk/by-label/abandonedfactory-fright0";
     crypttabExtraOpts = [ "tpm2-device=auto" ];
   };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/REDACTED";
+    { device = config.gensokyo.disks.boot or "/dev/disk/by-label/AF_BOOT";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
     };

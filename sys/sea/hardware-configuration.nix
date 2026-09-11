@@ -13,7 +13,8 @@
   boot.kernelModules = [ "kvm-intel" ];
   boot.extraModulePackages = [ ];
   
-  boot.initrd.luks.devices.cryptstorage.device = "/dev/disk/by-uuid/REDACTED";
+  boot.initrd.luks.devices.cryptstorage.device =
+    config.gensokyo.disks.cryptstorage or "/dev/disk/by-label/sea-cryptstorage";
 
   fileSystems."/" =
     { device = "torch";
@@ -32,12 +33,12 @@
     };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/REDACTED";
+    { device = config.gensokyo.disks.boot or "/dev/disk/by-label/sea-boot";
       fsType = "ext4";
     };
 
   fileSystems."/boot/efi" =
-    { device = "/dev/disk/by-uuid/REDACTED";
+    { device = config.gensokyo.disks.efi or "/dev/disk/by-label/SEA_EFI";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
     };

@@ -57,7 +57,7 @@
     };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-partuuid/REDACTED";
+    { device = config.gensokyo.disks.boot or "/dev/disk/by-partlabel/library-boot";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
     };

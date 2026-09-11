@@ -32,7 +32,7 @@
     };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/REDACTED";
+    { device = config.gensokyo.disks.boot or "/dev/disk/by-label/eientei-boot";
       fsType = "ext4";
     };
 
@@ -91,12 +91,11 @@
   # Use the GRUB 2 boot loader.
   boot.loader.grub.enable = true;
   boot.loader.grub.version = 2;
-  #  boot.loader.grub.device = "/dev/disk/by-id/REDACTED";
-  boot.loader.grub.device = "/dev/disk/by-id/REDACTED";
+  boot.loader.grub.device = config.gensokyo.disks.grub or "/dev/disk/by-id/eientei-disk";
   boot.loader.grub.splashImage = "/boot/splash.png";
 
   networking.hostName = "eientei";
-  networking.hostId = "AAAAAAAA";
+  networking.hostId = lib.mkDefault "00000000";
   networking.networkmanager.enable = true;
 
   networking.interfaces.enp4s0.useDHCP = true;

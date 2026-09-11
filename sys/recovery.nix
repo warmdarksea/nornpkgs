@@ -12,12 +12,12 @@ in
   # by provision-recovery-secrets.sh after the image is dd'd to a stick.
   fileSystems = {
     "/boot" = {
-      device = "/dev/disk/by-partlabel/REDACTED";
+      device = "/dev/disk/by-partlabel/esp";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
     };
     "/" = {
-      device = "/dev/disk/by-partlabel/REDACTED";
+      device = "/dev/disk/by-partlabel/root";
       fsType = "ext4";
     };
   };

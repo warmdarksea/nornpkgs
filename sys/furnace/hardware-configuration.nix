@@ -45,11 +45,11 @@
 
     boot.initrd.luks.devices = {
       fern0 = {
-        device = "/dev/disk/by-id/REDACTED";
+        device = config.gensokyo.disks.fern0 or "/dev/disk/by-label/furnace-fern0";
         header = "/boot/crypt/fern0.h";
       };
       fern1 = {
-        device = "/dev/disk/by-id/REDACTED";
+        device = config.gensokyo.disks.fern1 or "/dev/disk/by-label/furnace-fern1";
         header = "/boot/crypt/fern1.h";
       };
     };
@@ -71,7 +71,7 @@
         Type = "oneshot";
         RemainAfterExit = true;
         ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p /boot";
-        ExecStart = "${pkgs.util-linux}/bin/mount -t vfat /dev/disk/by-uuid/REDACTED /boot";
+        ExecStart = "${pkgs.util-linux}/bin/mount -t vfat ${config.gensokyo.disks.boot or "/dev/disk/by-label/FURNACE_BOOT"} /boot";
         #ExecStop = "${pkgs.util-linux}/bin/umount /boot";
       };
     };
@@ -84,7 +84,7 @@
     };
 
     fileSystems."/boot" = {
-      device = "/dev/disk/by-uuid/REDACTED";
+      device = config.gensokyo.disks.boot or "/dev/disk/by-label/FURNACE_BOOT";
       fsType = "vfat";
       neededForBoot = true;
       options = [ "fmask=0022" "dmask=0022" ];
@@ -139,8 +139,8 @@
       mode = "0600";
       text = ''
         # <volume-name> <encrypted-device> [key-file] [options]
-        yet0 /dev/disk/by-id/REDACTED /var/secret/yet/yet0.k header=/var/secret/yet/yet0.h
-        yet1 /dev/disk/by-id/REDACTED /var/secret/yet/yet1.k header=/var/secret/yet/yet1.h
+        yet0 ${config.gensokyo.disks.yet0 or "/dev/disk/by-label/furnace-yet0"} /var/secret/yet/yet0.k header=/var/secret/yet/yet0.h
+        yet1 ${config.gensokyo.disks.yet1 or "/dev/disk/by-label/furnace-yet1"} /var/secret/yet/yet1.k header=/var/secret/yet/yet1.h
       '';
     };
 

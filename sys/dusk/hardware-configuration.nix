@@ -27,7 +27,7 @@
   boot.supportedFilesystems = ["zfs"];
 
   fileSystems."/" =
-    { device = "/dev/disk/by-uuid/REDACTED";
+    { device = config.gensokyo.disks.root or "/dev/disk/by-label/dusk-root";
       fsType = "ext4";
     };
 
@@ -39,7 +39,7 @@
   #  };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/REDACTED";
+    { device = config.gensokyo.disks.boot or "/dev/disk/by-label/DUSK_BOOT";
       fsType = "vfat";
     };
 
@@ -87,7 +87,7 @@
 
   boot.initrd.luks.devices = {
     crypted = {
-      device = "/dev/disk/by-id/REDACTED";
+      device = config.gensokyo.disks.crypted or "/dev/disk/by-label/dusk-crypted";
       header = "/form.h";
       preLVM = true;
     };

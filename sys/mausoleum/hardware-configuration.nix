@@ -29,7 +29,7 @@
   #  };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/REDACTED";
+    { device = config.gensokyo.disks.boot or "/dev/disk/by-label/MAUSOLEUM_BOOT";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
     };
@@ -50,7 +50,7 @@
 
   boot.initrd.luks.devices = {
     crypted = {
-      device = "/dev/disk/by-id/REDACTED";
+      device = config.gensokyo.disks.crypted or "/dev/disk/by-label/mausoleum-crypted";
       header = "/leaf.h";
       preLVM = true;
     };

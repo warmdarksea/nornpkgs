@@ -22,12 +22,12 @@
     };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/REDACTED";
+    { device = config.gensokyo.disks.boot or "/dev/disk/by-label/cheese-boot";
       fsType = "ext4";
     };
 
   fileSystems."/boot/EFI" =
-    { device = "/dev/disk/by-uuid/REDACTED";
+    { device = config.gensokyo.disks.efi or "/dev/disk/by-label/CHEESE_EFI";
       fsType = "vfat";
     };
 
@@ -66,7 +66,7 @@
 
   boot.initrd.luks.devices = {
     crypted = {
-      device = "/dev/disk/by-id/REDACTED";
+      device = config.gensokyo.disks.crypted or "/dev/disk/by-label/cheese-crypted";
       header = "/splice.h";
       preLVM = true;
     };

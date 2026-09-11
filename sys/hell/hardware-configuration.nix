@@ -10,7 +10,8 @@
   boot.kernelModules = [ "kvm-amd" ];
   boot.extraModulePackages = [ ];
   
-  boot.initrd.luks.devices.cryptstorage.device = "/dev/disk/by-uuid/REDACTED";
+  boot.initrd.luks.devices.cryptstorage.device =
+    config.gensokyo.disks.cryptstorage or "/dev/disk/by-label/hell-cryptstorage";
 
   boot.zfs.requestEncryptionCredentials = false;
 
@@ -20,7 +21,7 @@
     };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/REDACTED";
+    { device = config.gensokyo.disks.boot or "/dev/disk/by-label/HELL_BOOT";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
     };
@@ -76,7 +77,7 @@
 
     swapDevices = [
       {
-        device = "/dev/disk/by-partuuid/REDACTED";  # Replace with your partition
+        device = config.gensokyo.disks.swap or "/dev/disk/by-partlabel/hell-swap";
         randomEncryption = {
           enable = true;
           cipher = "aes-xts-plain64";
