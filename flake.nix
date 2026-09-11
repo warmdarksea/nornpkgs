@@ -29,6 +29,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    nix-minecraft = {
+      url = "github:Infinidoge/nix-minecraft";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # some configuration options don't make sense to host publicly, even though
     # they're not strictly "secret" in the sense that they don't directly
     # contain credentials (e.g., knowledge of VPN endpoints could be used to
@@ -54,10 +59,40 @@
 
     nixpak,
 
+    nix-minecraft,
+
     gensokyo-private,
       ... }@inputs: let
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         lib = nixpkgs.lib;
+
+        # littledevil modules (akkoma on oracle cloud):
+        # bootstrap is for boot volumes and ssh
+        # live is for running the actual services (e.g. akkoma)
+        # prod is for hooking up to external services (e.g. grafana)
+        ldModules = {
+          bootstrap = import ./sys/littledevil/bootstrap.nix;
+          live = import ./sys/littledevil/live.nix;
+          live_test = import ./sys/littledevil/live_test.nix;
+          prod = import ./sys/littledevil/prod.nix;
+          oci = import ./sys/littledevil/oci.nix;
+          libvirt = import ./sys/littledevil/libvirt.nix;
+          minecraft = { config, pkgs, lib, ... }: {
+            imports = [ nix-minecraft.nixosModules.minecraft-servers ];
+            services.minecraft-servers = {
+              enable = true;
+              eula = true;
+              openFirewall = true;
+              servers.vanilla = {
+                enable = true;
+                jvmOpts = "-Xmx4G -Xms2G";
+
+                # Specify the custom minecraft server package
+                package = nix-minecraft.packages.x86_64-linux.vanilla-server;
+              };
+            };
+          };
+        };
     in {
     # nix modules
 
@@ -297,6 +332,144 @@
           home-manager.users."seija" = self.homeManagerModules.magician;
         }
       ];
+    };
+
+    # littledevil (oracle cloud VM.Standard.A1.Flex + local test variants)
+
+    # base
+    packages.aarch64.nixosConfigurations.base-bootstrap = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ldModules.bootstrap
+        { nixpkgs.crossSystem.system = "aarch64-linux"; }
+      ];
+    };
+
+    packages.x86_64.nixosConfigurations.base-bootstrap = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ldModules.bootstrap
+      ];
+    };
+
+    packages.aarch64.nixosConfigurations.base-live = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ldModules.live
+        ldModules.bootstrap
+        { nixpkgs.crossSystem.system = "aarch64-linux"; }
+      ];
+    };
+
+    packages.x86_64.nixosConfigurations.base-live = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ldModules.bootstrap
+        ldModules.live
+      ];
+    };
+
+    # oci
+    packages.aarch64.images.oci-bootstrap = self.packages.aarch64.nixosConfigurations.oci-bootstrap.config.system.build.OCIImage;
+    packages.x86_64.images.oci-bootstrap = self.packages.x86_64.nixosConfigurations.oci-bootstrap.config.system.build.OCIImage;
+
+    packages.aarch64.nixosConfigurations.oci-bootstrap = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ldModules.oci
+        ldModules.bootstrap
+        { nixpkgs.crossSystem.system = "aarch64-linux"; }
+        "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"
+        {
+          oci.efi = lib.mkForce true;
+          boot.loader.grub.enable = lib.mkForce false;
+          boot.loader.systemd-boot.enable = true;
+        }
+      ];
+    };
+
+    packages.x86_64.nixosConfigurations.oci-bootstrap = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ldModules.oci
+        ldModules.bootstrap
+        "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"
+        {
+          oci.efi = lib.mkForce false;
+        }
+      ];
+    };
+
+    packages.x86_64.nixosConfigurations.oci-live = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ldModules.oci
+        ldModules.live
+        ldModules.prod
+        ldModules.bootstrap
+        (gensokyo-private.nixosModules.littledevil-prod or {})
+        "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"
+        {
+          oci.efi = lib.mkForce false;
+          systemd.services.akkoma.environment = {
+            ERL_FLAGS = "+MIscs 256";
+          };
+        }
+      ];
+    };
+
+    packages.aarch64.nixosConfigurations.oci-live = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ldModules.oci
+        ldModules.live
+        ldModules.minecraft
+        ldModules.prod
+        ldModules.bootstrap
+        (gensokyo-private.nixosModules.littledevil-prod or {})
+        {
+          nixpkgs.localSystem.system = "x86_64-linux";
+          nixpkgs.crossSystem.system = "aarch64-linux";
+        }
+        "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"
+        {
+          oci.efi = lib.mkForce true;
+          boot.loader.grub.enable = lib.mkForce false;
+          boot.loader.systemd-boot.enable = true;
+          boot.loader.efi.canTouchEfiVariables = lib.mkForce true;
+        }
+      ];
+    };
+
+    # what actually runs on the oracle instance
+    nixosConfigurations.littledevil-prod-bootstrap = self.packages.aarch64.nixosConfigurations.oci-bootstrap;
+    nixosConfigurations.littledevil-prod = self.packages.aarch64.nixosConfigurations.oci-live;
+
+    devShells.x86_64-linux.littledevil = pkgs.mkShell {
+      packages = with pkgs; [
+        #aliyun-cli
+        #awscli2
+        #azure-cli
+        bruno
+        libvirt
+        m4
+        oci-cli
+        wireshark
+        wrangler
+        zap
+        (opentofu.withPlugins (p: [
+          p.hashicorp_null
+          p.hashicorp_tls
+          p.dmacvicar_libvirt
+          #p.hashicorp_aws
+          #p.hashicorp_azurerm
+          #p.aliyun_alicloud
+          p.oracle_oci
+          p.cloudflare_cloudflare
+        ]))
+      ];
+
+      shellHook = ". secret/credentials.sh";
     };
 
     # iso derivations
