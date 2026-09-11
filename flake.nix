@@ -98,6 +98,8 @@
     # nix modules
 
     nixosModules.base = import lib/base.nix;
+    nixosModules.desktop = import lib/desktop.nix;
+    nixosModules.server = import lib/server.nix;
     nixosModules.nvidia = import lib/nvidia.nix;
     nixosModules.defaultOverlays = { config, pkgs, lib, ... }: {
       nixpkgs.overlays = [
@@ -152,6 +154,7 @@
           }
           self.nixosModules.base
           (gensokyo-private.nixosModules.cheese or {})
+          self.nixosModules.desktop
           self.nixosModules.defaultOverlays
           nixos-hardware.nixosModules.gpd-pocket-3
           ./hw/gpd_pocket_3.nix
@@ -174,6 +177,7 @@
         }
         self.nixosModules.base
         (gensokyo-private.nixosModules.chireiden or {})
+        self.nixosModules.desktop
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.lenovo-thinkpad-x13-amd
@@ -197,6 +201,7 @@
         }
         self.nixosModules.base
         (gensokyo-private.nixosModules.dusk or {})
+        self.nixosModules.desktop
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         ./hw/gpd_pocket_2.nix
@@ -250,6 +255,7 @@
         }
         self.nixosModules.base
         (gensokyo-private.nixosModules.hell or {})
+        self.nixosModules.desktop
         self.nixosModules.nvidia
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
@@ -280,6 +286,7 @@
         }
         self.nixosModules.base
         (gensokyo-private.nixosModules.library or {})
+        self.nixosModules.server
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         ./hw/library.nix
@@ -327,6 +334,7 @@
         }
         self.nixosModules.base
         (gensokyo-private.nixosModules.sea or {})
+        self.nixosModules.desktop
         self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.dell-xps-13-9310
@@ -348,6 +356,7 @@
       system = "x86_64-linux";
       modules = [
         ldModules.bootstrap
+        self.nixosModules.server
         { nixpkgs.crossSystem.system = "aarch64-linux"; }
       ];
     };
@@ -356,6 +365,7 @@
       system = "x86_64-linux";
       modules = [
         ldModules.bootstrap
+        self.nixosModules.server
       ];
     };
 
@@ -364,6 +374,7 @@
       modules = [
         ldModules.live
         ldModules.bootstrap
+        self.nixosModules.server
         { nixpkgs.crossSystem.system = "aarch64-linux"; }
       ];
     };
@@ -372,6 +383,7 @@
       system = "x86_64-linux";
       modules = [
         ldModules.bootstrap
+        self.nixosModules.server
         ldModules.live
       ];
     };
@@ -386,6 +398,7 @@
         ./hw/oci_a1flex.nix
         ldModules.oci
         ldModules.bootstrap
+        self.nixosModules.server
         { nixpkgs.crossSystem.system = "aarch64-linux"; }
         "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"
         {
@@ -401,6 +414,7 @@
       modules = [
         ldModules.oci
         ldModules.bootstrap
+        self.nixosModules.server
         "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"
         {
           oci.efi = lib.mkForce false;
@@ -415,6 +429,7 @@
         ldModules.live
         ldModules.prod
         ldModules.bootstrap
+        self.nixosModules.server
         (gensokyo-private.nixosModules.littledevil-prod or {})
         "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"
         {
@@ -435,6 +450,7 @@
         ldModules.minecraft
         ldModules.prod
         ldModules.bootstrap
+        self.nixosModules.server
         (gensokyo-private.nixosModules.littledevil-prod or {})
         {
           nixpkgs.localSystem.system = "x86_64-linux";

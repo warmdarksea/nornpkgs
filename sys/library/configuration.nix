@@ -68,9 +68,7 @@
     };
   };
 
-  users.users.root.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA redacted"
-  ];
+  # the root key lives in lib/server.nix
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
 

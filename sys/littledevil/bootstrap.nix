@@ -2,23 +2,10 @@
   # lets us build this derivation standalone, with no bootloader
   boot.isContainer = lib.mkDefault true;
 
-  networking.firewall = {
-    enable = true;
-    allowedTCPPorts = [ 22 ];
-  };
+  # ssh, the firewall and the root key live in lib/server.nix, which is
+  # included next to this module in every littledevil configuration
 
-  services.openssh = {
-    enable = true;
-    settings = {
-      PermitRootLogin = "prohibit-password";
-      PasswordAuthentication = false;
-      KbdInteractiveAuthentication = false;
-    };
-  };
-
-  users.users.root.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA redacted"
-  ];
+  networking.firewall.allowedTCPPorts = [ 22 ];
 
   #environment.systemPackages = with pkgs; [
   #  tcpdump

@@ -61,7 +61,7 @@
     };
   };
 
-  hardware.bluetooth.enable = true;
+  # hardware.bluetooth lives in lib/desktop.nix
   hardware.sensor.iio.enable = true;
 
   fonts.packages = with pkgs; [
@@ -130,21 +130,8 @@
 
   hardware.pulseaudio.enable = false;
   # sound.enableOSSEmulation = true;
-  security.rtkit.enable = true;
-  services.pipewire = {
-    enable = true;
-    alsa.enable = true;
-    alsa.support32Bit = true;
-    pulse.enable = true;
-    # If you want to use JACK applications, uncomment this
-    jack.enable = true;
-
-    # use the example session manager (no others are packaged yet so this is enabled by default,
-    # no need to redefine it in your config for now)
-    #media-session.enable = true;
-    wireplumber.enable = true;
-    systemWide = true;
-  };
+  # rtkit + pipewire live in lib/desktop.nix
+  services.pipewire.systemWide = true;
 
   # lxd was removed from nixpkgs (unmaintained); incus is the successor
   #virtualisation.lxd.enable = true;
