@@ -196,6 +196,7 @@
       modules = [
         {
           networking.hostName = "furnace";
+          networking.hostId = lib.mkDefault "00000000";
         }
         self.nixosModules.base
         lanzaboote.nixosModules.lanzaboote
