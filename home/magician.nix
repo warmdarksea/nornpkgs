@@ -1,7 +1,8 @@
 { lib, pkgs, nixpak, ... }: let
   # fixme: mkShell / mkNixPakApplication / nixpak-desktop-wrap lived in the
-  # old nornpkgs repo, which is no longer an input. re-wire the bitwig
-  # sandbox via home/nixpak/bitwig.nix + the nixpak input when needed.
+  # retired nornpkgs package repo (this repo inherited the name), which is
+  # no longer an input. re-wire the bitwig sandbox via
+  # home/nixpak/bitwig.nix + the nixpak input when needed.
   # inherit (nornpkgs.lib) mkShell;
   # inherit (nornpkgs.lib.nixpak) mkNixPakApplication nixpak-desktop-wrap;
 

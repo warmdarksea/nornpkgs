@@ -1,5 +1,5 @@
 {
-  description = "flake for managing systems of *.gensokyo.internal";
+  description = "nornpkgs — systems of *.gensokyo.internal";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
