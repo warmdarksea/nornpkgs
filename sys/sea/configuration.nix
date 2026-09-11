@@ -46,7 +46,6 @@
 
   networking.wireguard.interfaces = {
     wg2 = {
-      ips = [ "0.0.0.0/24" ];
       # remember to open the port for this in allowedUDPPorts
       listenPort = 44283;
 
@@ -56,26 +55,9 @@
 
       # we need to set route weights, so do it manually
       allowedIPsAsRoutes = false;
-      postSetup = ''
-       ip route add 0.0.0.0/24 dev wg2 metric 200
-       ip route add 0.0.0.0/24 dev wg2 via 0.0.0.0 metric 200
-      '';
 
-      peers = [
-        {
-          publicKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-          presharedKeyFile = "/var/secret/wg/awsvpn/psk";
-
-          allowedIPs = [ "0.0.0.0/24" "0.0.0.0/24" ];
-
-          # note: need to do some firewall stuff for handshake to work, see:
-          # https://discourse.nixos.org/t/solved-minimal-firewall-setup-for-wireguard-client/7577
-          endpoint = "0.0.0.0:44283"; 
-
-          # Send keepalives every 25 seconds. Important to keep NAT tables alive.
-          persistentKeepalive = 25;
-        }
-      ];
+      # ips, peers & routes (VPN-internal addressing, peer public keys,
+      # endpoints) live in gensokyo-private.nixosModules.sea
     };
   };
 

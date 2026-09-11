@@ -11,9 +11,7 @@
 
 { config, lib, pkgs, ... }:
 
-let
-  RFC1918Addresses = [ "0.0.0.0/5" "0.0.0.0/7" "0.0.0.0/8" "0.0.0.0/6" "0.0.0.0/4" "0.0.0.0/3" "0.0.0.0/2" "0.0.0.0/3" "0.0.0.0/5" "0.0.0.0/6" "0.0.0.0/12" "0.0.0.0/11" "0.0.0.0/10" "0.0.0.0/9" "0.0.0.0/8" "0.0.0.0/7" "0.0.0.0/4" "0.0.0.0/9" "0.0.0.0/11" "0.0.0.0/13" "0.0.0.0/16" "0.0.0.0/15" "0.0.0.0/14" "0.0.0.0/12" "0.0.0.0/10" "0.0.0.0/8" "0.0.0.0/7" "0.0.0.0/6" "0.0.0.0/5" "0.0.0.0/4" ];
-in rec {
+rec {
   imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
@@ -117,7 +115,6 @@ in rec {
 
   networking.wireguard.interfaces = {
     wg-redacted = {
-      ips = [ "0.0.0.0/32" ];
       # remember to open the port for this in allowedUDPPorts
       listenPort = 51820;
 
@@ -125,27 +122,11 @@ in rec {
       # store
       privateKeyFile = "/var/secret/wg/redacted/privkey";
 
-      peers = [
-        {
-          publicKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-
-          # for testing
-          #allowedIPs = [ "0.0.0.0/32" ];
-
-          # redacted's DNS server + (all IPs - RFC1918)
-          allowedIPs = [ "0.0.0.0/32" ] ++ RFC1918Addresses;
-
-          # note: need to do some firewall stuff for handshake to work, see:
-          # https://discourse.nixos.org/t/solved-minimal-firewall-setup-for-wireguard-client/7577
-          endpoint = "0.0.0.0:51820";
-        }
-      ];
-
       # we need to set route weights, so do it manually
       allowedIPsAsRoutes = false;
-      postSetup = ''
-        ip route add 0.0.0.0/32 dev wg-redacted
-      '';
+
+      # ips, peers & routes (VPN-internal addressing, peer public keys,
+      # endpoints) live in gensokyo-private.nixosModules.furnace
           #   postSetup = ''
     #     ${pkgs.iproute2}/bin/ip route del 0.0.0.0/24 dev wgbr1 || true
     #     ${pkgs.iproute2}/bin/ip route add 0.0.0.0/24 dev wgbr1 table rt_redacted || true

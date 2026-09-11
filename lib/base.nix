@@ -26,7 +26,7 @@
   #DNS=0.0.0.0
   #Domains=~gensokyo.internal
   #'';
-  services.resolved.settings.Resolve.DNS = [ "0.0.0.0" ];
+  # the DNS server list lives in gensokyo-private per-host modules
   services.resolved.settings.Resolve.Domains = [ "~gensokyo.internal" ];
 
   #security.pki.certificateFiles = [
