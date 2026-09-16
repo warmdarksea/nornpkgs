@@ -163,6 +163,7 @@
     enable = true;
     earlySetup = true;
     keyMap = "${mykeymap}";
+    font = "default8x16";
   };
 
   # systemd.services.setconsole = {
