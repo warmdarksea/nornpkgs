@@ -418,22 +418,22 @@ in rec {
   ];
   users.users.clownpiece = {
     uid = 1000;
-    subUidRanges = [
-      { startUid = 100000; count = 16777216; }
-      { startUid = config.users.users.clownpiece-audio.uid; count = 1; }
-      { startUid = config.users.users.flandre.uid; count = 1; }
-      { startUid = config.users.users.claude.uid; count = 1; }
-    ];
-    subGidRanges = [
-      { startGid = 100000; count = 16777216; }  # Default range
-      { startGid = config.ids.gids.audio; count = 1; }
-      { startGid = config.ids.gids.video; count = 1; }
-      { startGid = config.ids.gids.render; count = 1; }
-      { startGid = config.users.groups.agent.gid; count = 1; }
-      { startGid = config.users.groups.kvm.gid; count = 1; }
-      { startGid = config.users.groups.games.gid; count = 1; }
-      { startGid = config.users.users.clownpiece-audio.uid; count = 1; }
-    ];
+    # subUidRanges = [
+    #   { startUid = 100000; count = 16777216; }
+    #   { startUid = config.users.users.clownpiece-audio.uid; count = 1; }
+    #   { startUid = config.users.users.flandre.uid; count = 1; }
+    #   { startUid = config.users.users.claude.uid; count = 1; }
+    # ];
+    # subGidRanges = [
+    #   { startGid = 100000; count = 16777216; }  # Default range
+    #   { startGid = config.ids.gids.audio; count = 1; }
+    #   { startGid = config.ids.gids.video; count = 1; }
+    #   { startGid = config.ids.gids.render; count = 1; }
+    #   { startGid = config.users.groups.agent.gid; count = 1; }
+    #   { startGid = config.users.groups.kvm.gid; count = 1; }
+    #   { startGid = config.users.groups.games.gid; count = 1; }
+    #   { startGid = config.users.users.clownpiece-audio.uid; count = 1; }
+    # ];
     extraGroups = [ "magician" "wheel" "audio" "video" "sudo" "render" "networkmanager" "docker" "podman" "libvirtd" "wireshark" "incus" "incus-admin" "input" "games" "plugdev" "pipewire" "lp" "scanner" "adbusers" "kvm"];
     isNormalUser = true;
   };
@@ -449,13 +449,6 @@ in rec {
   users.users.flandre = {
     uid = 4204;
     extraGroups = [ "audio" "video" "render" "input" "plugdev" "pipewire" "games" ];
-    isNormalUser = true;
-  };
-
-  users.users.claude = {
-    uid = 4738; # i asked him
-    group = "agent";
-    extraGroups = [ "kvm" ];
     isNormalUser = true;
   };
 

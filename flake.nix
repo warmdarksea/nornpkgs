@@ -101,6 +101,7 @@
     nixosModules.desktop = import lib/desktop.nix;
     nixosModules.server = import lib/server.nix;
     nixosModules.nvidia = import lib/nvidia.nix;
+    nixosModules.agent = import lib/agent.nix;
     nixosModules.defaultOverlays = { config, pkgs, lib, ... }: {
       nixpkgs.overlays = [
         (self: super: {
@@ -251,12 +252,21 @@
       modules = [
         {
           networking.hostName = "hell";
+          gensokyo-agent = {
+            enable = true;
+            user = "clownpiece";
+          };
+          nixpkgs.config = {
+            #cudaSupport = true;
+            cudaCapabilities = [ "8.9" ];
+          };
         }
         self.nixosModules.base
-        gensokyo-private.nixosModules.hell
+        self.nixosModules.agent
         self.nixosModules.desktop
         self.nixosModules.nvidia
         self.nixosModules.defaultOverlays
+        gensokyo-private.nixosModules.hell
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.common-cpu-amd
         nixos-hardware.nixosModules.common-cpu-amd-pstate
@@ -281,12 +291,20 @@
       modules = [
         {
           networking.hostName = "library";
-          networking.hostId = lib.mkDefault "00000000";
+          gensokyo-agent = {
+            enable = true;
+            user = "patchouli";
+          };
+          nixpkgs.config = {
+            cudaSupport = true;
+            cudaCapabilities = [ "8.6" ];
+          };
         }
         self.nixosModules.base
-        (gensokyo-private.nixosModules.library or {})
+        self.nixosModules.agent
         self.nixosModules.server
         self.nixosModules.defaultOverlays
+        (gensokyo-private.nixosModules.library or {})
         lanzaboote.nixosModules.lanzaboote
         ./hw/library.nix
         ./sys/library/configuration.nix

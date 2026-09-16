@@ -42,29 +42,32 @@
 
   boot.zfs.requestEncryptionCredentials = false;
 
-  fileSystems."/" =
-    { device = "story";
-      fsType = "zfs";
-    };
+  fileSystems."/" = {
+    device = "story";
+    fsType = "zfs";
+  };
+  
+  fileSystems."/nix" = {
+    device = "story/nix";
+    fsType = "zfs";
+  };
 
-  fileSystems."/nix" =
-    { device = "story/nix";
-      fsType = "zfs";
-    };
+  fileSystems."/workspace" = {
+    device = "story/workspace";
+    fsType = "zfs";
+  };
 
-  fileSystems."/boot" =
-    { device = config.gensokyo.disks.boot or "/dev/disk/by-partlabel/library-boot";
-      fsType = "vfat";
-      options = [ "fmask=0022" "dmask=0022" ];
-    };
+  fileSystems."/boot" = {
+    device = config.gensokyo.disks.boot or "/dev/disk/by-partlabel/library-boot";
+    fsType = "vfat";
+    options = [ "fmask=0022" "dmask=0022" ];
+  };
 
   boot.initrd.network = {
     enable = true;
     ssh = {
       enable = true;
       port = 2222;  # different port so your normal known_hosts entry doesn't conflict
-      hostKeys = [ /var/secret/ssh_library_ed25519_key ];
-      authorizedKeys = [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA redacted" ];
     };
   };
 
@@ -97,6 +100,19 @@
     isNormalUser = true;
     extraGroups = [ "wheel" "docker" ];
   };
+  security.auditd.enable = true;
+  security.audit.enable = true;
+  security.auditd.plugins = {
+    syslog = {
+      path = lib.getExe' config.security.auditd.package "audisp-syslog";
+      args = [ "LOG_INFO" ];
+    };
+  };
+  security.audit.rules = [
+    "-a always,exit -F arch=b64 -S execve -F uid=${builtins.toString config.users.users.claude.uid} -k claude-exec"
+  ];
+
+  #nix.settings.allowed-users = [ "claude" ];
 
   environment.systemPackages = with pkgs; [
     dtach
