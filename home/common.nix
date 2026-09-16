@@ -115,6 +115,7 @@
       zip
       unrar-wrapper
       tree
+      nanokvmctl # NanoKVM power/reset/boot control (warmdarksea/nanokvmctl, via defaultOverlays)
     ];
     desktop_pkgs = with pkgs; [
       #gnome.adwaita-icon-theme

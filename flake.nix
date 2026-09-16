@@ -118,7 +118,12 @@
     nixosModules.defaultOverlays = { config, pkgs, lib, ... }: {
       nixpkgs.overlays = [
         (self: super: {
-          # ...
+          # NanoKVM boot-control tooling (sources pinned in the let above).
+          # Built against the overlaid pkgs so cross/other systems stay correct.
+          nanokvm = self.python3Packages.callPackage "${nanokvmctlSrc}/nanokvm.nix" { };
+          nanokvmctl = self.python3Packages.callPackage "${nanokvmctlSrc}/default.nix" {
+            nanokvm = self.nanokvm;
+          };
         })
         (final: prev: {
           # https://github.com/NixOS/nixpkgs/issues/493503
