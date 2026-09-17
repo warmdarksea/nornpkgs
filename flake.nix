@@ -70,7 +70,7 @@
         # repos only the `url`s change; the pinned `rev`s stay valid.
         uefiTrampolineSrc = builtins.fetchGit {
           url = "https://github.com/warmdarksea/uefi_trampoline.git";
-          rev = "8d3ea294d6dfbc3bcccd17aec14b0430bb8ccd66";
+          rev = "b5f226568a350f7ec9744e2edca2526686839467";
           ref = "master";
         };
         nanokvmctlSrc = builtins.fetchGit {
