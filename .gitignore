@@ -1,0 +1,8 @@
+build/
+result
+result-*
+_CoqProject
+# clightgen writes beside the .c; the Makefile moves these into build/
+src/fib.v
+src/main.v
+.lia.cache
