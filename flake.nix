@@ -560,6 +560,12 @@
 
     # flake templates: nix flake init -t github:warmdarksea/nornpkgs#rust-hello
 
+    templates.coq-hellovst = {
+      path = ./template/coq-hellovst;
+      description = "coq + VST/CompCert: a C fibonacci program verified end to end (needs unfree CompCert)";
+      welcomeText = "# coq-hellovst\nproofs: nix flake check  binary: nix run  axioms: nix develop --command make audit";
+    };
+
     templates.lean4-hello = {
       path = ./template/lean4-hello;
       description = "lean 4 hello world (nix build + lean devshell)";
