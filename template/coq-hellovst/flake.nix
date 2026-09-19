@@ -1,11 +1,9 @@
 {
   description = "VST/CompCert template: an end-to-end verified Fibonacci program";
 
-  # Resolves through the system nix registry pin.
-  #
-  # Any nixpkgs providing coq 9.1 / VST 2.16 / CompCert 3.17 will do; pin it
-  # explicitly (e.g. "github:NixOS/nixpkgs/<rev>") if this flake needs to build
-  # the same way on a machine with a different registry.
+  # Pinned by the committed flake.lock; `nix flake update` re-resolves it
+  # through the machine's nix registry.  Any nixpkgs providing coq 9.1 /
+  # VST 2.16 / CompCert 3.17 will do.
   inputs.nixpkgs.url = "nixpkgs";
 
   outputs = { self, nixpkgs }:

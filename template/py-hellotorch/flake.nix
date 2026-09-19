@@ -1,7 +1,8 @@
 {
   description = "python + torch hello: matrix multiply on the GPU";
 
-  # Resolves through the system nix registry pin.
+  # Pinned by the committed flake.lock; `nix flake update` re-resolves it
+  # through the machine's nix registry.
   inputs.nixpkgs.url = "nixpkgs";
 
   outputs =
