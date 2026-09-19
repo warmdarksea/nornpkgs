@@ -65,20 +65,6 @@
       ... }@inputs: let
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         lib = nixpkgs.lib;
-        # NanoKVM boot-control tooling, pulled in as source (no extra flake
-        # inputs — each repo carries its own default.nix). After pushing the
-        # repos only the `url`s change; the pinned `rev`s stay valid.
-        uefiTrampolineSrc = builtins.fetchGit {
-          url = "https://github.com/warmdarksea/uefi_trampoline.git";
-          rev = "8d3ea294d6dfbc3bcccd17aec14b0430bb8ccd66";
-          ref = "master";
-        };
-        nanokvmctlSrc = builtins.fetchGit {
-          url = "https://github.com/warmdarksea/nanokvmctl.git";
-          rev = "6778fdbad429af3843563b52899bbb13c46618e9";
-          ref = "master";
-        };
-        nanokvm = pkgs.python3Packages.callPackage "${nanokvmctlSrc}/nanokvm.nix" { };
 
         # littledevil modules (akkoma on oracle cloud):
         # bootstrap is for boot volumes and ssh
@@ -611,11 +597,21 @@
     };
 
     # NanoKVM boot-control tooling.
-    packages.x86_64-linux.uefi_trampoline =
-      pkgs.callPackage "${uefiTrampolineSrc}/default.nix" { }; # .override { bootId = N; }
-    packages.x86_64-linux.nanokvm = nanokvm;
-    packages.x86_64-linux.nanokvmctl =
-      pkgs.python3Packages.callPackage "${nanokvmctlSrc}/default.nix" { inherit nanokvm; };
+    packages.x86_64-linux.uefi_trampoline = let
+      uefiTrampolineSrc = builtins.fetchGit {
+        url = "https://github.com/warmdarksea/uefi_trampoline.git";
+        rev = "8d3ea294d6dfbc3bcccd17aec14b0430bb8ccd66";
+        ref = "master";
+      };
+    in pkgs.callPackage "${uefiTrampolineSrc}/default.nix" { }; # .override { bootId = N; }
+    packages.x86_64-linux.nanokvm = pkgs.python3Packages.callPackage "${nanokvmctlSrc}/nanokvm.nix" { };;
+    packages.x86_64-linux.nanokvmctl = let
+      nanokvmctlSrc = builtins.fetchGit {
+        url = "https://github.com/warmdarksea/nanokvmctl.git";
+        rev = "6778fdbad429af3843563b52899bbb13c46618e9";
+        ref = "master";
+      };
+    in pkgs.python3Packages.callPackage "${nanokvmctlSrc}/default.nix" { inherit nanokvm; };
 
     # and, mirroring your existing packages.<arch>.images.<name> pattern:
     images.gensokyo-recovery =
