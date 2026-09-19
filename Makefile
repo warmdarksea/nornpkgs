@@ -308,3 +308,38 @@ why_depends_sys:
 
 #
 
+
+#
+
+# NanoKVM UEFI trampoline artifacts.
+# Build the unsigned trampoline .efi from the pinned uefi_trampoline source (same
+# rev as flake.nix's uefiTrampolineSrc), Secure Boot-sign it when keys are given,
+# and wrap it in a small hybrid ISO for `nanokvmctl boot`. Keys never live here:
+#
+#   make trampolines SB_KEY=~/sb/db/db.key SB_CERT=~/sb/db/db.pem
+#   make build/uefi-trampoline-0002-nixos.iso SB_KEY=... SB_CERT=...
+#   make build/uefi-trampoline-0007-fedora.iso SB_KEY=... SB_CERT=...   # any Boot#### id
+#
+# Omit SB_KEY/SB_CERT for an unsigned ISO (Secure Boot off / testing).
+
+ESP_MB  ?= 4
+SB_KEY  ?=
+SB_CERT ?=
+
+# single source of truth for the trampoline pin is flake.nix's uefiTrampolineSrc
+TRAMP_URL := $(shell sed -n '/uefiTrampolineSrc = builtins.fetchGit/,/};/{s/.*url = "\(.*\)";/\1/p;}' flake.nix)
+TRAMP_REV := $(shell sed -n '/uefiTrampolineSrc = builtins.fetchGit/,/};/{s/.*rev = "\(.*\)";/\1/p;}' flake.nix)
+
+.PHONY: trampolines
+trampolines: $(BUILD_DIR)/uefi-trampoline-0002-nixos.iso $(BUILD_DIR)/uefi-trampoline-0004-windows.iso
+
+# build/uefi-trampoline-<hexid>-<slug>.iso
+$(BUILD_DIR)/uefi-trampoline-%.iso: scripts/pack-trampoline-iso.sh
+	@test -n "$(TRAMP_URL)" -a -n "$(TRAMP_REV)" || { echo "could not read uefiTrampolineSrc url/rev from flake.nix"; exit 1; }
+	@mkdir -p $(BUILD_DIR)
+	spec='$*'; id=$${spec%%-*}; slug=$${spec#*-}; dec=$$((16#$$id)); \
+	  echo "trampoline BootNext=0x$$id ($$slug) <- $(TRAMP_URL)@$(TRAMP_REV)"; \
+	  efi=$$(nix build --no-link --print-out-paths --impure --expr "let p = import <nixpkgs> {}; s = builtins.fetchGit { url = \"$(TRAMP_URL)\"; rev = \"$(TRAMP_REV)\"; ref = \"master\"; }; in p.callPackage \"\$${s}/default.nix\" { bootId = $$dec; }")/lib/uefi-trampoline/BOOTX64.EFI; \
+	  TEFI="$$efi" OUT="$@" TSLUG="$$slug" ESP_MB="$(ESP_MB)" SB_KEY="$(SB_KEY)" SB_CERT="$(SB_CERT)" \
+	    nix shell nixpkgs#sbsigntool nixpkgs#mtools nixpkgs#xorriso --command bash scripts/pack-trampoline-iso.sh
+	@echo "-> $@"

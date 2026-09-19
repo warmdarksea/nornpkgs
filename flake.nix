@@ -105,7 +105,12 @@
     nixosModules.defaultOverlays = { config, pkgs, lib, ... }: {
       nixpkgs.overlays = [
         (self: super: {
-          # ...
+          # NanoKVM boot-control tooling (sources pinned in the let above).
+          # Built against the overlaid pkgs so cross/other systems stay correct.
+          nanokvm = self.python3Packages.callPackage "${nanokvmctlSrc}/nanokvm.nix" { };
+          nanokvmctl = self.python3Packages.callPackage "${nanokvmctlSrc}/default.nix" {
+            nanokvm = self.nanokvm;
+          };
         })
         (final: prev: {
           # https://github.com/NixOS/nixpkgs/issues/493503
@@ -600,7 +605,7 @@
     packages.x86_64-linux.uefi_trampoline = let
       uefiTrampolineSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/uefi_trampoline.git";
-        rev = "8d3ea294d6dfbc3bcccd17aec14b0430bb8ccd66";
+        rev = "b5f226568a350f7ec9744e2edca2526686839467";
         ref = "master";
       };
     in pkgs.callPackage "${uefiTrampolineSrc}/default.nix" { }; # .override { bootId = N; }
