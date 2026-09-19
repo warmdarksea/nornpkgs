@@ -1,15 +1,12 @@
 {
   description = "VST/CompCert template: an end-to-end verified Fibonacci program";
 
-  # Pinned to the exact nixpkgs already present in this machine's store
-  # (the `to.path` of the `nixpkgs` entry in /etc/nix/registry.json), so that
-  # nothing has to be rebuilt or refetched.
+  # Resolves through the system nix registry pin.
   #
-  # To make this flake portable to another machine, replace the line below with
-  # a normal revision pin, e.g.
-  #     inputs.nixpkgs.url = "github:NixOS/nixpkgs/<rev>";
-  # Any nixpkgs providing coq 9.1 / VST 2.16 / CompCert 3.17 will do.
-  inputs.nixpkgs.url = "path:/nix/store/ww3132d3ajq53n9xx2s8mic73jk91j4r-source";
+  # Any nixpkgs providing coq 9.1 / VST 2.16 / CompCert 3.17 will do; pin it
+  # explicitly (e.g. "github:NixOS/nixpkgs/<rev>") if this flake needs to build
+  # the same way on a machine with a different registry.
+  inputs.nixpkgs.url = "nixpkgs";
 
   outputs = { self, nixpkgs }:
     let
