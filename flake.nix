@@ -1,12 +1,8 @@
 {
-  description = "nornpkgs — systems of *.gensokyo.internal";
+  description = "nornpkgs - nix infrastructure for gensokyo.internal";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    # nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?ref=gensokyo-master&rev=90a81b8f3db208bfc05c90f2061969706d71fe89";
-    # nixpkgs.url = "git+file:///home/clownpiece/src/nixpkgs?rev=bfc1b8a4574108ceef22f02bafcf6611380c100d";
-    # nixpkgs.url = "github:nixos/nixpkgs/26f079d4265d403f27f164336c7e20d774d91393";
-
     nixos-hardware.url = "github:NixOS/nixos-hardware";
 
     emacs-overlay = {
@@ -49,7 +45,7 @@
 
   outputs = {
     self,
-      
+
     nixpkgs,
     nixos-hardware,
 
@@ -65,6 +61,7 @@
       ... }@inputs: let
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         lib = nixpkgs.lib;
+        system = "x86_64-linux";
 
         # littledevil modules (akkoma on oracle cloud):
         # bootstrap is for boot volumes and ssh
@@ -94,6 +91,17 @@
             };
           };
         };
+
+        nanokvmctlSrc = builtins.fetchGit {
+        url = "https://github.com/warmdarksea/nanokvmctl.git";
+        rev = "6778fdbad429af3843563b52899bbb13c46618e9";
+        ref = "master";
+      };
+      uefiTrampolineSrc = builtins.fetchGit {
+        url = "https://github.com/warmdarksea/uefi_trampoline.git";
+        rev = "b5f226568a350f7ec9744e2edca2526686839467";
+        ref = "master";
+      };
     in {
     # nix modules
 
@@ -104,13 +112,11 @@
     nixosModules.agent = import lib/agent.nix;
     nixosModules.defaultOverlays = { config, pkgs, lib, ... }: {
       nixpkgs.overlays = [
-        (self: super: {
+        (self_: super: {
           # NanoKVM boot-control tooling (sources pinned in the let above).
           # Built against the overlaid pkgs so cross/other systems stay correct.
-          nanokvm = self.python3Packages.callPackage "${nanokvmctlSrc}/nanokvm.nix" { };
-          nanokvmctl = self.python3Packages.callPackage "${nanokvmctlSrc}/default.nix" {
-            nanokvm = self.nanokvm;
-          };
+          nanokvm = self.packages.${system}.nanokvm;
+          nanokvmctl = self.packages.${system}.nanokvmctl;
         })
         (final: prev: {
           # https://github.com/NixOS/nixpkgs/issues/493503
@@ -133,7 +139,7 @@
       };
     };
 
-    # systems            
+    # systems
     nixosConfigurations.abandonedfactory = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
@@ -608,21 +614,12 @@
     };
 
     # NanoKVM boot-control tooling.
-    packages.x86_64-linux.uefi_trampoline = let
-      uefiTrampolineSrc = builtins.fetchGit {
-        url = "https://github.com/warmdarksea/uefi_trampoline.git";
-        rev = "b5f226568a350f7ec9744e2edca2526686839467";
-        ref = "master";
-      };
-    in pkgs.callPackage "${uefiTrampolineSrc}/default.nix" { }; # .override { bootId = N; }
-    packages.x86_64-linux.nanokvm = pkgs.python3Packages.callPackage "${nanokvmctlSrc}/nanokvm.nix" { };;
-    packages.x86_64-linux.nanokvmctl = let
-      nanokvmctlSrc = builtins.fetchGit {
-        url = "https://github.com/warmdarksea/nanokvmctl.git";
-        rev = "6778fdbad429af3843563b52899bbb13c46618e9";
-        ref = "master";
-      };
-    in pkgs.python3Packages.callPackage "${nanokvmctlSrc}/default.nix" { inherit nanokvm; };
+    packages.x86_64-linux.uefi_trampoline =
+      pkgs.callPackage "${uefiTrampolineSrc}/default.nix" { }; # .override { bootId = N; }
+    packages.x86_64-linux.nanokvm =
+      pkgs.python3Packages.callPackage "${nanokvmctlSrc}/nanokvm.nix" { };
+    packages.x86_64-linux.nanokvmctl =
+      pkgs.python3Packages.callPackage "${nanokvmctlSrc}/default.nix" { nanokvm = self.packages.${system}.nanokvm; };
 
     # and, mirroring your existing packages.<arch>.images.<name> pattern:
     images.gensokyo-recovery =
