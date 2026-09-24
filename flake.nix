@@ -80,6 +80,11 @@
         };
         nanokvm = pkgs.python3Packages.callPackage "${nanokvmctlSrc}/nanokvm.nix" { };
 
+        # Model fetchers (lib/models.nix). A function of the *caller's* pkgs --
+        # shadowing the one above is deliberate: the lib output below has to
+        # work for whatever nixpkgs the consumer brings.
+        modelLib = pkgs: import lib/models.nix pkgs;
+
         # littledevil modules (akkoma on oracle cloud):
         # bootstrap is for boot volumes and ssh
         # live is for running the actual services (e.g. akkoma)
@@ -109,6 +114,23 @@
           };
         };
     in {
+    # library functions (not nixos modules). system-agnostic: the caller brings
+    # their own pkgs, so this needs no per-system plumbing.
+    #
+    #   nornpkgs.lib.fetchHuggingFace {
+    #     inherit pkgs;
+    #     src   = "hf:Qwen/Qwen2.5-7B@d149729398750b98c0af14eb82c78cfe92750796";
+    #     files = [ "*.safetensors" "*.json" "merges.txt" ];
+    #     hash  = "sha256-...";
+    #   }
+    #
+    # .gguf / .gguf.quant.<type> / .safetensors hang off the result; the whole
+    # tree is documented at the top of lib/models.nix.
+    lib.fetchModel = { pkgs, ... }@args:
+      (modelLib pkgs).fetchModel (removeAttrs args [ "pkgs" ]);
+    lib.fetchHuggingFace = { pkgs, ... }@args:
+      (modelLib pkgs).fetchHuggingFace (removeAttrs args [ "pkgs" ]);
+
     # nix modules
 
     nixosModules.base = import lib/base.nix;
@@ -556,6 +578,12 @@
 
     # flake templates: nix flake init -t github:warmdarksea/nornpkgs#rust-hello
 
+    templates.hello-llm = {
+      path = ./template/hello-llm;
+      description = "llama-server on a gguf read straight out of the store, under a transient systemd unit";
+      welcomeText = "# hello-llm\nbuild: make build  run: make run  test: make test";
+    };
+
     templates.lean4-hello = {
       path = ./template/lean4-hello;
       description = "lean 4 hello world (nix build + lean devshell)";
@@ -591,6 +619,12 @@
       description = "rust + cuda saxpy via runtime nvrtc (builds without a gpu; running needs one)";
       welcomeText = "# rust-hellocuda\nbuild: make build  run (needs gpu): make run  test: make test";
     };
+
+    # reclaims the multi-GB checkouts lib.fetchModel leaves behind: a converted
+    # gguf holds no reference to its source, so the checkout is dead weight the
+    # moment you have the format you wanted.
+    #   nix run .#gc-model-sources -- --dry-run /nix/store/...-f16.gguf
+    packages.x86_64-linux.gc-model-sources = (modelLib pkgs).gc-model-sources;
 
     packages.x86_64-linux.claude-env = pkgs.buildEnv {
       name = "claude-env";
