@@ -24,19 +24,51 @@ let
   # `#!/usr/bin/env python3`, no interpreter and no dependencies, so it cannot
   # be run as installed. Wrap it against the gguf-py vendored in the *same*
   # source tree, so script and library never drift apart.
+  #
+  # The transformers pin is load-bearing, not cargo-culted. convert's
+  # get_vocab_base_pre() tokenizes a fixed string, sha256s the token ids and
+  # looks the digest up in a hardcoded table; a tokenizer whose digest is
+  # absent is rejected outright with "BPE pre-tokenizer was not recognized".
+  # transformers 5.x tokenizes LlamaTokenizerFast models differently from the
+  # 4.57.6 llama.cpp pins, so every digest in that family misses and the whole
+  # llama-tokenizer family (deepseek-llm, deepseek-coder and descendants like
+  # DeepSeek-Prover) fails to convert -- including the two models llama.cpp
+  # itself cites as references for those table entries. GPT2/Qwen2 tokenizers
+  # are unaffected, which is what makes this easy to miss.
+  #
+  # nixpkgs marks transformers_4 broken as `versionAtLeast
+  # huggingface-hub.version "1.0"`, so pinning the hub back to 0.x inside this
+  # private python satisfies the real constraint and clears the marker with
+  # it -- no allowBroken, and nothing leaks into anyone else's package set.
+  # None of it is in a built gguf's closure either way.
+  convertPython = pkgs.python3.override {
+    packageOverrides = _: prev: {
+      huggingface-hub = prev.huggingface-hub_0;
+      # 4.57.6 caps tokenizers at <=0.23.0 and nixpkgs is past that on some
+      # revisions -- once in wheel metadata, and again in transformers' own
+      # import-time check, so relaxing one without the other just moves the
+      # error. The cap is conservative rather than real: the digests that
+      # matter here come out identical under 0.22.2 and 0.23.2 (checked
+      # against llama.cpp's deepseek-llm and deepseek-coder entries, which are
+      # exactly the ones a wrong tokenizer would break).
+      transformers_4 = prev.transformers_4.overridePythonAttrs (o: {
+        pythonRelaxDeps = (o.pythonRelaxDeps or [ ]) ++ [ "tokenizers" ];
+        postPatch = (o.postPatch or "") + ''
+          substituteInPlace src/transformers/dependency_versions_table.py \
+            --replace-fail '"tokenizers": "tokenizers>=0.22.0,<=0.23.0"' \
+                           '"tokenizers": "tokenizers"'
+        '';
+      });
+    };
+  };
+
   convert-hf-to-gguf = pkgs.writeShellApplication {
     name = "convert-hf-to-gguf";
     runtimeInputs = [
-      (pkgs.python3.withPackages (ps: [
+      (convertPython.withPackages (ps: [
         ps.numpy
         ps.sentencepiece
-        # llama.cpp pins transformers==4.57.6 and nixpkgs is on 5.x, but
-        # nixpkgs' transformers_4 is meta.broken (it needs huggingface-hub
-        # <1.0 and nixpkgs ships 1.x). 5.x works here because the converter
-        # only imports AutoConfig eagerly -- AutoTokenizer is pulled in lazily
-        # by the handful of architectures that need a slow-tokenizer fallback.
-        # If a model ever trips over that, the traceback says so plainly.
-        ps.transformers
+        ps.transformers_4
         ps.protobuf
         ps.safetensors
         ps.torchWithoutCuda # cpu-only on purpose: conversion never uses a gpu
@@ -139,9 +171,13 @@ let
         };
 
       # ---- gguf ----------------------------------------------------------
-      toGguf = { outtype ? "f16" }:
+      # vocabOnly writes the tokenizer and metadata and stops. It is the cheap
+      # half of a conversion -- it needs no weights at all, so paired with
+      # `files = [ "*.json" ]` it settles "will llama.cpp accept this
+      # tokenizer?" for a few MB instead of a few GB.
+      toGguf = { outtype ? "f16", vocabOnly ? false }:
         pkgs.stdenvNoCC.mkDerivation {
-          name = "${name}-${outtype}.gguf";
+          name = "${name}-${if vocabOnly then "vocab" else outtype}.gguf";
           src = checkout;
           nativeBuildInputs = [ convert-hf-to-gguf ];
           # don't cp -r gigabytes into the build dir; read $src in place
@@ -155,6 +191,7 @@ let
             ln -s "$src" "${name}"
             convert-hf-to-gguf \
               --model-name ${lib.escapeShellArg name} \
+              ${lib.optionalString vocabOnly "--vocab-only"} \
               --outtype ${outtype} --outfile "$out" "${name}"
           '';
           dontInstall = true;
