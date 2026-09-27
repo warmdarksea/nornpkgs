@@ -9,34 +9,53 @@ NIXCMD := $(NIX) $(NIX_FLAGS)
 NORNPKGS ?=
 OVERRIDE := $(if $(NORNPKGS),--override-input nornpkgs '$(NORNPKGS)' --no-write-lock-file)
 
+# every artifact lands under here: nix is pointed at --out-links inside
+# $(BUILD_DIR) rather than dropping a ./result symlink into the source tree.
+BUILD_DIR ?= build
+RESULT := $(BUILD_DIR)/result
+GGUF   := $(BUILD_DIR)/gguf
+
+SRCS := flake.nix $(wildcard flake.lock)
+
 PROMPT ?= The capital of France is
 HOST ?= nonexistant
 
 .PHONY: build gguf run ask logs status stop test copy clean
 
-build:
-	$(NIXCMD) build $(OVERRIDE)
+build: $(RESULT)
 
 # just the model, no server
-gguf:
-	$(NIXCMD) build $(OVERRIDE) .#gguf --no-link --print-out-paths
+gguf: $(GGUF)
+
+# the trailing slash is deliberate: a target named plain `$(BUILD_DIR)` would
+# collide with the phony `build` above, and make drops that rule as circular.
+$(BUILD_DIR)/:
+	mkdir -p $@
+
+# the out-links point into the store, where every mtime is epoch 1, so these
+# recipes re-run whenever they are reached; nix is the actual incremental step.
+$(RESULT): $(SRCS) | $(BUILD_DIR)/
+	$(NIXCMD) build $(OVERRIDE) --out-link $@
+
+$(GGUF): $(SRCS) | $(BUILD_DIR)/
+	$(NIXCMD) build $(OVERRIDE) .#gguf --out-link $@ --print-out-paths
 
 run: build
-	./result/bin/hello-llm start
+	$(RESULT)/bin/hello-llm start
 
 ask: build
-	./result/bin/hello-llm ask "$(PROMPT)"
+	$(RESULT)/bin/hello-llm ask "$(PROMPT)"
 
 logs status stop: build
-	./result/bin/hello-llm $@
+	$(RESULT)/bin/hello-llm $@
 
 # serve, ask one question, shut down. no systemd, no gpu.
 test: build
-	./result/bin/hello-llm selftest "$(PROMPT)"
+	$(RESULT)/bin/hello-llm selftest "$(PROMPT)"
 
 # the gguf is in the closure, so this is the whole deployment
 copy: build
-	$(NIXCMD) copy --to ssh://$(HOST) ./result
+	$(NIXCMD) copy --to ssh://$(HOST) $(RESULT)
 
 clean:
-	rm -f result
+	rm -rf $(BUILD_DIR)
