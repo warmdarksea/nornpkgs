@@ -48,6 +48,3 @@ make ask PROMPT='the capital of france is'
 make logs ; make stop
 make copy HOST=hell
 ```
-
-ships smollm2-135m so it builds in a minute; the flake carries a
-commented swap to qwen2.5-7b f16 on a cuda llama.cpp.
