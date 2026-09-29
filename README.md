@@ -17,7 +17,7 @@ repository for managing my digital life. mostly nix, some terraform/cloudflare s
 
 ## declarative models
 
-huggingface repos as fixed-output sparse lfs checkouts, with gguf
+huggingface/git lfs repos as fixed-output sparse lfs checkouts, with gguf
 conversion and quantization as attributes:
 
 ```nix
