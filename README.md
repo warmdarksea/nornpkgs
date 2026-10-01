@@ -15,10 +15,10 @@ repository for managing my digital life. mostly nix, some terraform/cloudflare s
 * `Makefile` — build/deploy driver (`Makefile.littledevil` for the
   cloud targets)
 
-## models
+## declarative models
 
-huggingface repos as fixed-output sparse lfs checkouts, with gguf
-conversion and quantization hanging off them. bring your own pkgs:
+huggingface/git lfs repos as fixed-output sparse lfs checkouts, with gguf
+conversion and quantization as attributes:
 
 ```nix
 inputs.nornpkgs.url = "github:warmdarksea/nornpkgs";
@@ -38,18 +38,7 @@ in {
 }
 ```
 
-start with `hash = pkgs.lib.fakeHash` and paste what nix reports.
-`files` are gitignore-style globs (omit for the whole repo); lfs
-honours them, so excluded weights are never transferred. pin a
-revision with `hf:org/repo@<rev>`; `lib.fetchModel` is the same thing
-against an arbitrary git url. a built `.gguf` has no reference to its
-checkout, so `nix run .#gc-model-sources -- --dry-run <installable>`
-finds the multi-gb sources nothing needs any more.
-
-serving one — a gguf read straight out of the store, under a transient
-`systemd --user` unit (`--collect`, so no unit outlives it). no unit
-file, no nixos module, and `nix copy` of the closure is the whole
-deployment because the weights are in it:
+test:
 
 ```sh
 nix flake init -t github:warmdarksea/nornpkgs#hello-llm
@@ -59,6 +48,3 @@ make ask PROMPT='the capital of france is'
 make logs ; make stop
 make copy HOST=hell
 ```
-
-ships smollm2-135m so it builds in a minute; the flake carries a
-commented swap to qwen2.5-7b f16 on a cuda llama.cpp.
