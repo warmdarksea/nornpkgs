@@ -41,10 +41,11 @@ in {
 test:
 
 ```sh
-nix flake init -t github:warmdarksea/nornpkgs#hello-llm
+nix flake init -t github:warmdarksea/nornpkgs#llm-hello
 make test   # serve, ask one thing, shut down. no gpu, no systemd
-make run    # systemd-run --user --unit=hello-llm --collect -- llama-server
+make run    # systemd-run --user --unit=llm-hello --collect -- llama-server
 make ask PROMPT='the capital of france is'
 make logs ; make stop
-make copy HOST=hell
+make copy HOST=hell   # just the closure
+make remote HOST=hell # the closure, then the oneshot over ssh
 ```

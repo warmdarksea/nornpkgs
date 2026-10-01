@@ -103,6 +103,16 @@ let
       ];
       sparse = if files == null then [ ] else map (f: "/${f}") files;
 
+      # quoted into the gguf builder's diagnostic below, the one place where
+      # what was asked for and what arrived can be shown side by side.
+      filesNote =
+        if files == null then
+          "the whole repo was fetched, so the repo itself ships no weights."
+        else
+          "fetched with files = [ "
+          + lib.concatMapStringsSep " " (f: ''"${f}"'') files
+          + " ]; widen it -- sharded weights want \"*.safetensors\".";
+
       prefetchCmd = ''
         nix-prefetch-git --builder \
           --url ${lib.escapeShellArg prefetchUrl} \
@@ -176,6 +186,27 @@ let
       # `files = [ "*.json" ]` it settles "will llama.cpp accept this
       # tokenizer?" for a few MB instead of a few GB.
       toGguf = { outtype ? "f16", vocabOnly ? false }:
+        let
+          # A `files` glob that matches nothing is not an error to git's sparse
+          # checkout -- it just yields a tree without those files, and the
+          # converter then dies much later, in a traceback that never mentions
+          # the fetcher. Sharded weights are the usual way in: a repo holding
+          # model-00001-of-0000N.safetensors does not match the glob
+          # "model.safetensors", so the checkout arrives as a config and a
+          # tokenizer with nothing to convert. A vocabOnly build wants exactly
+          # that tree, so it is the one case with nothing to check.
+          weightsGuard = lib.optionalString (!vocabOnly) ''
+            if [ -z "$(find -L "${name}" -maxdepth 1 \
+                         \( -name '*.safetensors' -o -name '*.bin' \) \
+                         -print -quit)" ]; then
+              echo >&2 "${name}: the checkout holds no *.safetensors or *.bin."
+              echo >&2 ${lib.escapeShellArg filesNote}
+              echo >&2 "what was fetched:"
+              ls -A >&2 "${name}"
+              exit 1
+            fi
+          '';
+        in
         pkgs.stdenvNoCC.mkDerivation {
           name = "${name}-${if vocabOnly then "vocab" else outtype}.gguf";
           src = checkout;
@@ -189,6 +220,8 @@ let
             # *reference* the checkout -- pinning it forever and defeating
             # gc-model-sources. Hand it a cleanly named symlink.
             ln -s "$src" "${name}"
+
+            ${weightsGuard}
             convert-hf-to-gguf \
               --model-name ${lib.escapeShellArg name} \
               ${lib.optionalString vocabOnly "--vocab-only"} \

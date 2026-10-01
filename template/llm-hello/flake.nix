@@ -17,7 +17,10 @@
 
       # 135M, ~270 MB as f16: builds in a minute and serves fine on a cpu.
       # `files` are gitignore-style globs and lfs honours them, so an upstream
-      # README edit can neither move the hash nor cross the wire.
+      # README edit can neither move the hash nor cross the wire. the flip side
+      # is that a glob matching nothing is silent: "model.safetensors" suits a
+      # single-file repo, and anything large enough to be sharded into
+      # model-00001-of-0000N.safetensors wants "*.safetensors" instead.
       model = nornpkgs.lib.fetchHuggingFace {
         inherit pkgs;
         src = "hf:HuggingFaceTB/SmolLM2-135M";
@@ -54,22 +57,22 @@
       gguf = model.gguf; # f16, unquantized; .gguf.quant.q4_k_m etc. also exist
       alias = model.modelName;
 
-      hello-llm = pkgs.writeShellApplication {
-        name = "hello-llm";
+      llm-hello = pkgs.writeShellApplication {
+        name = "llm-hello";
         # deliberately not pkgs.systemd: the systemd that supervises this is
         # the one already running the caller's session, and a second copy in
         # the closure is pure `nix copy` weight. writeShellApplication only
         # prepends to PATH, so the host's systemctl/journalctl stay reachable.
         runtimeInputs = [ pkgs.curl pkgs.jq ];
         text = ''
-          unit=hello-llm
-          host=''${HELLO_LLM_HOST:-127.0.0.1}
-          port=''${HELLO_LLM_PORT:-8080}
-          ctx=''${HELLO_LLM_CTX:-4096}
+          unit=llm-hello
+          host=''${LLM_HELLO_HOST:-127.0.0.1}
+          port=''${LLM_HELLO_PORT:-8080}
+          ctx=''${LLM_HELLO_CTX:-4096}
           # layers on the gpu. 999 = all of them; lower it when vram is tight
           # (an f16 7B is ~15 GB, so an 8 GB card wants something like NGL=12).
           # ignored by a llama.cpp built without gpu support.
-          ngl=''${HELLO_LLM_NGL:-999}
+          ngl=''${LLM_HELLO_NGL:-999}
           api="http://$host:$port"
 
           # store paths, interpolated: this is what puts the weights in the
@@ -106,11 +109,11 @@
           }
 
           wait_ready() {
-            for _ in $(seq 1 "''${HELLO_LLM_TIMEOUT:-600}"); do
+            for _ in $(seq 1 "''${LLM_HELLO_TIMEOUT:-600}"); do
               curl -fsS "$api/health" >/dev/null 2>&1 && return 0
               sleep 1
             done
-            echo "$unit: nothing on $api/health after ''${HELLO_LLM_TIMEOUT:-600}s" >&2
+            echo "$unit: nothing on $api/health after ''${LLM_HELLO_TIMEOUT:-600}s" >&2
             return 1
           }
 
@@ -119,7 +122,7 @@
           # to the server argv if you want the chat endpoint.
           ask() {
             curl -fsS "$api/completion" -H 'content-type: application/json' \
-              --data "$(jq -n --arg p "$1" --argjson n "''${HELLO_LLM_N:-64}" \
+              --data "$(jq -n --arg p "$1" --argjson n "''${LLM_HELLO_N:-64}" \
                           '{prompt: $p, n_predict: $n, temperature: 0.2}')" \
               | jq -r '.content'
           }
@@ -169,8 +172,8 @@
     in
     {
       packages.${system} = {
-        default = hello-llm;
-        inherit hello-llm;
+        default = llm-hello;
+        inherit llm-hello;
         gguf = gguf;      # nix build .#gguf -> the bare model store path
         checkout = model; # the hf tree, for gc-model-sources
       };
@@ -178,7 +181,7 @@
       apps.${system} = {
         default = {
           type = "app";
-          program = "${hello-llm}/bin/hello-llm";
+          program = "${llm-hello}/bin/llm-hello";
         };
         # gated repo, or a sandbox with no hf credentials: run this outside
         # the sandbox and the build becomes a no-op. also the cheapest way to

@@ -588,10 +588,10 @@
 
     # flake templates: nix flake init -t github:warmdarksea/nornpkgs#rust-hello
 
-    templates.hello-llm = {
-      path = ./template/hello-llm;
+    templates.llm-hello = {
+      path = ./template/llm-hello;
       description = "llama-server on a gguf read straight out of the store, under a transient systemd unit";
-      welcomeText = "# hello-llm\nbuild: make build  run: make run  test: make test";
+      welcomeText = "# llm-hello\nbuild: make build  run: make run  test: make test";
     };
 
     templates.coq-hellovst = {
