@@ -112,6 +112,16 @@ remote_pull_sys_closure: $(BUILD_DIR)/remote-sys-$(TARGET)
 	nix copy --no-check-sigs --from "ssh://root@$(HOST)" "$(shell realpath $<)"
 	ln -sfn $(shell realpath $<) $(BUILD_DIR)/sys-$(TARGET)
 
+.PHONY: remote_pull_valid_inputs
+
+remote_pull_valid_inputs: $(BUILD_DIR)/sys-$(TARGET).drv
+	@echo "Pulling valid build-graph outputs of $(shell realpath $<) from $(HOST)"
+	nix-store -qR "$(shell realpath $<)" | grep '\.drv$$' | xargs nix-store -q --outputs | sort -u > $(BUILD_DIR)/remote-wanted-$(TARGET)
+	ssh "root@$(HOST)" -- xargs -r nix-store --check-validity --print-invalid < $(BUILD_DIR)/remote-wanted-$(TARGET) | sort -u > $(BUILD_DIR)/remote-missing-$(TARGET)
+	comm -23 $(BUILD_DIR)/remote-wanted-$(TARGET) $(BUILD_DIR)/remote-missing-$(TARGET) > $(BUILD_DIR)/remote-have-$(TARGET)
+	@echo "$$(wc -l < $(BUILD_DIR)/remote-have-$(TARGET)) / $$(wc -l < $(BUILD_DIR)/remote-wanted-$(TARGET)) outputs valid on $(HOST)"
+	xargs -r nix copy --no-check-sigs -s --from "ssh://root@$(HOST)" < $(BUILD_DIR)/remote-have-$(TARGET)
+
 #
 
 # remote package building (arbitrary flake refs, not system closures)
