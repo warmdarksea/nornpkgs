@@ -125,6 +125,23 @@
     lib.fetchHuggingFace = { pkgs, ... }@args:
       (modelLib pkgs).fetchHuggingFace (removeAttrs args [ "pkgs" ]);
 
+    # Sandboxed jupyter servers for the templates (lib/jupyter.nix). Same
+    # deal as the fetchers: a function of the *caller's* pkgs, so the kernels
+    # are built against whatever nixpkgs (and whatever cudaCapabilities) the
+    # consuming flake brought.
+    #
+    #   nornpkgs.lib.mkJupyter {
+    #     inherit pkgs;
+    #     name = "py-hellotorch";
+    #     kernels.python = { packages = ps: [ ps.torch-bin ]; cuda = true; };
+    #   }
+    #
+    # -> bin/jupyter-sandbox start|stop|status|logs|shell|print-cmd, running
+    # the server under rootless podman. The extension list and the kernel
+    # presets live at the top of lib/jupyter.nix.
+    lib.mkJupyter = { pkgs, ... }@args:
+      (import lib/jupyter.nix pkgs).mkJupyter (removeAttrs args [ "pkgs" ]);
+
     # nix modules
 
     nixosModules.base = import lib/base.nix;
@@ -615,25 +632,25 @@
     templates.py-hello = {
       path = ./template/py-hello;
       description = "python hello world (nix build + pytest devshell)";
-      welcomeText = "# py-hello\nbuild: make build  run: make run  test: make test\njupyter: make start_jupyter / make stop_jupyter";
+      welcomeText = "# py-hello\nbuild: make build  run: make run  test: make test\njupyter (sandboxed, needs podman): make start_jupyter / make stop_jupyter";
     };
 
     templates.py-hellotorch = {
       path = ./template/py-hellotorch;
       description = "python + torch gpu matmul (builds without a gpu; running needs one)";
-      welcomeText = "# py-hellotorch\nbuild: make build  run (needs gpu): make run  test: make test\njupyter (torch kernel): make start_jupyter / make stop_jupyter";
+      welcomeText = "# py-hellotorch\nbuild: make build  run (needs gpu): make run  test: make test\njupyter (sandboxed, torch kernel): make start_jupyter / make stop_jupyter";
     };
 
     templates.rust-hello = {
       path = ./template/rust-hello;
       description = "rust hello world (nix build + rust devshell)";
-      welcomeText = "# rust-hello\nbuild: make build  run: make run  test: make test\njupyter (evcxr kernel): make start_jupyter / make stop_jupyter";
+      welcomeText = "# rust-hello\nbuild: make build  run: make run  test: make test\njupyter (sandboxed, evcxr kernel): make start_jupyter / make stop_jupyter";
     };
 
     templates.rust-hellocuda = {
       path = ./template/rust-hellocuda;
       description = "rust + cuda saxpy via runtime nvrtc (builds without a gpu; running needs one)";
-      welcomeText = "# rust-hellocuda\nbuild: make build  run (needs gpu): make run  test: make test\njupyter (evcxr + cuda kernel): make start_jupyter / make stop_jupyter";
+      welcomeText = "# rust-hellocuda\nbuild: make build  run (needs gpu): make run  test: make test\njupyter (sandboxed, evcxr + cuda kernel): make start_jupyter / make stop_jupyter";
     };
 
     # reclaims the multi-GB checkouts lib.fetchModel leaves behind: a converted

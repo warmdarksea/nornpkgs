@@ -5,8 +5,15 @@
   # through the machine's nix registry.
   inputs.nixpkgs.url = "nixpkgs";
 
+  # The sandboxed jupyter server: kernels, the extension list and the podman
+  # wrapper all live in nornpkgs lib/jupyter.nix. Not in the committed lock,
+  # so the first build adds it. When hacking on the module itself:
+  #   make start_jupyter NORNPKGS=path:/home/clownpiece/src/nornpkgs
+  inputs.nornpkgs.url = "github:warmdarksea/nornpkgs";
+  inputs.nornpkgs.inputs.nixpkgs.follows = "nixpkgs";
+
   outputs =
-    { self, nixpkgs }:
+    { self, nixpkgs, nornpkgs }:
     let
       system = "x86_64-linux";
 
@@ -31,17 +38,6 @@
       };
 
       inherit (pkgs) lib;
-      python = pkgs.python3;
-
-      # libnvrtc comes from nix; libcuda comes from the host driver, which on
-      # NixOS lives in /run/opengl-driver/lib. Both the packaged binary and
-      # the notebook kernel need them on the library path.
-      cudaRuntimeLdPath = "${
-        lib.makeLibraryPath [
-          pkgs.cudaPackages.cuda_nvrtc
-          pkgs.cudaPackages.cuda_cudart
-        ]
-      }:/run/opengl-driver/lib";
 
       rust-hellocuda = pkgs.rustPlatform.buildRustPackage {
         pname = "rust-hellocuda";
@@ -57,73 +53,27 @@
         meta.mainProgram = "rust-hellocuda";
       };
 
-      # ---- jupyter -------------------------------------------------------
-
-      # evcxr compiles each cell against a scratch crate, so unlike the python
-      # kernels this one carries no project code: `:dep cudarc = "0.19"` is
-      # how a notebook pulls the driver bindings in, and that reaches for
-      # crates.io at cell-evaluation time rather than resolving through this
-      # flake. The Makefile keeps the resulting cargo state under $(STATE_DIR).
+      # Runs under rootless podman: a notebook cell is arbitrary code
+      # execution by design, so the thing evaluating it does not get the
+      # host. The evcxr kernel rebuilds a scratch crate per cell and resolves
+      # `:dep cudarc = "0.19"` against crates.io, which is the main reason to
+      # want it boxed in; its cargo dirs land under the project's state dir.
       #
-      # LD_LIBRARY_PATH belongs here rather than in the Makefile: cudarc
-      # dlopens libcuda and libnvrtc, so it is the kernel process that needs
-      # them, not the notebook server that spawns it. Set in the kernelspec,
-      # it applies however the server was started.
+      # cuda binds the gpu devices and the host driver into the sandbox, and
+      # puts libnvrtc/libcudart on the kernel's library path -- cudarc dlopens
+      # both, so it is the kernel process that needs them.
       #
-      # evcxr speaks no DAP, so there is no `metadata.debugger` here -- the
-      # flag would only put a debug button in jupyterlab that cannot work.
-      # nixpkgs already wraps evcxr_jupyter with cargo/rustc/gcc on PATH,
-      # which is what it shells out to for every cell. That wrapper is also
-      # why the kernel logs a harmless "tried to update client, but failed:
-      # Read-only file system" on startup: evcxr notices the kernel.json argv
-      # is the wrapper rather than the binary it is running as and offers to
-      # rewrite it, which the store rightly refuses.
-      kernels.rust = {
-        displayName = "Rust (evcxr, cuda)";
-        argv = [
-          "${pkgs.evcxr}/bin/evcxr_jupyter"
-          "--control_file"
-          "{connection_file}"
-        ];
-        language = "rust";
-        env.LD_LIBRARY_PATH = cudaRuntimeLdPath;
-        logo32 = null;
-        logo64 = null;
+      # jupyter-lsp ships no rust-analyzer spec, so the LSP features in the
+      # default extension list cover python only here.
+      jupyter = nornpkgs.lib.mkJupyter {
+        inherit pkgs;
+        name = "rust-hellocuda";
+        kernels.rust = {
+          displayName = "Rust (evcxr, cuda)";
+          cuda = true;
+        };
+        port = 8891;
       };
-
-      # The env has ipykernel in its closure (jupyterlab depends on it), and
-      # ipykernel ships a kernelspec of its own under share/jupyter/kernels.
-      # JUPYTER_PATH wins for a kernel of the same name, but anything else in
-      # there shows up as an extra, undeclared "Python 3 (ipykernel)" entry --
-      # one whose argv is a bare `python` and which advertises a debugger this
-      # env has no debugpy for. Pin the server to the kernels this flake
-      # actually defines. In the env rather than the Makefile, so it holds
-      # however the server was started.
-      jupyterConfig = pkgs.writeTextDir "jupyter_server_config.py" ''
-        c.KernelSpecManager.allowed_kernelspecs = ${builtins.toJSON (builtins.attrNames kernels)}
-      '';
-
-      # This is what pkgs.jupyter builds, with jupyterlab asked for by name.
-      # notebook 7 is built on jupyterlab and so drags it in either way, but
-      # pkgs.jupyter only requests notebook -- spelling it out here makes /lab
-      # part of this flake's contract rather than a detail of notebook's
-      # dependency list that a future bump could drop.
-      jupyter =
-        (python.buildEnv.override {
-          extraLibs = [
-            python.pkgs.notebook
-            python.pkgs.jupyterlab
-          ];
-          makeWrapperArgs = [
-            "--prefix JUPYTER_PATH : ${pkgs.jupyter-kernel.create { definitions = kernels; }}"
-            "--prefix JUPYTER_CONFIG_PATH : ${jupyterConfig}"
-          ];
-        }).overrideAttrs
-          (_: {
-            meta = python.pkgs.notebook.meta // {
-              mainProgram = "jupyter-notebook";
-            };
-          });
     in
     {
       # The CUDA kernel is compiled at runtime with NVRTC, so building this
@@ -133,16 +83,27 @@
         default = rust-hellocuda;
       };
 
-      devShells.${system}.default = pkgs.mkShell {
-        packages = with pkgs; [
-          rustc
-          cargo
-          clippy
-          rustfmt
-          rust-analyzer
-        ];
-        # for cudarc (and anything else dlopening CUDA libs) in the shell
-        env.LD_LIBRARY_PATH = cudaRuntimeLdPath;
+      devShells.${system} = {
+        default = pkgs.mkShell {
+          packages = with pkgs; [
+            rustc
+            cargo
+            clippy
+            rustfmt
+            rust-analyzer
+          ];
+          # for cudarc (and anything else dlopening CUDA libs) in the shell
+          env.LD_LIBRARY_PATH = "${
+            lib.makeLibraryPath [
+              pkgs.cudaPackages.cuda_nvrtc
+              pkgs.cudaPackages.cuda_cudart
+            ]
+          }:/run/opengl-driver/lib";
+        };
+
+        # `nix develop .#jupyter` -- the server wrapper and podman, without
+        # any of that weight in the default shell.
+        jupyter = pkgs.mkShell { packages = [ jupyter ]; };
       };
     };
 }
