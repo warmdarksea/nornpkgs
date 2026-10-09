@@ -52,11 +52,6 @@
     fsType = "zfs";
   };
 
-  fileSystems."/workspace" = {
-    device = "story/workspace";
-    fsType = "zfs";
-  };
-
   fileSystems."/boot" = {
     device = config.gensokyo.disks.boot or "/dev/disk/by-partlabel/library-boot";
     fsType = "vfat";
@@ -113,6 +108,11 @@
   ];
 
   #nix.settings.allowed-users = [ "claude" ];
+
+  programs.nix-required-mounts = {
+    enable = true;
+    presets.nvidia-gpu.enable = true;
+  };
 
   environment.systemPackages = with pkgs; [
     dtach
