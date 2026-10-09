@@ -615,25 +615,25 @@
     templates.py-hello = {
       path = ./template/py-hello;
       description = "python hello world (nix build + pytest devshell)";
-      welcomeText = "# py-hello\nbuild: make build  run: make run  test: make test";
+      welcomeText = "# py-hello\nbuild: make build  run: make run  test: make test\njupyter: make start_jupyter / make stop_jupyter";
     };
 
     templates.py-hellotorch = {
       path = ./template/py-hellotorch;
       description = "python + torch gpu matmul (builds without a gpu; running needs one)";
-      welcomeText = "# py-hellotorch\nbuild: make build  run (needs gpu): make run  test: make test";
+      welcomeText = "# py-hellotorch\nbuild: make build  run (needs gpu): make run  test: make test\njupyter (torch kernel): make start_jupyter / make stop_jupyter";
     };
 
     templates.rust-hello = {
       path = ./template/rust-hello;
       description = "rust hello world (nix build + rust devshell)";
-      welcomeText = "# rust-hello\nbuild: make build  run: make run  test: make test";
+      welcomeText = "# rust-hello\nbuild: make build  run: make run  test: make test\njupyter (evcxr kernel): make start_jupyter / make stop_jupyter";
     };
 
     templates.rust-hellocuda = {
       path = ./template/rust-hellocuda;
       description = "rust + cuda saxpy via runtime nvrtc (builds without a gpu; running needs one)";
-      welcomeText = "# rust-hellocuda\nbuild: make build  run (needs gpu): make run  test: make test";
+      welcomeText = "# rust-hellocuda\nbuild: make build  run (needs gpu): make run  test: make test\njupyter (evcxr + cuda kernel): make start_jupyter / make stop_jupyter";
     };
 
     # reclaims the multi-GB checkouts lib.fetchModel leaves behind: a converted

@@ -10,14 +10,19 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-    in
-    {
-      packages.${system}.default = pkgs.leanPackages.buildLakePackage {
+
+      lean4-hello = pkgs.leanPackages.buildLakePackage {
         pname = "lean4-hello";
         version = "0.1.0";
         src = ./.;
         isLibrary = false;
         meta.mainProgram = "lean4-hello";
+      };
+    in
+    {
+      packages.${system} = {
+        inherit lean4-hello;
+        default = lean4-hello;
       };
 
       devShells.${system}.default = pkgs.mkShell {

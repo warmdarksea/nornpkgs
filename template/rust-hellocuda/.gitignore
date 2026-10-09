@@ -1,0 +1,4 @@
+build/
+state/
+# cargo's own target dir, for anyone running cargo outside `make test`
+target/

@@ -80,6 +80,14 @@ let
 
       args=(
         --rm --log-driver none
+        # catatonit as pid 1. without it the agent itself is pid 1, and pid 1
+        # in a pid namespace is the only process that can reap orphans -- so
+        # anything the agent daemonises (a jupyter server, a dev server, any
+        # nohup'd thing) is reparented to a process that never calls wait()
+        # and stays a zombie for the life of the sandbox. zombies still answer
+        # `kill -0`, which makes a pidfile look live long after the process
+        # has gone. nixpkgs' podman points init_path at catatonit already.
+        --init
         --rootfs
         --uidmap 0:0:1 --uidmap ${uid}:@${uid}:1
         --gidmap 0:0:1 --gidmap ${gid}:@${gid}:1 --gidmap ${kvm}:@${kvm}:1
