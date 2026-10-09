@@ -2,7 +2,6 @@
 # `make test` needs neither a gpu nor systemd; `make run` needs systemd.
 NIX ?= nix
 NIX_FLAGS ?= --extra-experimental-features 'nix-command flakes'
-NIXCMD := $(NIX) $(NIX_FLAGS)
 
 # point at a local nornpkgs checkout when hacking on the fetchers:
 #   make build NORNPKGS=path:/home/clownpiece/src/nornpkgs
@@ -12,8 +11,11 @@ OVERRIDE := $(if $(NORNPKGS),--override-input nornpkgs '$(NORNPKGS)' --no-write-
 # every artifact lands under here: nix is pointed at --out-links inside
 # $(BUILD_DIR) rather than dropping a ./result symlink into the source tree.
 BUILD_DIR ?= build
-RESULT := $(BUILD_DIR)/result
-GGUF   := $(BUILD_DIR)/gguf
+
+# the flake output this template is named after, built to $(BUILD_DIR)/$(NAME)
+NAME := llm-hello
+BIN  := $(BUILD_DIR)/$(NAME)
+GGUF := $(BUILD_DIR)/gguf
 
 SRCS := flake.nix $(wildcard flake.lock)
 
@@ -23,7 +25,7 @@ SSH_FLAGS ?=
 
 .PHONY: build gguf run ask logs status stop test copy remote clean
 
-build: $(RESULT)
+build: $(BIN)
 
 # just the model, no server
 gguf: $(GGUF)
@@ -35,28 +37,28 @@ $(BUILD_DIR)/:
 
 # the out-links point into the store, where every mtime is epoch 1, so these
 # recipes re-run whenever they are reached; nix is the actual incremental step.
-$(RESULT): $(SRCS) | $(BUILD_DIR)/
-	$(NIXCMD) build $(OVERRIDE) --out-link $@
+$(BIN): $(SRCS) | $(BUILD_DIR)/
+	$(NIX) $(NIX_FLAGS) build $(OVERRIDE) .#$(NAME) --out-link $@
 
 $(GGUF): $(SRCS) | $(BUILD_DIR)/
-	$(NIXCMD) build $(OVERRIDE) .#gguf --out-link $@ --print-out-paths
+	$(NIX) $(NIX_FLAGS) build $(OVERRIDE) .#gguf --out-link $@ --print-out-paths
 
 run: build
-	$(RESULT)/bin/llm-hello start
+	$(BIN)/bin/$(NAME) start
 
 ask: build
-	$(RESULT)/bin/llm-hello ask "$(PROMPT)"
+	$(BIN)/bin/$(NAME) ask "$(PROMPT)"
 
 logs status stop: build
-	$(RESULT)/bin/llm-hello $@
+	$(BIN)/bin/$(NAME) $@
 
 # serve, ask one question, shut down. no systemd, no gpu.
 test: build
-	$(RESULT)/bin/llm-hello selftest "$(PROMPT)"
+	$(BIN)/bin/$(NAME) selftest "$(PROMPT)"
 
 # the gguf is in the closure, so this is the whole deployment
 copy: build
-	$(NIXCMD) copy --to ssh://$(HOST) $(RESULT)
+	$(NIX) $(NIX_FLAGS) copy --to ssh://$(HOST) $(BIN)
 
 # copy the closure to $(HOST), then run the oneshot there:
 #   make remote HOST=hell PROMPT='the capital of france is'
@@ -67,7 +69,7 @@ copy: build
 # serve, wait for /health, ask once, shut the server down again, so no systemd
 # and no gpu are required over there either.
 remote: copy
-	ssh $(SSH_FLAGS) "$(HOST)" "$$(readlink -f $(RESULT))/bin/llm-hello selftest '$(PROMPT)'"
+	ssh $(SSH_FLAGS) "$(HOST)" "$$(readlink -f $(BIN))/bin/$(NAME) selftest '$(PROMPT)'"
 
 clean:
 	rm -rf $(BUILD_DIR)

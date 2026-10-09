@@ -11,14 +11,19 @@
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       inherit (pkgs) leanPackages;
-    in
-    {
+
       # A library of proofs: building it type-checks them.
-      packages.${system}.default = leanPackages.buildLakePackage {
+      lean4-hellomath = leanPackages.buildLakePackage {
         pname = "lean4-hellomath";
         version = "0.1.0";
         src = ./.;
         leanDeps = [ leanPackages.mathlib ];
+      };
+    in
+    {
+      packages.${system} = {
+        inherit lean4-hellomath;
+        default = lean4-hellomath;
       };
 
       devShells.${system}.default = pkgs.mkShell {
