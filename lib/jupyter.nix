@@ -424,8 +424,11 @@ in
         # the server from the host.
         net=''${JUPYTER_SANDBOX_NETWORK:-}
 
+        # No --rm: a container that dies on startup has to stick around long
+        # enough to say why. `start` reaps a previous corpse before reusing
+        # the name, and `stop` removes it.
         args=(
-          --rm --init --detach
+          --init --detach
           --name "$unit"
           --rootfs "$root"
           # the project: the only writable mount, and the only part of the
@@ -450,12 +453,18 @@ in
             -e XDG_CACHE_HOME="$abs_state/cache"
           )
         ''}
+        # The driver directory is bind-mounted but deliberately NOT put on the
+        # server's LD_LIBRARY_PATH. Nothing needs it there: torch-bin finds
+        # libcuda through the RUNPATH nixpkgs stamps into it, and the rust
+        # kernel carries its own library path in its kernelspec. Setting it
+        # process-wide would instead make the loader search the driver dir
+        # first for *every* library, which is a reliable way to break
+        # unrelated binaries against the wrong libstdc++.
         ${lib.optionalString anyCuda ''
           args+=(
             --device /dev/nvidiactl --device /dev/nvidia0
             --device /dev/nvidia-uvm --device /dev/nvidia-uvm-tools
             -v /run/opengl-driver:/run/opengl-driver:ro
-            -e LD_LIBRARY_PATH=/run/opengl-driver/lib
           )
         ''}
 
@@ -481,8 +490,25 @@ in
           --ServerApp.custom_display_url="http://127.0.0.1:$port/"
         )
 
-        running() { podman container exists "$unit"; }
+        exists() { podman container exists "$unit"; }
+        running() {
+          [ "$(podman container inspect --format '{{.State.Running}}' "$unit" 2>/dev/null)" = true ]
+        }
         url_from_log() { podman logs "$unit" 2>&1 | grep -m1 -o 'http://127.0.0.1:[^ ]*'; }
+
+        # Clear the remains of a previous run before reusing the name.
+        reap() { if exists && ! running; then podman rm "$unit" >/dev/null 2>&1 || true; fi; }
+
+        # podman has to be able to write into the container root to create
+        # mountpoints, so the skeleton is copied out of the store.
+        stage_rootfs() {
+          mkdir -p "$abs_state"/{jupyter-data,jupyter-runtime,jupyter-config,home}
+          rm -rf "$root"
+          mkdir -p "$root"
+          cp -r ${rootfs}/. "$root/"
+          chmod -R u+w "$root"
+          chmod 755 "$root"
+        }
 
         case "''${1:-start}" in
           start)
@@ -491,20 +517,20 @@ in
               url_from_log || true
               exit 0
             fi
-            mkdir -p "$abs_state"/{jupyter-data,jupyter-runtime,jupyter-config,home}
-            rm -rf "$root"
-            mkdir -p "$root"
-            cp -r ${rootfs}/. "$root/"
-            chmod -R u+w "$root"
-            chmod 755 "$root"
+            reap
+            stage_rootfs
             podman run "''${args[@]}" -- "''${server[@]}" >/dev/null
             for _ in $(seq 1 60); do
               if url=$(url_from_log); then echo "$unit up: $url"; exit 0; fi
-              running || {
-                echo "$unit died:" >&2
-                podman logs "$unit" 2>&1 | tail -20 >&2
+              if ! running; then
+                echo "$unit exited during startup. its log:" >&2
+                podman logs "$unit" 2>&1 | tail -40 >&2 || true
+                echo >&2
+                echo "the container is kept so the log survives; for more:" >&2
+                echo "  podman logs $unit" >&2
+                echo "  $0 foreground   # same argv, attached, so errors land here" >&2
                 exit 1
-              }
+              fi
               sleep 1
             done
             echo "$unit is up but printed no url; try: $0 logs" >&2
@@ -517,25 +543,39 @@ in
             else
               echo "$unit is not running"
             fi
+            if exists; then podman rm "$unit" >/dev/null 2>&1 || true; fi
             rm -rf "$root"
             ;;
           status)
             if running; then
               podman ps --filter "name=$unit" --format '{{.Names}} {{.Status}} {{.Ports}}'
               url_from_log || true
+            elif exists; then
+              echo "$unit exited; its log is kept: podman logs $unit"
             else
               echo "$unit is not running"
             fi
             ;;
           logs) podman logs -f "$unit" ;;
           shell) podman exec -it "$unit" ${pkgs.bashInteractive}/bin/bash ;;
+          # The same argv without --detach, so a server that will not come up
+          # says why on your terminal instead of into a container log.
+          foreground)
+            reap
+            stage_rootfs
+            fg_args=(--rm)
+            for a in "''${args[@]}"; do
+              [ "$a" = --detach ] || fg_args+=("$a")
+            done
+            exec podman run "''${fg_args[@]}" -- "''${server[@]}"
+            ;;
           # what `start` would run, without running it
           print-cmd)
             printf '%q ' podman run "''${args[@]}" -- "''${server[@]}"
             echo
             ;;
           *)
-            echo "usage: $0 {start|stop|status|logs|shell|print-cmd}" >&2
+            echo "usage: $0 {start|stop|status|logs|shell|foreground|print-cmd}" >&2
             exit 2
             ;;
         esac
