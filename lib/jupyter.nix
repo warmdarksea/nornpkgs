@@ -427,10 +427,19 @@ in
         # No --rm: a container that dies on startup has to stick around long
         # enough to say why. `start` reaps a previous corpse before reusing
         # the name, and `stop` removes it.
+        #
+        # --rootfs is NOT in here, and that is load-bearing. It is a boolean
+        # flag whose path is the positional that would otherwise be the image
+        # name, and `podman run` stops parsing its own flags at that
+        # positional -- it has to, or `podman run img ls -la` could not pass
+        # -la to ls. So anything after the rootfs path is the *container's*
+        # argv: putting --rootfs mid-array silently demotes every later -v,
+        # -e and -p into arguments of the command, which then fails to exec
+        # and dies with an empty log. It goes immediately before the command,
+        # the same way lib/agent.nix does it.
         args=(
           --init --detach
           --name "$unit"
-          --rootfs "$root"
           # the project: the only writable mount, and the only part of the
           # host this server can see
           -v "$PWD:$PWD" -w "$PWD"
@@ -519,7 +528,7 @@ in
             fi
             reap
             stage_rootfs
-            podman run "''${args[@]}" -- "''${server[@]}" >/dev/null
+            podman run "''${args[@]}" --rootfs "$root" "''${server[@]}" >/dev/null
             for _ in $(seq 1 60); do
               if url=$(url_from_log); then echo "$unit up: $url"; exit 0; fi
               if ! running; then
@@ -567,11 +576,11 @@ in
             for a in "''${args[@]}"; do
               [ "$a" = --detach ] || fg_args+=("$a")
             done
-            exec podman run "''${fg_args[@]}" -- "''${server[@]}"
+            exec podman run "''${fg_args[@]}" --rootfs "$root" "''${server[@]}"
             ;;
           # what `start` would run, without running it
           print-cmd)
-            printf '%q ' podman run "''${args[@]}" -- "''${server[@]}"
+            printf '%q ' podman run "''${args[@]}" --rootfs "$root" "''${server[@]}"
             echo
             ;;
           *)
