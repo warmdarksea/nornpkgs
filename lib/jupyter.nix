@@ -440,6 +440,12 @@ in
         args=(
           --init --detach
           --name "$unit"
+          # k8s-file, not the default: rootless podman often defaults to
+          # journald, and `podman logs` then comes back empty when the user
+          # journal is not reachable -- which is exactly when a server that
+          # died on startup has something to say. This writes a plain file
+          # next to the container, so the log is always readable.
+          --log-driver=k8s-file
           # the project: the only writable mount, and the only part of the
           # host this server can see
           -v "$PWD:$PWD" -w "$PWD"
@@ -491,9 +497,22 @@ in
 
         # custom_display_url is so the url jupyter prints is one that can
         # actually be pasted, rather than the in-container bind address.
+        #
+        # allow_root: the container runs as uid 0, which jupyter refuses by
+        # default -- reasonably, since on a normal machine that means real
+        # root. Here it does not. Rootless podman maps container uid 0 through
+        # a user namespace to the invoking user, so this process has exactly
+        # the host privileges you do and no more, and files it writes into the
+        # bind mount come out owned by you rather than by root. The boundary
+        # is the namespace, not the uid inside it.
+        #
+        # (uid 0 does still hold capabilities *within* that namespace, which
+        # is a little more surface than an unprivileged uid inside would be.
+        # --cap-drop=ALL would trim it; jupyter needs none of them.)
         server=(
           ${env}/bin/jupyter-notebook
           --no-browser
+          --ServerApp.allow_root=True
           --ServerApp.ip="$bind_ip"
           --ServerApp.port="$port"
           --ServerApp.custom_display_url="http://127.0.0.1:$port/"
