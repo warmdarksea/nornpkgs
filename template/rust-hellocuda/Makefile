@@ -4,6 +4,15 @@
 NIX ?= nix
 NIX_FLAGS ?= --extra-experimental-features 'nix-command flakes'
 
+# the artifacts below are nix out-links: symlinks into the store, where every
+# mtime is epoch 1. without -L make stats *through* the symlink, sees 1970,
+# concludes the artifact is older than every source, and re-runs `nix build` --
+# a full flake re-evaluation -- on every `make run`. -L (--check-symlink-times)
+# makes make take the newer of the link's own mtime and its target's, i.e. the
+# moment nix created the out-link, so an artifact that is already there counts
+# as up to date and `make run` just runs it.
+MAKEFLAGS += -L
+
 # point at a local nornpkgs checkout when hacking on lib/jupyter.nix:
 #   make start_jupyter NORNPKGS=path:/home/clownpiece/src/nornpkgs
 NORNPKGS ?=
@@ -22,6 +31,8 @@ NAME := rust-hellocuda
 BIN  := $(BUILD_DIR)/$(NAME)
 JUPYTER := $(BUILD_DIR)/jupyter
 
+# the same files the flake's fileset feeds to cargo; target/ and the state dir
+# are deliberately not in here.
 SRCS := flake.nix flake.lock Cargo.toml Cargo.lock $(shell find src -type f)
 
 .PHONY: build run test start_jupyter stop_jupyter status_jupyter clean
@@ -33,17 +44,19 @@ build: $(BIN)
 $(BUILD_DIR)/:
 	mkdir -p $@
 
-# the out-link points into the store, where every mtime is epoch 1, so this
-# recipe re-runs whenever it is reached; nix is the actual incremental step.
 $(BIN): $(SRCS) | $(BUILD_DIR)/
 	$(NIX) $(NIX_FLAGS) build $(OVERRIDE) .#$(NAME) --out-link $@
 
 $(JUPYTER): $(SRCS) | $(BUILD_DIR)/
 	$(NIX) $(NIX_FLAGS) build $(OVERRIDE) .#jupyter --out-link $@
 
-run: build
+# depends on the artifact rather than on the phony `build`, so an out-link that
+# is already in place is run as-is, without nix being consulted at all.
+run: $(BIN)
 	$(BIN)/bin/$(NAME)
 
+# the devshell, not the artifact: cargo test compiles the working tree, so this
+# one does have to evaluate the flake.
 test:
 	$(NIX) $(NIX_FLAGS) develop $(OVERRIDE) --command cargo test
 

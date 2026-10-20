@@ -136,6 +136,7 @@
             shellHook = ''
               echo "VST template devshell: coq ${coqVersion}, VST ${VST.version}, CompCert ${compcert.version}"
               echo "  make        clightgen + ccomp + check every proof"
+              echo "  make run    run the compiled program (make run N=90)"
               echo "  make audit  print the axioms the end-to-end theorem rests on"
               echo "  make smoke  run the compiled program on a few inputs"
             '';

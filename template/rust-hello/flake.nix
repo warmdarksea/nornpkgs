@@ -17,11 +17,26 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      inherit (pkgs) lib;
+      fs = lib.fileset;
+
+      # Exactly what cargo is given, and nothing else. `src = ./.` would also
+      # copy in the nix out-links make leaves in build/ -- symlinks to the
+      # *previous* output, which change this build's source hash every time --
+      # along with state/ and cargo's own target/.
+      src = fs.toSource {
+        root = ./.;
+        fileset = fs.unions [
+          ./Cargo.toml
+          ./Cargo.lock
+          ./src
+        ];
+      };
 
       rust-hello = pkgs.rustPlatform.buildRustPackage {
         pname = "rust-hello";
         version = "0.1.0";
-        src = ./.;
+        inherit src;
         cargoLock.lockFile = ./Cargo.lock;
         meta.mainProgram = "rust-hello";
       };
