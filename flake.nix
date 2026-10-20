@@ -614,7 +614,7 @@
     templates.coq-hellovst = {
       path = ./template/coq-hellovst;
       description = "coq + VST/CompCert: a C fibonacci program verified end to end (needs unfree CompCert)";
-      welcomeText = "# coq-hellovst\nproofs: nix flake check  binary: nix run  axioms: nix develop --command make audit";
+      welcomeText = "# coq-hellovst\nproofs: nix flake check  binary: nix run  axioms: nix develop --command make audit\nin the devshell: make (proofs)  make run  make smoke  make audit";
     };
 
     templates.lean4-hello = {
@@ -626,7 +626,7 @@
     templates.lean4-hellomath = {
       path = ./template/lean4-hellomath;
       description = "lean 4 proofs with mathlib; building type-checks them";
-      welcomeText = "# lean4-hellomath\nbuild (= check the proofs): make build";
+      welcomeText = "# lean4-hellomath\nbuild (= check the proofs): make build  run: make run  test: make test";
     };
 
     templates.py-hello = {

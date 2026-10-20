@@ -46,13 +46,29 @@
         ];
       };
 
+      inherit (pkgs) lib;
+      fs = lib.fileset;
       python = pkgs.python3;
+
+      # Exactly what the wheel is built from, and nothing else. `src = ./.`
+      # would also copy in the nix out-links make leaves in build/ -- symlinks
+      # to the *previous* output, which change this build's source hash every
+      # time -- along with state/, __pycache__ and .pytest_cache.
+      src = fs.toSource {
+        root = ./.;
+        fileset = fs.unions [
+          ./pyproject.toml
+          ./conftest.py
+          (fs.fileFilter (f: f.hasExt "py") ./py_hellotorch)
+          (fs.fileFilter (f: f.hasExt "py") ./tests)
+        ];
+      };
 
       py-hellotorch = python.pkgs.buildPythonApplication {
         pname = "py-hellotorch";
         version = "0.1.0";
         pyproject = true;
-        src = ./.;
+        inherit src;
         build-system = [ python.pkgs.hatchling ];
         dependencies = [ python.pkgs.torch-bin ];
         meta.mainProgram = "py-hellotorch";

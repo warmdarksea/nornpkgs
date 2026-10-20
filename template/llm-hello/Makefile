@@ -3,6 +3,17 @@
 NIX ?= nix
 NIX_FLAGS ?= --extra-experimental-features 'nix-command flakes'
 
+# the artifacts below are nix out-links: symlinks into the store, where every
+# mtime is epoch 1. without -L make stats *through* the symlink, sees 1970,
+# concludes the artifact is older than every source, and re-runs `nix build` --
+# a full flake re-evaluation -- on every `make run`. -L (--check-symlink-times)
+# makes make take the newer of the link's own mtime and its target's, i.e. the
+# moment nix created the out-link, so an artifact that is already there counts
+# as up to date and `make run` just runs it. that matters most here: the gguf
+# is a fixed-output fetch, and re-resolving it is the slowest thing in the
+# template.
+MAKEFLAGS += -L
+
 # point at a local nornpkgs checkout when hacking on the fetchers:
 #   make build NORNPKGS=path:/home/clownpiece/src/nornpkgs
 NORNPKGS ?=
@@ -17,6 +28,8 @@ NAME := llm-hello
 BIN  := $(BUILD_DIR)/$(NAME)
 GGUF := $(BUILD_DIR)/gguf
 
+# the flake has no local `src`: the model comes from a fetcher and the entry
+# point is a writeShellApplication, so the flake itself is the whole input.
 SRCS := flake.nix $(wildcard flake.lock)
 
 PROMPT ?= The capital of France is
@@ -35,29 +48,29 @@ gguf: $(GGUF)
 $(BUILD_DIR)/:
 	mkdir -p $@
 
-# the out-links point into the store, where every mtime is epoch 1, so these
-# recipes re-run whenever they are reached; nix is the actual incremental step.
 $(BIN): $(SRCS) | $(BUILD_DIR)/
 	$(NIX) $(NIX_FLAGS) build $(OVERRIDE) .#$(NAME) --out-link $@
 
 $(GGUF): $(SRCS) | $(BUILD_DIR)/
 	$(NIX) $(NIX_FLAGS) build $(OVERRIDE) .#gguf --out-link $@ --print-out-paths
 
-run: build
+# everything below depends on the artifact rather than on the phony `build`, so
+# an out-link that is already in place is used as-is and nix is not consulted.
+run: $(BIN)
 	$(BIN)/bin/$(NAME) start
 
-ask: build
+ask: $(BIN)
 	$(BIN)/bin/$(NAME) ask "$(PROMPT)"
 
-logs status stop: build
+logs status stop: $(BIN)
 	$(BIN)/bin/$(NAME) $@
 
 # serve, ask one question, shut down. no systemd, no gpu.
-test: build
+test: $(BIN)
 	$(BIN)/bin/$(NAME) selftest "$(PROMPT)"
 
 # the gguf is in the closure, so this is the whole deployment
-copy: build
+copy: $(BIN)
 	$(NIX) $(NIX_FLAGS) copy --to ssh://$(HOST) $(BIN)
 
 # copy the closure to $(HOST), then run the oneshot there:

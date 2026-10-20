@@ -32,7 +32,7 @@ AST_V   := $(addprefix $(BUILD_DIR)/,$(addsuffix .v,$(ASTS)))
 VOFILES := $(addprefix $(BUILD_DIR)/,$(addsuffix .vo,$(ASTS) $(PROOFS)))
 OFILES  := $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(ASTS)))
 
-.PHONY: all build bin proofs audit smoke clean depend
+.PHONY: all build bin run proofs audit smoke clean depend
 .DELETE_ON_ERROR:
 
 all: bin proofs
@@ -43,6 +43,15 @@ build: all
 bin: $(BUILD_DIR)/fib
 
 proofs: $(VOFILES)
+
+# every target below names the artifact it needs, so nothing is rebuilt (and
+# no proof is re-checked) just to run the program.
+#
+# fib reads its argument from stdin; N overrides it:  make run N=90
+N ?= 10
+
+run: $(BUILD_DIR)/fib
+	@echo $(N) | $(BUILD_DIR)/fib
 
 # the trailing slash is deliberate: a target named plain $(BUILD_DIR) would
 # collide with the phony `build` above, and make drops that rule as circular.
