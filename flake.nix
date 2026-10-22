@@ -99,12 +99,12 @@
 
         nanokvmctlSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/nanokvmctl.git";
-        rev = "6778fdbad429af3843563b52899bbb13c46618e9";
+        rev = "e941498c4d0bd51661b5c689a6e1de24eb85fec9";
         ref = "master";
       };
       uefiTrampolineSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/uefi_trampoline.git";
-        rev = "b5f226568a350f7ec9744e2edca2526686839467";
+        rev = "b1d84a5752aecdbb62488753060afa9977f7ee11";
         ref = "master";
       };
     in {
