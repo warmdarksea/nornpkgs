@@ -51,6 +51,11 @@ remote_assert:
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
+# order-only-ish "always run me" marker for pattern targets that `.PHONY` can't
+# cover (`.PHONY` does not expand `%`).
+.PHONY: FORCE
+FORCE:
+
 #
 
 # can't be bothered figuring out all of the dependencies, just build it again
@@ -344,7 +349,13 @@ TRAMP_REV := $(shell sed -n '/uefiTrampolineSrc = builtins.fetchGit/,/};/{s/.*re
 trampolines: $(BUILD_DIR)/uefi-trampoline-0002-nixos.iso $(BUILD_DIR)/uefi-trampoline-0004-windows.iso
 
 # build/uefi-trampoline-<hexid>-<slug>.iso
-$(BUILD_DIR)/uefi-trampoline-%.iso: scripts/pack-trampoline-iso.sh
+# Always rebuilt (via FORCE): the real inputs are the pinned trampoline rev and
+# SB_KEY/SB_CERT, none of which make can see. Without this, a previous *unsigned*
+# build already satisfies the target, so re-running with SB_KEY set silently
+# leaves the old unsigned ISO in place and Secure Boot rejects it at boot.
+# Note: `.PHONY` does NOT accept patterns -- the `%` is taken literally -- so a
+# FORCE prerequisite is the only thing that works here.
+$(BUILD_DIR)/uefi-trampoline-%.iso: scripts/pack-trampoline-iso.sh FORCE
 	@test -n "$(TRAMP_URL)" -a -n "$(TRAMP_REV)" || { echo "could not read uefiTrampolineSrc url/rev from flake.nix"; exit 1; }
 	@mkdir -p $(BUILD_DIR)
 	spec='$*'; id=$${spec%%-*}; slug=$${spec#*-}; dec=$$((16#$$id)); \
