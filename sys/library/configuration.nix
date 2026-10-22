@@ -38,6 +38,32 @@
 
   boot.loader.efi.canTouchEfiVariables = true;
 
+  # --- UEFI BootOrder pinning -----------------------------------------------
+  # Windows Boot Manager promotes itself to the head of BootOrder on every boot,
+  # demoting the NanoKVM entry so the uefi_trampoline never gets booted. No OS
+  # can lock BootOrder, so both sides re-assert it: this unit on start *and*
+  # stop, and lib/boot-order-assert.ps1 as a startup task on the Windows side.
+  # Rationale and the by-label resolution live in the script's header comment.
+  systemd.services.assert-boot-order =
+    let
+      pin = pkgs.writeShellApplication {
+        name = "boot-order-assert";
+        runtimeInputs = with pkgs; [ efibootmgr gawk gnused gnugrep coreutils ];
+        text = builtins.readFile ../../lib/boot-order-assert.sh;
+      };
+    in {
+      description = "Pin UEFI BootOrder with the NanoKVM entry first";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "local-fs.target" ];
+      unitConfig.ConditionPathExists = "/sys/firmware/efi/efivars";
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;            # so ExecStop fires on shutdown too
+        ExecStart = "${pin}/bin/boot-order-assert";
+        ExecStop = "${pin}/bin/boot-order-assert";
+      };
+    };
+
   # machine specs live in hw/library.nix
 
   boot.zfs.requestEncryptionCredentials = false;
