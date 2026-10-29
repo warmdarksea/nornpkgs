@@ -195,6 +195,7 @@
       audioPlugins.packages = [
         self.packages.x86_64-linux.gearmulator-compat
         self.packages.x86_64-linux.lsp-plugins-compat
+        self.packages.x86_64-linux.openutau-bridge
       ];
     };
 
@@ -703,6 +704,11 @@
     # flatpak. Harmless in newer-glibc hosts, so the home profiles link these.
     packages.x86_64-linux.gearmulator-compat = pkgsCompat.callPackage ./pkgs/gearmulator { };
     packages.x86_64-linux.lsp-plugins-compat = pkgsCompat.lsp-plugins;
+
+    # OpenUtau's DAW integration plugin (VST3/CLAP/VST2 + the bridge-host
+    # conformance harness), from our OpenUtau fork's openutau-vst branch.
+    # Built from the compat pin for the same Bitwig-flatpak reason.
+    packages.x86_64-linux.openutau-bridge = pkgsCompat.callPackage ./pkgs/openutau-bridge { };
 
     packages.x86_64-linux.claude-env = pkgs.buildEnv {
       name = "claude-env";
