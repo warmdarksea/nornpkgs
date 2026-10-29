@@ -1,8 +1,11 @@
 # Gearmulator: low-level emulation of classic VA synths & effects as audio
 # plugins (Osirus, OsTIrus, Vavra, Xenia, Nodal Red 2x, JE-8086, 88emu).
 #
-# Written nixpkgs-style so it can be upstreamed as-is:
+# Written nixpkgs-style:
 #   pkgs.callPackage ./pkgs/gearmulator { }
+#
+# Built from our fork's 88emu-vst branch, which additionally builds the
+# 88emu player (MT-32/CM/MV-30/Sound Canvas) as VST3 and VST2 plugins.
 #
 # Upstream's defaults are kept: every synth, VST3 + VST2 (via the bundled
 # GPL FST headers - Steinberg's SDK is not fetched) + CLAP. The plugins land
@@ -15,7 +18,6 @@
 {
   lib,
   stdenv,
-  fetchFromGitHub,
   cmake,
   ninja,
   pkg-config,
@@ -36,14 +38,18 @@
 stdenv.mkDerivation (finalAttrs: {
   pname = "gearmulator";
   # project() version at the pinned revision; 2.2.28 is not tagged yet
-  version = "2.2.28-unstable-2026-10-28";
+  version = "2.2.28-unstable-2026-10-29";
 
-  src = fetchFromGitHub {
-    owner = "dsp56300";
-    repo = "gearmulator";
-    rev = "0ed1fc73abceb9b00a425fc67eb157f33a1769b2";
-    fetchSubmodules = true;
-    hash = "sha256-H5bQBhT+CbtQNmxk7R+UgHmRvJ4zimovpSxtfGUe0nE=";
+  # Our fork, 88emu-vst branch, from the local checkout for now.
+  # TODO: once the fork is pushed, switch to the GitHub copy:
+  #   url = "https://github.com/<username>/gearmulator.git";
+  # (same ref/rev scheme; or fetchFromGitHub with fetchSubmodules = true).
+  # Upstream base: github:dsp56300/gearmulator @ 0ed1fc73 (2.2.28 pre-release).
+  src = builtins.fetchGit {
+    url = "file:///tmp/tmp.dXIYLCNQck/src/gearmulator";
+    ref = "88emu-vst";
+    rev = "0bc8e13d9128bb563933634731bc41c3d00768af";
+    submodules = true;
   };
 
   nativeBuildInputs = [
