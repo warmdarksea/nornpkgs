@@ -673,6 +673,11 @@
         hash = "sha256-Zu8WFs3xBEEpMuccy3A27iCGAxE4XFwOM3lD282DSaA=";
       }).gguf.convert { vocabOnly = true; };
 
+    # Gearmulator: classic VA synths & sound modules (Access Virus, Waldorf
+    # microQ/XT, Nord Lead 2x, JP-8000, MT-32/Sound Canvas) as audio plugins.
+    # pkgs/gearmulator is written nixpkgs-style so it can be upstreamed as-is.
+    packages.x86_64-linux.gearmulator = pkgs.callPackage ./pkgs/gearmulator { };
+
     packages.x86_64-linux.claude-env = pkgs.buildEnv {
       name = "claude-env";
       paths = with pkgs; [ nix gitMinimal bash coreutils ];
