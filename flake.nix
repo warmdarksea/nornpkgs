@@ -184,10 +184,6 @@
           nanokvm = self.packages.${system}.nanokvm;
           nanokvmctl = self.packages.${system}.nanokvmctl;
         })
-        (final: prev: {
-          # https://github.com/NixOS/nixpkgs/issues/493503
-          guile-zlib = prev.guile-zlib.overrideAttrs { doCheck = false; };
-        })
         emacs-overlay.overlays.default
         emacs-overlay.overlays.package
       ];
