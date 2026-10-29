@@ -46,12 +46,11 @@ stdenv.mkDerivation (finalAttrs: {
   # (same ref/rev scheme; or fetchFromGitHub with fetchSubmodules = true).
   # Upstream base: github:dsp56300/gearmulator @ 0ed1fc73 (2.2.28 pre-release).
   src = builtins.fetchGit {
-    url = "file:///tmp/tmp.dXIYLCNQck/src/gearmulator";
+    url = "https://github.com/warmdarksea/gearmulator.git";
     ref = "88emu-vst";
     rev = "0bc8e13d9128bb563933634731bc41c3d00768af";
     submodules = true;
   };
-
   nativeBuildInputs = [
     cmake
     ninja
