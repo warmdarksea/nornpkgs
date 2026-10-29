@@ -344,7 +344,7 @@
           # derivation and misses cache.nixos-cuda.org, which builds the
           # default set (see nixConfig at the top)
           nixpkgs.config = {
-            #cudaSupport = true;
+            cudaSupport = true;
           };
         }
         self.nixosModules.base
