@@ -1,0 +1,76 @@
+# Build a nixosConfiguration against the public inputs plus gensokyo-private's
+# `ci` branch (gensokyo.ci = true: no CUDA group, no large packages, no dev
+# docs -- see lib/ci.nix and home/common.nix).
+#
+#   on push:    builds `base` (lib/base.nix alone; nearly all cache hits)
+#   by hand:    Actions -> build -> "Run workflow" -> pick a system, or
+#                 gh workflow run build.yml -f system=library
+#
+# The runner has ~14 GB free; `base` fits as-is, the desktop closures only
+# after the disk-space step, and hell (~50 GB unpacked) is a stretch even then.
+name: build
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      system:
+        description: nixosConfiguration to build
+        type: choice
+        default: base
+        options:
+          - base
+          - abandonedfactory
+          - cheese
+          - chireiden
+          - dusk
+          - eientei
+          - furnace
+          - hell
+          - library
+          - magic
+          - mausoleum
+          - sea
+
+concurrency:
+  group: build-${{ github.ref }}-${{ inputs.system || 'base' }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      SYSTEM: ${{ inputs.system || 'base' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: free disk space
+        if: env.SYSTEM != 'base'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/.ghcup /usr/share/swift
+          sudo docker image prune --all --force || true
+          df -h /
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          # trust the flake's nixConfig (cache.nixos-cuda.org)
+          extra_nix_config: |
+            accept-flake-config = true
+
+      - name: build nixosConfigurations.${{ env.SYSTEM }}
+        # the hosts allow their unfree packages (claude-code in the agent
+        # sandbox, zotero's firefox-esr, ...) in their private modules, which
+        # the ci stub lacks; let the environment allow them instead
+        env:
+          NIXPKGS_ALLOW_UNFREE: "1"
+        run: |
+          nix build -L --no-link --print-out-paths --impure \
+            --override-input gensokyo-private github:warmdarksea/gensokyo-private/ci \
+            --no-write-lock-file \
+            ".#nixosConfigurations.$SYSTEM.config.system.build.toplevel" \
+            | tee out-path
+
+      - name: closure size
+        run: nix path-info -Sh "$(cat out-path)"

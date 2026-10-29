@@ -3,7 +3,9 @@
 #
 # Per-host:
 #   gensokyo-agent = { enable = true; user = "clownpiece"; };
-#   nixpkgs.config = { cudaSupport = true; cudaCapabilities = [ "8.6" ]; };
+#   nixpkgs.config = { cudaSupport = true; };
+# (no cudaCapabilities: the default set is what cache.nixos-cuda.org builds;
+# the gencode flags below therefore cover every supported arch)
 #
 # One-time, as the user (rootless secrets are per-user):
 #   gensokyo-agent claude setup-token            # browser flow, prints a 1-year token

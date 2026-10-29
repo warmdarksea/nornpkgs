@@ -1,10 +1,25 @@
 {config, lib, pkgs, ...}:
 
 {
-  imports = [ ./disks.nix ];
+  imports = [ ./disks.nix ./ci.nix ];
 
   nix.settings.auto-optimise-store = true;
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+  # cache.nixos.org plus the nixpkgs CUDA team's cache (the nixConfig block in
+  # flake.nix has the story). Defining these lists replaces the module
+  # defaults, so cache.nixos.org is spelled out again. nix asks the caches in
+  # ascending priority (cache.nixos.org advertises 40), so the CUDA cache is
+  # pinned behind it: anything hydra built comes from cache.nixos.org, and the
+  # CUDA cache only ever serves what cache.nixos.org does not have.
+  nix.settings.substituters = [
+    "https://cache.nixos.org/"
+    "https://cache.nixos-cuda.org?priority=50"
+  ];
+  nix.settings.trusted-public-keys = [
+    "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+    "cache.nixos-cuda.org:74DUi4Ye579gUqzH4ziL9IyiJBlDpMRn9MBN8oNan9M="
+  ];
 
   #nixpkgs.config.allowlistedLicenses = with lib.licenses; [ bsl11 ];
 
@@ -46,8 +61,11 @@
   # mkDefault so the installer images (which force "no") don't conflict
   services.openssh.settings.PermitRootLogin = lib.mkDefault "prohibit-password";
 
-  documentation.dev.enable = true;
-  documentation.man.generateCaches = true;
+  # dev docs pull every package's doc/devdoc output into the closure (nix's
+  # doxygen tree alone is an uncached build), and the man cache is a mandb
+  # run over all of them. Neither is worth the runner's time.
+  documentation.dev.enable = !config.gensokyo.ci;
+  documentation.man.cache.enable = !config.gensokyo.ci;
 
   environment.systemPackages = with pkgs; [
     vim

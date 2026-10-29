@@ -1,4 +1,15 @@
-{ lib, pkgs, ... }: {
+{ lib, pkgs, osConfig ? { }, ... }: let
+  # The CUDA-flavoured desktop packages (cuda_pkgs, below) only go in where
+  # there is a GPU to use them *and* a machine that can build them:
+  #   cudaEnabled follows the host's nixpkgs.config.cudaSupport, which is
+  #               what makes blender & co. pull the CUDA toolchain in;
+  #   ci          is gensokyo-private's ci branch flagging the GitHub
+  #               Actions runner (lib/ci.nix), which must never build them.
+  # osConfig is the NixOS config when home-manager runs as its module; under
+  # standalone home-manager it is absent, hence the defaults.
+  cudaEnabled = pkgs.config.cudaSupport or false;
+  ci = osConfig.gensokyo.ci or false;
+in {
 #let
   # myEmacs = (pkgs.emacsWithPackagesFromUsePackage {
   #   package = pkgs.emacs29-pgtk;  # replace with pkgs.emacsPgtk, or another version if desired.
@@ -51,60 +62,46 @@
 
   programs.home-manager.enable = true;
 
+  # Two tiers plus CUDA. small_pkgs is what the CI build keeps: cli tools,
+  # light desktop utilities, and the toolchains programs.emacs drags in
+  # regardless (ghc + haskell-language-server, which its lsp wants on $PATH).
+  # large_pkgs are the big leaves -- desktop apps, anything carrying an
+  # electron/qt/webkit runtime, the heavy dev tools -- and only go in on the
+  # hosts (!ci). cuda_pkgs are the CUDA builds, see the let at the top.
   home.packages = let
-    nix_thirdparty = with pkgs; [
-      #      nix-du
-      #      nix-index
-      #      nix-prefetch-scripts
-      #      nix-tree
-    ];
-    base_pkgs = with pkgs; [
+    small_pkgs = with pkgs; [
+      # cli
       bc
       bind
       curl
-      #dmidecode
-      #      emacs-nox
-      #neovim
       fdupes
       jq
       yq
       file
-      #gnum4
       git
-      #gnupg
-      #gnutar
+      git-lfs
       gzip
       htop
       inetutils
-      #inotify-tools
       iperf
       lsof
       lz4
-      #mg
       mosh
-      #moreutils
-      #proxychains-ng
       nmap
-      #ntfs3g
       p7zip
       parallel
       pari
       psmisc
       pv
       rclone
-      #recode
       rlwrap
       rsync
-      #screenfetch
-      #neofetch
       fastfetch
       netcat
       speedtest-cli
-      #sqlite
       sysstat
       tmux
       screen
-      #      unrar
       unzip
       pciutils
       usbutils
@@ -115,122 +112,59 @@
       zip
       unrar-wrapper
       tree
-      nanokvmctl # NanoKVM power/reset/boot control (warmdarksea/nanokvmctl, via defaultOverlays)
-    ];
-    desktop_pkgs = with pkgs; [
-      #gnome.adwaita-icon-theme
-      #arandr
-      #filelight
-      #breeze-qt5
-      chromium
-      # dfeet
-      #dconf
-      #desktop-file-utils
-      #dmenu
-      #gnome.dconf-editor
-      #element-desktop-wayland
-      #element-desktop
-      #      emacs-gtk
-      #      emacsPgtk
-      # myEmacs
-      #foliate
-      #okular
-      #evolution
-      #evtest
+      cloc
+      colordiff
+      gnumake
+      flarectl
+      ossutil
+      syncplay
+      nanokvmctl # NanoKVM power/reset/boot control (warmdarksea/nanokvmctl, via overlays.default)
+      # light desktop
       exif
       feh
       ffmpeg
       ffmpegthumbnailer
       file-roller
-      #gnome.gnome-calendar
-      #konsole
-      #lxappearance
-      #filezilla
-      #firefox-wayland
-      #firefox
-      #cdrkit
-      #cuetools
       flac
-      #gedit
-      gimp
-      #glxinfo
       mesa-demos
-      #gsettings-desktop-schemas
-      #gvfs
-      #hamster
-      #hexchat
-      #hicolor-icon-theme
-      #hplip
       keepassxc
-      #liberation_ttf
-      #dunst
-      libreoffice
-      #megatools
-      qbittorrent
       mpv
-      #      nerdfonts
       pavucontrol
-      #pcmanfm
-      #read-edid
-      #scrot
       sshfs-fuse
       trash-cli
-      vlc
-      wireshark-qt
-      #wmctrl
-      #xarchiver
-      #xbindkeys
-      #xbindkeys-config
-      #xscreensaver
-      #xclip
+      wl-clipboard
       xorg.xclock
-      #xdotool
       xorg.xev
       xorg.xeyes
-      #xorg.xhost
-      #youtube-dl
       yt-dlp
-      #streamlink
-      #gnome.zenity
-      #wdisplays
-      #kanshi
+      flatpak
+      flatpak-builder
+      # in the closure through programs.emacs anyway
+      ghc
+      haskell-language-server
+    ];
+    large_pkgs = with pkgs; [
+      # browsers and electron/qt/webkit apps
+      chromium
+      signal-desktop
       komikku
       foliate
       remmina
-      flatpak
-      flatpak-builder
       gnome-software
-      signal-desktop
-    ];
-    dev_pkgs = with pkgs; [
-      # aliyun-cli
-      cloc
-      colordiff
-      #    coq
-      # ddd
-      #eclipses.eclipse-platform
-      #gdb
-      #      gdbgui
-      #ghc
-      #glade
-      #sqlitebrowser
-      #subversion
+      qbittorrent
+      vlc
+      wireshark-qt
+      # big desktop apps
+      libreoffice
+      gimp
+      krita
+      anki
+      ghidra
+      retroarch-free
       virt-manager
-      #docker
-      #docker-compose
-      #vscodium
-      #xfig
-      #qemu
-      #stdenv
-      gnumake
+      # heavy dev tools
       awscli2
-      flarectl
-      # (pkgs.terraform.withPlugins (p: [
-      #   p.hashicorp_null
-      #   p.hashicorp_tls
-      #   p.hashicorp_aws
-      #   p.dmacvicar_libvirt
-      # ]))
+      cabal-install
       (pkgs.opentofu.withPlugins (p: [
         p.hashicorp_null
         p.hashicorp_tls
@@ -239,41 +173,27 @@
         p.hashicorp_azurerm
         p.aliyun_alicloud
       ]))
-      git-lfs
-      # fixme: haskell lsp demands that these are in $PATH for some bizarre reason
-      ghc
-      cabal-install
-      haskell-language-server
+      # retired / parked: audacity calibre inkscape gzdoom prismlauncher
+      # element-desktop evolution okular filezilla hexchat docker
+      # docker-compose vscodium qemu ddd gdb ghc-via-emacs terraform.withPlugins
     ];
-    # my_ghidra = pkgs.ghidra.overrideAttrs (oldAttrs: {
-    #   pname = "${oldAttrs.pname}-patched";
-    #   postFixup = ''
-    #   ${oldAttrs.postFixup or ""}
-    #   sed -i 's/-Dsun.java2d.uiScale=1/-Dsun.java2d.uiScale=2/' $out/lib/ghidra/support/launch.properties
-    # '';
-    # });
-    local_pkgs = with pkgs; [
+    # CUDA builds (cycles/optix, nvenc): hours to build, so only with the
+    # cache-friendly default cudaCapabilities, never on the runner.
+    cuda_pkgs = with pkgs; [
       blender
-      #audacity
-      krita
       obs-studio
-      #      calibre
-      # inkscape
-      # gzdoom
-      syncplay
-      ossutil
-      anki
-      ghidra
-      wl-clipboard
-      retroarch-free
-      #prismlauncher
     ];
     shell_scripts = [
       # fixme: mktemp_home / random_passwd / random_hex lived in the old
       # gensokyo-dotfiles repo, which is no longer an input. inline the
       # scripts here (bin/) if they're still wanted.
     ];
-  in lib.concatLists [nix_thirdparty base_pkgs desktop_pkgs dev_pkgs local_pkgs shell_scripts];
+  in lib.concatLists [
+    small_pkgs
+    shell_scripts
+    (lib.optionals (!ci) large_pkgs)
+    (lib.optionals (cudaEnabled && !ci) cuda_pkgs)
+  ];
 
   programs.bash = {
     enable = true;

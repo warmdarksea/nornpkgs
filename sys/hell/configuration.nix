@@ -369,7 +369,6 @@ in rec {
     #memtree
     sqlite
     sqlitebrowser
-    zotero
     lyx
     nftables
     virt-viewer
@@ -398,6 +397,10 @@ in rec {
     ghostty
     foot
     xorg.xauth
+  ] ++ lib.optionals (!config.gensokyo.ci) [
+    # large, uncached builds (zotero drags its own firefox-esr in); the
+    # home profile's large_pkgs is the same idea
+    zotero
   ];
 
   users.groups.magician.gid = 381;
