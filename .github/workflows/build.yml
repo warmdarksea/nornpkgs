@@ -60,8 +60,13 @@ jobs:
             accept-flake-config = true
 
       - name: build nixosConfigurations.${{ env.SYSTEM }}
+        # the hosts allow their unfree packages (claude-code in the agent
+        # sandbox, zotero's firefox-esr, ...) in their private modules, which
+        # the ci stub lacks; let the environment allow them instead
+        env:
+          NIXPKGS_ALLOW_UNFREE: "1"
         run: |
-          nix build -L --no-link --print-out-paths \
+          nix build -L --no-link --print-out-paths --impure \
             --override-input gensokyo-private github:warmdarksea/gensokyo-private/ci \
             --no-write-lock-file \
             ".#nixosConfigurations.$SYSTEM.config.system.build.toplevel" \
