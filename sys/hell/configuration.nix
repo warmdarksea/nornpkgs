@@ -79,6 +79,7 @@ in rec {
     "systemd.unified_cgroup_hierarchy=1"
     # found online, might reduce stuttering?
     # "amdgpu.preempt_mm=0"
+    "amdgpu.dcdebugmask=0x10"
   ];
 
   boot.kernel.sysctl = {
