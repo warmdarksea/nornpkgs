@@ -35,7 +35,7 @@ stdenv.mkDerivation (finalAttrs: {
   #   url = "https://github.com/<username>/OpenUtau.git";
   # Upstream base: github:stakira/OpenUtau @ b7c35b90.
   src = builtins.fetchGit {
-    url = "file:///tmp/tmp.dXIYLCNQck/src/openutau";
+    url = "https://github.com/warmdarksea/OpenUtau.git";
     ref = "openutau-vst";
     rev = "75a21a2ff719d20815a7a0eee08eacefc1275b3f";
     submodules = true;
