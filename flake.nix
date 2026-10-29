@@ -97,7 +97,18 @@
           };
         };
 
-        nanokvmctlSrc = builtins.fetchGit {
+        # An older nixpkgs (glibc 2.40 toolchain) for audio plugins that must
+      # load into hosts running older libcs: a .so can never demand a newer
+      # glibc than the host process already has loaded, and the Bitwig
+      # flatpak's freedesktop runtime lags nixpkgs-unstable. Plugins built
+      # from this pin top out at GLIBC_2.38, which both the flatpak runtimes
+      # and every native host here satisfy.
+      pkgsCompat = import (builtins.fetchTarball {
+        url = "https://github.com/NixOS/nixpkgs/archive/3497aa5c9457a9d88d71fa93a4a8368816fbeeba.tar.gz";
+        sha256 = "sha256-dhhvQY67aboBk8b0/u0XB6vwHdgbROZT3fJAjyNh5Ww=";
+      }) { system = "x86_64-linux"; config = { }; overlays = [ ]; };
+
+      nanokvmctlSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/nanokvmctl.git";
         rev = "e941498c4d0bd51661b5c689a6e1de24eb85fec9";
         ref = "master";
@@ -179,9 +190,11 @@
       _module.args = {
         nixpak = nixpak;
       };
+      # The -compat builds (older glibc), so the plugins also load into the
+      # Bitwig flatpak's freedesktop runtime.
       audioPlugins.packages = [
-        self.packages.x86_64-linux.gearmulator
-        pkgs.lsp-plugins
+        self.packages.x86_64-linux.gearmulator-compat
+        self.packages.x86_64-linux.lsp-plugins-compat
       ];
     };
 
@@ -684,6 +697,12 @@
     # microQ/XT, Nord Lead 2x, JP-8000, MT-32/Sound Canvas) as audio plugins.
     # pkgs/gearmulator is written nixpkgs-style so it can be upstreamed as-is.
     packages.x86_64-linux.gearmulator = pkgs.callPackage ./pkgs/gearmulator { };
+
+    # The same plugins and lsp-plugins from the glibc-2.40 pin (pkgsCompat in
+    # the let above), for hosts whose process runs an older libc - the Bitwig
+    # flatpak. Harmless in newer-glibc hosts, so the home profiles link these.
+    packages.x86_64-linux.gearmulator-compat = pkgsCompat.callPackage ./pkgs/gearmulator { };
+    packages.x86_64-linux.lsp-plugins-compat = pkgsCompat.lsp-plugins;
 
     packages.x86_64-linux.claude-env = pkgs.buildEnv {
       name = "claude-env";
