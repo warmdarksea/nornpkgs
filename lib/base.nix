@@ -6,6 +6,18 @@
   nix.settings.auto-optimise-store = true;
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
+  # cache.nixos.org plus the nixpkgs CUDA team's cache (the nixConfig block in
+  # flake.nix has the story). Defining these lists replaces the module
+  # defaults, so cache.nixos.org is spelled out again.
+  nix.settings.substituters = [
+    "https://cache.nixos.org/"
+    "https://cache.nixos-cuda.org"
+  ];
+  nix.settings.trusted-public-keys = [
+    "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+    "cache.nixos-cuda.org:74DUi4Ye579gUqzH4ziL9IyiJBlDpMRn9MBN8oNan9M="
+  ];
+
   #nixpkgs.config.allowlistedLicenses = with lib.licenses; [ bsl11 ];
 
   systemd.services.nixos-upgrade.path = [ pkgs.git ];

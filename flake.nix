@@ -1,6 +1,17 @@
 {
   description = "nornpkgs - nix infrastructure for gensokyo.internal";
 
+  # Binary caches. cache.nixos-cuda.org is the nixpkgs CUDA team's cache (the
+  # successor of cuda-maintainers.cachix.org, which no longer exists): CUDA
+  # builds of nixos-unstable with the *default* cudaCapabilities, which is why
+  # no host below narrows cudaCapabilities any more. Declared here so a plain
+  # `nix build` of this flake (CI, non-NixOS) picks it up, given
+  # --accept-flake-config; the hosts get the same substituter via lib/base.nix.
+  nixConfig = {
+    extra-substituters = [ "https://cache.nixos-cuda.org" ];
+    extra-trusted-public-keys = [ "cache.nixos-cuda.org:74DUi4Ye579gUqzH4ziL9IyiJBlDpMRn9MBN8oNan9M=" ];
+  };
+
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     nixos-hardware.url = "github:NixOS/nixos-hardware";
@@ -327,9 +338,11 @@
             enable = true;
             user = "clownpiece";
           };
+          # no cudaCapabilities: narrowing them changes the hash of every CUDA
+          # derivation and misses cache.nixos-cuda.org, which builds the
+          # default set (see nixConfig at the top)
           nixpkgs.config = {
             #cudaSupport = true;
-            cudaCapabilities = [ "8.9" ];
           };
         }
         self.nixosModules.base
@@ -368,7 +381,7 @@
           };
           nixpkgs.config = {
             cudaSupport = true;
-            cudaCapabilities = [ "8.6" ];
+            # no cudaCapabilities, see hell
           };
         }
         self.nixosModules.base
