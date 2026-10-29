@@ -74,6 +74,9 @@
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         lib = nixpkgs.lib;
         system = "x86_64-linux";
+        # pkgs with overlays.default applied; the packages.* outputs for our
+        # own packages come from here so they match what the hosts install.
+        nornpkgs = pkgs.extend self.overlays.default;
 
         # Model fetchers (lib/models.nix). A function of the *caller's* pkgs --
         # shadowing the one above is deliberate: the lib output below has to
@@ -177,18 +180,24 @@
     nixosModules.server = import lib/server.nix;
     nixosModules.nvidia = import lib/nvidia.nix;
     nixosModules.agent = import lib/agent.nix;
-    nixosModules.defaultOverlays = { config, pkgs, lib, ... }: {
-      nixpkgs.overlays = [
-        (self_: super: {
-          # NanoKVM boot-control tooling (sources pinned in the let above).
-          # Built against the overlaid pkgs so cross/other systems stay correct.
-          nanokvm = self.packages.${system}.nanokvm;
-          nanokvmctl = self.packages.${system}.nanokvmctl;
-        })
-        emacs-overlay.overlays.default
-        emacs-overlay.overlays.package
-      ];
-    };
+    # The project-wide overlay: our own packages plus emacs-overlay. Every
+    # nixosSystem below applies it ({ nixpkgs.overlays = [ self.overlays.default ]; }),
+    # and packages.x86_64-linux.* are taken from pkgs with it applied.
+    overlays.default = lib.composeManyExtensions [
+      (final: prev: {
+        # NanoKVM boot-control tooling (sources pinned in the let above),
+        # built against the overlaid pkgs so cross/other systems stay correct.
+        nanokvm = final.python3Packages.callPackage "${nanokvmctlSrc}/nanokvm.nix" { };
+        nanokvmctl = final.python3Packages.callPackage "${nanokvmctlSrc}/default.nix" { inherit (final) nanokvm; };
+        # Audio plugins from our forks (pkgs/*, nixpkgs-style). The -compat
+        # variants for the Bitwig flatpak stay under packages.*: they need the
+        # older glibc pin, not whatever pkgs this overlay lands on.
+        gearmulator = final.callPackage ./pkgs/gearmulator { };
+        openutau-bridge = final.callPackage ./pkgs/openutau-bridge { };
+      })
+      emacs-overlay.overlays.default
+      emacs-overlay.overlays.package
+    ];
 
     # home manager modules
 
@@ -221,6 +230,7 @@
     nixosConfigurations.base = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         {
           networking.hostName = "base";
           fileSystems."/" = { device = "/dev/disk/by-label/base-root"; fsType = "ext4"; };
@@ -235,6 +245,7 @@
     nixosConfigurations.abandonedfactory = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         {
           networking.hostName = "abandonedfactory";
         }
@@ -252,6 +263,7 @@
     nixosConfigurations.cheese = lib.nixosSystem {
         system = "x86_64-linux";
         modules = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
           {
             networking.hostName = "cheese";
             networking.hostId = lib.mkDefault "00000000";
@@ -259,7 +271,6 @@
           self.nixosModules.base
           (gensokyo-private.nixosModules.cheese or {})
           self.nixosModules.desktop
-          self.nixosModules.defaultOverlays
           nixos-hardware.nixosModules.gpd-pocket-3
           ./hw/gpd_pocket_3.nix
           ./sys/cheese/configuration.nix
@@ -275,6 +286,7 @@
     nixosConfigurations.chireiden = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         {
           networking.hostName = "chireiden";
           networking.hostId = lib.mkDefault "00000000";
@@ -282,7 +294,6 @@
         self.nixosModules.base
         (gensokyo-private.nixosModules.chireiden or {})
         self.nixosModules.desktop
-        self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.lenovo-thinkpad-x13-amd
         ./hw/lenovo_thinkpad_x13_gen2.nix
@@ -299,6 +310,7 @@
     nixosConfigurations.dusk = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         {
           networking.hostName = "dusk";
           networking.hostId = lib.mkDefault "00000000";
@@ -306,7 +318,6 @@
         self.nixosModules.base
         (gensokyo-private.nixosModules.dusk or {})
         self.nixosModules.desktop
-        self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         ./hw/gpd_pocket_2.nix
         ./sys/dusk/configuration.nix
@@ -322,13 +333,13 @@
     nixosConfigurations.eientei = lib.nixosSystem {
       system = "i686-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         {
           networking.hostName = "eientei";
           networking.hostId = lib.mkDefault "00000000";
         }
         self.nixosModules.base
         (gensokyo-private.nixosModules.eientei or {})
-        self.nixosModules.defaultOverlays
         ./hw/eeepc.nix
         ./sys/eientei.nix
       ];
@@ -337,6 +348,7 @@
     nixosConfigurations.furnace = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         {
           networking.hostName = "furnace";
           networking.hostId = lib.mkDefault "00000000";
@@ -353,6 +365,7 @@
     nixosConfigurations.hell = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         {
           networking.hostName = "hell";
           networking.hostId = lib.mkDefault "00000000";
@@ -371,7 +384,6 @@
         self.nixosModules.agent
         self.nixosModules.desktop
         self.nixosModules.nvidia
-        self.nixosModules.defaultOverlays
         (gensokyo-private.nixosModules.hell or {})
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.common-cpu-amd
@@ -395,6 +407,7 @@
     nixosConfigurations.library = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         {
           networking.hostName = "library";
           networking.hostId = lib.mkDefault "00000000";
@@ -410,7 +423,6 @@
         self.nixosModules.base
         self.nixosModules.agent
         self.nixosModules.server
-        self.nixosModules.defaultOverlays
         (gensokyo-private.nixosModules.library or {})
         lanzaboote.nixosModules.lanzaboote
         ./hw/library.nix
@@ -421,13 +433,13 @@
     nixosConfigurations.magic = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         {
           networking.hostName = "magic";
           networking.hostId = lib.mkDefault "00000000";
         }
         self.nixosModules.base
         (gensokyo-private.nixosModules.magic or {})
-        self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         ./hw/magic.nix
         ./sys/magic/configuration.nix
@@ -437,6 +449,7 @@
     nixosConfigurations.mausoleum = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         {
           networking.hostName = "mausoleum";
           networking.hostId = lib.mkDefault "00000000";
@@ -452,6 +465,7 @@
     nixosConfigurations.sea = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         {
           networking.hostName = "sea";
           networking.hostId = lib.mkDefault "00000000";
@@ -459,7 +473,6 @@
         self.nixosModules.base
         (gensokyo-private.nixosModules.sea or {})
         self.nixosModules.desktop
-        self.nixosModules.defaultOverlays
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.dell-xps-13-9310
         ./hw/dell_xps_13_9310.nix
@@ -479,6 +492,7 @@
     littledevil.aarch64.nixosConfigurations.base-bootstrap = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         ldModules.bootstrap
         self.nixosModules.server
         { nixpkgs.crossSystem.system = "aarch64-linux"; }
@@ -488,6 +502,7 @@
     littledevil.x86_64.nixosConfigurations.base-bootstrap = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         ldModules.bootstrap
         self.nixosModules.server
       ];
@@ -496,6 +511,7 @@
     littledevil.aarch64.nixosConfigurations.base-live = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         ldModules.live
         ldModules.bootstrap
         self.nixosModules.server
@@ -506,6 +522,7 @@
     littledevil.x86_64.nixosConfigurations.base-live = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         ldModules.bootstrap
         self.nixosModules.server
         ldModules.live
@@ -519,6 +536,7 @@
     littledevil.aarch64.nixosConfigurations.oci-bootstrap = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         ./hw/oci_a1flex.nix
         ldModules.oci
         ldModules.bootstrap
@@ -536,6 +554,7 @@
     littledevil.x86_64.nixosConfigurations.oci-bootstrap = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         ldModules.oci
         ldModules.bootstrap
         self.nixosModules.server
@@ -549,6 +568,7 @@
     littledevil.x86_64.nixosConfigurations.oci-live = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         ldModules.oci
         ldModules.live
         ldModules.prod
@@ -568,6 +588,7 @@
     littledevil.aarch64.nixosConfigurations.oci-live = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         ./hw/oci_a1flex.nix
         ldModules.oci
         ldModules.live
@@ -625,6 +646,7 @@
     nixosConfigurations.iso-minimal = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
         self.nixosModules.base
         ./sys/minimal.nix
@@ -641,6 +663,7 @@
     nixosConfigurations.iso-livecd = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-graphical-gnome.nix"
         self.nixosModules.base
         ./sys/livecd.nix
@@ -650,6 +673,7 @@
     nixosConfigurations.gensokyo-recovery = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        { nixpkgs.overlays = [ self.overlays.default ]; }
         {
           networking.hostName = "gensokyo-recovery";
           networking.hostId = lib.mkDefault "00000000";
@@ -733,7 +757,7 @@
     # Gearmulator: classic VA synths & sound modules (Access Virus, Waldorf
     # microQ/XT, Nord Lead 2x, JP-8000, MT-32/Sound Canvas) as audio plugins.
     # pkgs/gearmulator is written nixpkgs-style so it can be upstreamed as-is.
-    packages.x86_64-linux.gearmulator = pkgs.callPackage ./pkgs/gearmulator { };
+    packages.x86_64-linux.gearmulator = nornpkgs.gearmulator;
 
     # The same plugins and lsp-plugins from the glibc-2.40 pin (pkgsCompat in
     # the let above), for hosts whose process runs an older libc - the Bitwig
@@ -754,10 +778,8 @@
     # NanoKVM boot-control tooling.
     packages.x86_64-linux.uefi_trampoline =
       pkgs.callPackage "${uefiTrampolineSrc}/default.nix" { }; # .override { bootId = N; }
-    packages.x86_64-linux.nanokvm =
-      pkgs.python3Packages.callPackage "${nanokvmctlSrc}/nanokvm.nix" { };
-    packages.x86_64-linux.nanokvmctl =
-      pkgs.python3Packages.callPackage "${nanokvmctlSrc}/default.nix" { nanokvm = self.packages.${system}.nanokvm; };
+    packages.x86_64-linux.nanokvm = nornpkgs.nanokvm;
+    packages.x86_64-linux.nanokvmctl = nornpkgs.nanokvmctl;
 
     # and, mirroring your existing packages.<arch>.images.<name> pattern:
     images.gensokyo-recovery =
