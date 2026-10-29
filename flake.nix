@@ -8,7 +8,8 @@
   # `nix build` of this flake (CI, non-NixOS) picks it up, given
   # --accept-flake-config; the hosts get the same substituter via lib/base.nix.
   nixConfig = {
-    extra-substituters = [ "https://cache.nixos-cuda.org" ];
+    # priority 50 keeps it behind cache.nixos.org (40), see lib/base.nix
+    extra-substituters = [ "https://cache.nixos-cuda.org?priority=50" ];
     extra-trusted-public-keys = [ "cache.nixos-cuda.org:74DUi4Ye579gUqzH4ziL9IyiJBlDpMRn9MBN8oNan9M=" ];
   };
 

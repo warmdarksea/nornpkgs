@@ -8,10 +8,13 @@
 
   # cache.nixos.org plus the nixpkgs CUDA team's cache (the nixConfig block in
   # flake.nix has the story). Defining these lists replaces the module
-  # defaults, so cache.nixos.org is spelled out again.
+  # defaults, so cache.nixos.org is spelled out again. nix asks the caches in
+  # ascending priority (cache.nixos.org advertises 40), so the CUDA cache is
+  # pinned behind it: anything hydra built comes from cache.nixos.org, and the
+  # CUDA cache only ever serves what cache.nixos.org does not have.
   nix.settings.substituters = [
     "https://cache.nixos.org/"
-    "https://cache.nixos-cuda.org"
+    "https://cache.nixos-cuda.org?priority=50"
   ];
   nix.settings.trusted-public-keys = [
     "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
