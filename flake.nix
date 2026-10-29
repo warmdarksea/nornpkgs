@@ -77,6 +77,8 @@
         # pkgs with overlays.default applied; the packages.* outputs for our
         # own packages come from here so they match what the hosts install.
         nornpkgs = pkgs.extend self.overlays.default;
+        # gensokyo-private's ci branch exports gensokyo.ci = true; nothing else does.
+        ci = gensokyo-private.gensokyo.ci or false;
 
         # Model fetchers (lib/models.nix). A function of the *caller's* pkgs --
         # shadowing the one above is deliberate: the lib output below has to
@@ -174,7 +176,7 @@
     # gensokyo.ci = true, its other branches nothing (option in lib/ci.nix).
     nixosModules.base = { ... }: {
       imports = [ ./lib/base.nix ];
-      gensokyo.ci = gensokyo-private.gensokyo.ci or false;
+      gensokyo.ci = ci;
     };
     nixosModules.desktop = import lib/desktop.nix;
     nixosModules.server = import lib/server.nix;
@@ -377,7 +379,8 @@
           # derivation and misses cache.nixos-cuda.org, which builds the
           # default set (see nixConfig at the top)
           nixpkgs.config = {
-            cudaSupport = true;
+            # the CUDA builds are host-only; the runner builds the structure
+            cudaSupport = !ci;
           };
         }
         self.nixosModules.base
@@ -416,7 +419,7 @@
             user = "patchouli";
           };
           nixpkgs.config = {
-            cudaSupport = true;
+            cudaSupport = !ci; # see hell
             # no cudaCapabilities, see hell
           };
         }
