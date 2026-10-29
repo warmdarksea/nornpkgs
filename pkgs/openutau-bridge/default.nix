@@ -30,12 +30,11 @@ stdenv.mkDerivation (finalAttrs: {
   pname = "openutau-bridge";
   version = "0.1.0-unstable-2026-10-29";
 
-  # Our fork, openutau-vst branch, from the local checkout for now.
-  # TODO: once the fork is pushed, switch to the GitHub copy:
-  #   url = "https://github.com/<username>/OpenUtau.git";
+  # Our fork's openutau-vst branch (the plugin lives in OpenUtau.DawPlugin/
+  # with JUCE, clap-juce-extensions and xxHash as submodules).
   # Upstream base: github:stakira/OpenUtau @ b7c35b90.
   src = builtins.fetchGit {
-    url = "file:///tmp/tmp.dXIYLCNQck/src/openutau";
+    url = "https://github.com/warmdarksea/OpenUtau.git";
     ref = "openutau-vst";
     rev = "75a21a2ff719d20815a7a0eee08eacefc1275b3f";
     submodules = true;
