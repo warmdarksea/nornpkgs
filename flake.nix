@@ -171,11 +171,18 @@
     homeManagerModules.common = { config, lib, pkgs, ... }: {
       imports = [ ./home/common.nix ];
     };
+    # Audio plugins (VST3/VST2/CLAP/LV2) from packages into ~/.vst3 & friends,
+    # see home/audio-plugins.nix for the mechanics.
+    homeManagerModules.audioPlugins = import ./home/audio-plugins.nix;
     homeManagerModules.magician = { config, lib, pkgs, ... }: {
-      imports = [ ./home/common.nix ./home/magician.nix ];
+      imports = [ ./home/common.nix ./home/magician.nix self.homeManagerModules.audioPlugins ];
       _module.args = {
         nixpak = nixpak;
       };
+      audioPlugins.packages = [
+        self.packages.x86_64-linux.gearmulator
+        pkgs.lsp-plugins
+      ];
     };
 
     # systems
