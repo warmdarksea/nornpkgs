@@ -213,6 +213,25 @@
     };
 
     # systems
+
+    # The smallest system this flake expresses: lib/base.nix on a placeholder
+    # disk, nothing else. Never deployed. CI builds it on every push (cheap,
+    # nearly all cache hits), and it is a quick local check of lib/base.nix:
+    #   make build_sys_closure TARGET=base
+    nixosConfigurations.base = lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        {
+          networking.hostName = "base";
+          fileSystems."/" = { device = "/dev/disk/by-label/base-root"; fsType = "ext4"; };
+          boot.loader.systemd-boot.enable = true;
+          boot.loader.efi.canTouchEfiVariables = true;
+          system.stateVersion = "26.11";
+        }
+        self.nixosModules.base
+      ];
+    };
+
     nixosConfigurations.abandonedfactory = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
