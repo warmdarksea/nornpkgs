@@ -254,7 +254,7 @@
     # });
     local_pkgs = with pkgs; [
       blender
-      audacity
+      #audacity
       krita
       obs-studio
       #      calibre
@@ -289,7 +289,7 @@
 
   programs.emacs = {
     enable = true;
-    package = pkgs.emacs30-pgtk;
+    package = pkgs.emacs-pgtk;
     extraPackages = let
       lean4-mode = {
         trivialBuild,
