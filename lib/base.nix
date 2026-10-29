@@ -58,8 +58,11 @@
   # mkDefault so the installer images (which force "no") don't conflict
   services.openssh.settings.PermitRootLogin = lib.mkDefault "prohibit-password";
 
-  documentation.dev.enable = true;
-  documentation.man.generateCaches = true;
+  # dev docs pull every package's doc/devdoc output into the closure (nix's
+  # doxygen tree alone is an uncached build), and the man cache is a mandb
+  # run over all of them. Neither is worth the runner's time.
+  documentation.dev.enable = !config.gensokyo.ci;
+  documentation.man.cache.enable = !config.gensokyo.ci;
 
   environment.systemPackages = with pkgs; [
     vim

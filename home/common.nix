@@ -270,9 +270,13 @@ in {
       blender
       obs-studio
     ];
+    # Big builds hydra does not cache at the moment (krita is one with
+    # cudaSupport on). Fine on the hosts, pointless on the runner.
+    large_pkgs = with pkgs; [
+      krita
+    ];
     local_pkgs = with pkgs; [
       #audacity
-      krita
       #      calibre
       # inkscape
       # gzdoom
@@ -292,6 +296,7 @@ in {
   in lib.concatLists [
     nix_thirdparty base_pkgs desktop_pkgs dev_pkgs local_pkgs shell_scripts
     (lib.optionals (cudaEnabled && !ci) cuda_pkgs)
+    (lib.optionals (!ci) large_pkgs)
   ];
 
   programs.bash = {
