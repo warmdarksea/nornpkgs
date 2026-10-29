@@ -1,7 +1,7 @@
 {config, lib, pkgs, ...}:
 
 {
-  imports = [ ./disks.nix ];
+  imports = [ ./disks.nix ./ci.nix ];
 
   nix.settings.auto-optimise-store = true;
   nix.settings.experimental-features = [ "nix-command" "flakes" ];

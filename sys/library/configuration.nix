@@ -89,6 +89,10 @@
     ssh = {
       enable = true;
       port = 2222;  # different port so your normal known_hosts entry doesn't conflict
+      # the real key path lives in gensokyo-private.nixosModules.library; this
+      # placeholder only keeps the public/ci stubs evaluating (it is a string
+      # the initrd reads at build time, so nothing touches it at eval)
+      hostKeys = lib.mkDefault [ "/var/secret/initrd/ssh_host_ed25519_key" ];
     };
   };
 

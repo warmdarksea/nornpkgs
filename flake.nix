@@ -166,7 +166,12 @@
 
     # nix modules
 
-    nixosModules.base = import lib/base.nix;
+    # lib/base.nix plus the CI flag: gensokyo-private's `ci` branch exports
+    # gensokyo.ci = true, its other branches nothing (option in lib/ci.nix).
+    nixosModules.base = { ... }: {
+      imports = [ ./lib/base.nix ];
+      gensokyo.ci = gensokyo-private.gensokyo.ci or false;
+    };
     nixosModules.desktop = import lib/desktop.nix;
     nixosModules.server = import lib/server.nix;
     nixosModules.nvidia = import lib/nvidia.nix;
@@ -334,6 +339,7 @@
       modules = [
         {
           networking.hostName = "hell";
+          networking.hostId = lib.mkDefault "00000000";
           gensokyo-agent = {
             enable = true;
             user = "clownpiece";
@@ -350,7 +356,7 @@
         self.nixosModules.desktop
         self.nixosModules.nvidia
         self.nixosModules.defaultOverlays
-        gensokyo-private.nixosModules.hell
+        (gensokyo-private.nixosModules.hell or {})
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.common-cpu-amd
         nixos-hardware.nixosModules.common-cpu-amd-pstate
@@ -375,6 +381,7 @@
       modules = [
         {
           networking.hostName = "library";
+          networking.hostId = lib.mkDefault "00000000";
           gensokyo-agent = {
             enable = true;
             user = "patchouli";

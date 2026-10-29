@@ -1,4 +1,15 @@
-{ lib, pkgs, ... }: {
+{ lib, pkgs, osConfig ? { }, ... }: let
+  # The CUDA-flavoured desktop packages (cuda_pkgs, below) only go in where
+  # there is a GPU to use them *and* a machine that can build them:
+  #   cudaEnabled follows the host's nixpkgs.config.cudaSupport, which is
+  #               what makes blender & co. pull the CUDA toolchain in;
+  #   ci          is gensokyo-private's ci branch flagging the GitHub
+  #               Actions runner (lib/ci.nix), which must never build them.
+  # osConfig is the NixOS config when home-manager runs as its module; under
+  # standalone home-manager it is absent, hence the defaults.
+  cudaEnabled = pkgs.config.cudaSupport or false;
+  ci = osConfig.gensokyo.ci or false;
+in {
 #let
   # myEmacs = (pkgs.emacsWithPackagesFromUsePackage {
   #   package = pkgs.emacs29-pgtk;  # replace with pkgs.emacsPgtk, or another version if desired.
@@ -252,11 +263,16 @@
     #   sed -i 's/-Dsun.java2d.uiScale=1/-Dsun.java2d.uiScale=2/' $out/lib/ghidra/support/launch.properties
     # '';
     # });
-    local_pkgs = with pkgs; [
+    # The big ones: with cudaSupport these build the CUDA toolchain into
+    # themselves (cycles/optix, nvenc) and take hours. Only on hosts with
+    # cudaEnabled, never on the CI runner -- see the let at the top.
+    cuda_pkgs = with pkgs; [
       blender
+      obs-studio
+    ];
+    local_pkgs = with pkgs; [
       #audacity
       krita
-      obs-studio
       #      calibre
       # inkscape
       # gzdoom
@@ -273,7 +289,10 @@
       # gensokyo-dotfiles repo, which is no longer an input. inline the
       # scripts here (bin/) if they're still wanted.
     ];
-  in lib.concatLists [nix_thirdparty base_pkgs desktop_pkgs dev_pkgs local_pkgs shell_scripts];
+  in lib.concatLists [
+    nix_thirdparty base_pkgs desktop_pkgs dev_pkgs local_pkgs shell_scripts
+    (lib.optionals (cudaEnabled && !ci) cuda_pkgs)
+  ];
 
   programs.bash = {
     enable = true;
