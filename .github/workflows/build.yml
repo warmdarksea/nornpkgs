@@ -59,13 +59,6 @@ jobs:
           extra_nix_config: |
             accept-flake-config = true
 
-      # GitHub Actions cache for what this job builds (runner-only)
-      - uses: DeterminateSystems/magic-nix-cache-action@v15
-        with:
-          use-gha-cache: true
-          use-flakehub: false
-          diagnostic-endpoint: ""
-
       - name: build nixosConfigurations.${{ env.SYSTEM }}
         # the hosts allow their unfree packages (claude-code in the agent
         # sandbox, zotero's firefox-esr, ...) in their private modules, which
