@@ -80,10 +80,16 @@ jobs:
             accept-flake-config = true
 
       # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB runs the commands Claude executes inside
-      # bubblewrap, which the runner image lacks (Claude Code refuses to start
-      # without it)
-      - name: install bubblewrap for the subprocess env scrub
-        run: sudo apt-get install -y --no-install-recommends bubblewrap
+      # a bubblewrap sandbox. The runner image lacks bubblewrap and socat, and
+      # Ubuntu 24.04 blocks unprivileged user namespaces, which the sandbox
+      # needs; without all three Claude Code refuses to start or Bash fails.
+      # Same recipe as the action uses when it installs these itself.
+      - name: sandbox dependencies for the subprocess env scrub
+        run: |
+          sudo apt-get install -y --no-install-recommends bubblewrap socat
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
 
       - uses: anthropics/claude-code-action@v1
         with:
@@ -97,9 +103,12 @@ jobs:
           show_full_output: true
           additional_permissions: |
             actions: read
+          # With the env scrub on, Claude Code forces permission mode "default", so
+          # the action's acceptEdits auto-approval of edits in the checkout no longer
+          # applies; allow the edit tools explicitly, scoped to the checkout (./**).
           # Bash is off by default; the action itself allows git add/commit/rm
           # and its push wrapper. nix and make are what this repo is driven
           # with, the read-only git commands let Claude see what it changed.
           claude_args: |
             --max-turns 60
-            --allowedTools "Bash(nix:*),Bash(make:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+            --allowedTools "Edit(./**),MultiEdit(./**),Write(./**),Bash(nix:*),Bash(make:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
