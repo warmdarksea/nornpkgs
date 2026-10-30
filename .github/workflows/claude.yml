@@ -60,6 +60,10 @@ jobs:
       # same as build.yml: the hosts' private modules allow their unfree
       # packages, the ci stub does not
       NIXPKGS_ALLOW_UNFREE: "1"
+      # TEMPORARY diagnostic, with show_full_output below: make the bundled SDK
+      # log its HTTP requests (auth headers redacted by the SDK) so the request
+      # the API rejects with billing_error can be seen and replayed.
+      ANTHROPIC_LOG: debug
     steps:
       - uses: actions/checkout@v4
         with:
@@ -89,4 +93,5 @@ jobs:
           # with, the read-only git commands let Claude see what it changed.
           claude_args: |
             --max-turns 60
+            --debug
             --allowedTools "Bash(nix:*),Bash(make:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
