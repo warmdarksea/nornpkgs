@@ -10,25 +10,26 @@ and `nixosModules` attribute sets near the bottom are the map.
 ## verifying a change
 
 Everything is evaluated through the flake. The `gensokyo-private` input is
-a private repository you cannot fetch; CI and you substitute its public
-`ci` branch, which turns on `gensokyo.ci` (no CUDA, no large packages, no
-dev docs). Always pass these flags:
+a private repository you cannot fetch; CI substitutes its public `ci`
+branch, which turns on `gensokyo.ci` (no CUDA, no large packages, no dev
+docs). Two Makefile targets do that for you, and they are the only way that
+works in your sandbox: it masks `.git/config`, which makes nix's libgit2
+unable to open the checkout, so `nix build .#...` fails with "could not find
+repository" no matter what. The targets build from a git-free copy instead.
 
 ```sh
-nix build -L --no-link --impure --no-write-lock-file \
-  --override-input gensokyo-private github:warmdarksea/gensokyo-private/ci \
-  '.#nixosConfigurations.base.config.system.build.toplevel'
+make ci_check TARGET=base      # build the toplevel
+make ci_eval  TARGET=<host>    # evaluate only
 ```
 
-* `base` is small and almost entirely cache hits: build it for any change
-  under `lib/base.nix`, `lib/ci.nix`, or the flake itself.
-* For a change to one host, evaluate that host instead of building it:
-  `nix eval --impure ... '.#nixosConfigurations.<host>.config.system.build.toplevel.drvPath'`
-  with the same override flags. Desktop closures are tens of gigabytes;
-  build them only if the issue is about a build failure.
-* For a package under `pkgs/`, `nix build .#<name>` if it is exported, or
-  evaluate the module that uses it.
-* Run `nix flake show` or `nix eval` before guessing attribute names.
+* `base` is small and almost entirely cache hits: `ci_check` it for any
+  change under `lib/base.nix`, `lib/ci.nix`, or the flake itself.
+* For a change to one host, `ci_eval` that host. Desktop closures are tens
+  of gigabytes; `ci_check` them only if the issue is about a build failure.
+* For a package under `pkgs/`, `nix build "path:$PWD/build/ci-tree#<name>"`
+  after `make ci_tree`, if it is exported; otherwise evaluate the module
+  that uses it.
+* `nix flake show "path:$PWD/build/ci-tree"` before guessing attribute names.
 
 `.github/workflows/build.yml` runs the `base` build on every push, so a
 pushed branch gets a real CI result; read it with the CI tools before

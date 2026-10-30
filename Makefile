@@ -88,6 +88,28 @@ build_img: $(BUILD_DIR)/img-$(TARGET)
 .PHONY: build_iso_closure
 build_iso: $(BUILD_DIR)/iso-$(ISO_FLAVOR)
 
+# CI checks against the public inputs plus gensokyo-private's `ci` stub, from
+# a git-free copy of the working tree under $(BUILD_DIR)/ci-tree. The copy
+# matters inside the Claude Code action: its sandbox masks .git/config (the
+# GitHub token lives there), and nix's libgit2 then cannot open the checkout
+# at all ("could not find repository", error class 6), while a `path:` flake
+# never looks at git. Uncommitted edits are included, build/ and .git are not.
+#   make ci_check TARGET=base     # build the toplevel (base: minutes, cache hits)
+#   make ci_eval TARGET=hell      # evaluate only (desktops are tens of GB to build)
+CI_NIX_FLAGS=--impure --no-write-lock-file --override-input gensokyo-private github:warmdarksea/gensokyo-private/ci
+CI_TREE=$(BUILD_DIR)/ci-tree
+
+.PHONY: ci_tree ci_check ci_eval
+ci_tree: | $(BUILD_DIR)
+	rm -rf $(CI_TREE) && mkdir -p $(CI_TREE)
+	tar --exclude=./.git --exclude=./$(BUILD_DIR) --exclude=./secret -cf - . | tar -xf - -C $(CI_TREE)
+
+ci_check: ci_tree
+	nix build -L --no-link $(CI_NIX_FLAGS) "path:$(CURDIR)/$(CI_TREE)#nixosConfigurations.$(TARGET).config.system.build.toplevel"
+
+ci_eval: ci_tree
+	nix eval $(CI_NIX_FLAGS) "path:$(CURDIR)/$(CI_TREE)#nixosConfigurations.$(TARGET).config.system.build.toplevel.drvPath"
+
 # remote building
 .PHONY: remote_build_sys_closure remote_build_reset remote_build_log remote_build_status remote_build_check remote_pull_sys_closure
 
