@@ -59,8 +59,18 @@ jobs:
           extra_nix_config: |
             accept-flake-config = true
 
-      # GitHub Actions cache for what this job builds (runner-only)
+      # GitHub Actions cache for what this job builds (runner-only; the hosts
+      # pull from cache1). Opt-in through the NIX_GHA_CACHE repository variable
+      # (Settings -> Secrets and variables -> Actions -> Variables, value true),
+      # because over the account's cache egress allowance the action hangs
+      # instead of degrading: at start-up, or in its post step after the build
+      # succeeded. The timeout bounds a hang and continue-on-error keeps it from
+      # failing the build; whether the timeout also covers the post step is
+      # unverified, so if that hangs, unset the variable.
       - uses: DeterminateSystems/magic-nix-cache-action@v15
+        if: vars.NIX_GHA_CACHE == 'true'
+        timeout-minutes: 5
+        continue-on-error: true
         with:
           use-gha-cache: true
           use-flakehub: false
