@@ -60,10 +60,6 @@ jobs:
       # same as build.yml: the hosts' private modules allow their unfree
       # packages, the ci stub does not
       NIXPKGS_ALLOW_UNFREE: "1"
-      # TEMPORARY diagnostic, with show_full_output below: make the bundled SDK
-      # log its HTTP requests (auth headers redacted by the SDK) so the request
-      # the API rejects with billing_error can be seen and replayed.
-      ANTHROPIC_LOG: debug
     steps:
       - uses: actions/checkout@v4
         with:
@@ -82,10 +78,6 @@ jobs:
           anthropic_organization_id: 4620bbeb-5071-42f9-b9fd-8fafb663a617
           anthropic_service_account_id: svac_01CzCqkam6rWF5tWzKfF4P7i
           anthropic_workspace_id: wrkspc_01RTpknaC1EDYttZ5oiH8LLM
-          # TEMPORARY diagnostic: the first run failed inside Claude Code within
-          # 400 ms with its output hidden; this prints it. Remove once the
-          # error is known (logs are public on this repository).
-          show_full_output: true
           additional_permissions: |
             actions: read
           # Bash is off by default; the action itself allows git add/commit/rm
@@ -93,5 +85,4 @@ jobs:
           # with, the read-only git commands let Claude see what it changed.
           claude_args: |
             --max-turns 60
-            --debug
             --allowedTools "Bash(nix:*),Bash(make:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
