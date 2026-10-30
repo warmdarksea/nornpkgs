@@ -1,6 +1,7 @@
 # Smoke test for the Claude workload identity federation: fetch the job's
-# GitHub OIDC token and exchange it for an Anthropic access token under the
-# federation rule. Never runs on its own; start it by hand:
+# GitHub OIDC token, exchange it for an Anthropic access token under the
+# federation rule, then probe the Messages API with it. Never runs on its
+# own; start it by hand:
 #
 #   gh workflow run anthropic-wif-test.yml
 #
@@ -37,9 +38,9 @@ jobs:
 
       - name: Exchange for an Anthropic access token
         run: |
-          curl -sS --fail-with-body https://api.anthropic.com/v1/oauth/token \
+          resp=$(curl -sS --fail-with-body https://api.anthropic.com/v1/oauth/token \
             -H "content-type: application/json" \
-            --data @- <<JSON | jq 'with_entries(if (.key | test("token$")) then .value = "<redacted>" else . end)'
+            --data @- <<JSON
           {
             "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
             "assertion": "$JWT",
@@ -49,3 +50,27 @@ jobs:
             "workspace_id": "wrkspc_01RTpknaC1EDYttZ5oiH8LLM"
           }
           JSON
+          ) || { echo "exchange failed:"; echo "$resp"; exit 1; }
+          token=$(jq -r .access_token <<<"$resp")
+          echo "::add-mask::$token"
+          jq 'with_entries(if (.key | test("token$")) then .value = "<redacted>" else . end)' <<<"$resp"
+          echo "ACCESS_TOKEN=$token" >> "$GITHUB_ENV"
+
+      # Is inference actually allowed for this service account, and does it
+      # depend on the model or on the request's worst-case cost? Each probe is
+      # a few tokens; only the status and the error text are printed.
+      - name: Probe the Messages API with the federated token
+        run: |
+          probe() {
+            printf '== %-18s max_tokens=%-6s HTTP ' "$1" "$2"
+            curl -sS -o body.json -w '%{http_code}\n' https://api.anthropic.com/v1/messages \
+              -H "authorization: Bearer $ACCESS_TOKEN" \
+              -H "anthropic-version: 2023-06-01" \
+              -H "content-type: application/json" \
+              -d "{\"model\":\"$1\",\"max_tokens\":$2,\"messages\":[{\"role\":\"user\",\"content\":\"Reply with OK\"}]}"
+            jq -c '{type, error, request_id, usage, text: (.content[0].text // null)}' body.json
+          }
+          probe claude-haiku-5-5  16
+          probe claude-sonnet-5-5 16
+          probe claude-opus-5-5   16
+          probe claude-opus-5-5   32000

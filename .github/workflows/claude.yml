@@ -13,6 +13,9 @@
 # exercises the same rule by hand).
 #
 # Nix is installed so Claude can evaluate and build; CLAUDE.md tells it how.
+# No magic-nix-cache here: with the account over its Actions-cache egress
+# limit the action hangs at startup (run 41124231785), and the only cost of
+# going without is slower nix builds inside the run.
 name: claude
 
 on:
@@ -67,13 +70,6 @@ jobs:
           # trust the flake's nixConfig (cache.nixos-cuda.org)
           extra_nix_config: |
             accept-flake-config = true
-
-      # GitHub Actions cache for what Claude builds (runner-only), as in build.yml
-      - uses: DeterminateSystems/magic-nix-cache-action@v15
-        with:
-          use-gha-cache: true
-          use-flakehub: false
-          diagnostic-endpoint: ""
 
       - uses: anthropics/claude-code-action@v1
         with:
