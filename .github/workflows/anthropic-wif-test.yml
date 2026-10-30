@@ -62,11 +62,12 @@ jobs:
       - name: Probe the Messages API with the federated token
         run: |
           probe() {
-            printf '== %-18s max_tokens=%-6s HTTP ' "$1" "$2"
+            printf '== %-18s max_tokens=%-6s beta=%-45s HTTP ' "$1" "$2" "${3:--}"
             curl -sS -o body.json -w '%{http_code}\n' https://api.anthropic.com/v1/messages \
               -H "authorization: Bearer $ACCESS_TOKEN" \
               -H "anthropic-version: 2023-06-01" \
               -H "content-type: application/json" \
+              -H "anthropic-beta: ${3:-}" \
               -d "{\"model\":\"$1\",\"max_tokens\":$2,\"messages\":[{\"role\":\"user\",\"content\":\"Reply with OK\"}]}"
             jq -c '{type, error, request_id, usage, text: (.content[0].text // null)}' body.json
           }
@@ -74,3 +75,11 @@ jobs:
           probe claude-sonnet-5-5 16
           probe claude-opus-5-5   16
           probe claude-opus-5-5   32000
+          # what Claude Code adds to its requests under federation (headers seen in
+          # the CLI binary): which of them makes the API say "Credit balance is too low"?
+          probe claude-opus-5-5   16    oidc-federation-2026-04-01
+          probe claude-opus-5-5   16    oauth-2025-04-20
+          probe claude-opus-5-5   16    oauth-2025-04-20,oidc-federation-2026-04-01
+          probe claude-opus-5-5   16    context-1m-2025-08-07
+          probe claude-opus-5-5   16    oauth-2025-04-20,oidc-federation-2026-04-01,context-1m-2025-08-07,prompt-caching-scope-2026-01-05
+          probe claude-sonnet-5-5 16    oauth-2025-04-20,oidc-federation-2026-04-01
