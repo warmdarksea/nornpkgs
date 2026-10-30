@@ -103,3 +103,22 @@ jobs:
           raw 'opus thinking adaptive high' '{"model":"claude-opus-5-5","max_tokens":4000,"thinking":{"type":"adaptive"},"output_config":{"effort":"high"},'"$M"'}'
           raw 'opus metadata.user_id'       '{"model":"claude-opus-5-5","max_tokens":16,"metadata":{"user_id":"probe"},'"$M"'}'
           raw 'opus cached system prompt'   '{"model":"claude-opus-5-5","max_tokens":16,"system":[{"type":"text","text":"You are a probe.","cache_control":{"type":"ephemeral"}}],'"$M"'}'
+          # Claude Code identifies itself with x-app and a claude-cli User-Agent.
+          # If the API bills "Claude Code traffic" against the Claude Code
+          # workspace's policy instead of the token's workspace, these fail.
+          ident() {
+            printf '== %-32s HTTP ' "$1"; shift
+            curl -sS -o body.json -w '%{http_code}\n' https://api.anthropic.com/v1/messages \
+              -H "authorization: Bearer $ACCESS_TOKEN" \
+              -H "anthropic-version: 2023-06-01" \
+              -H "content-type: application/json" \
+              "$@" \
+              -d '{"model":"claude-opus-5-5","max_tokens":16,"messages":[{"role":"user","content":"Reply with OK"}]}'
+            head -c 300 body.json | tr '\n' ' '; echo
+          }
+          UA='claude-cli/2.1.314 (external, claude-code-github-action, agent-sdk/0.3.314)'
+          ident 'x-app: cli'                     -H 'x-app: cli'
+          ident 'claude-cli user-agent'          -A "$UA"
+          ident 'x-app + user-agent'             -H 'x-app: cli' -A "$UA"
+          ident 'x-app + UA + federation betas'  -H 'x-app: cli' -A "$UA" -H 'anthropic-beta: oauth-2025-04-20,oidc-federation-2026-04-01'
+          ident 'x-app + UA, sonnet'             -H 'x-app: cli' -A "$UA" -d '{"model":"claude-sonnet-5-5","max_tokens":16,"messages":[{"role":"user","content":"Reply with OK"}]}'
