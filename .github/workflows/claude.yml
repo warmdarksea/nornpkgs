@@ -92,6 +92,9 @@ jobs:
           # Claude reads only the owner's comments and its own: a stranger's text in
           # a thread you @claude is never in its context
           include_comments_by_actor: warmdarksea,claude[bot]
+          # TEMPORARY: the first subscription-token run failed inside Claude Code
+          # in two seconds with the output hidden; show it, then remove this
+          show_full_output: true
           additional_permissions: |
             actions: read
           # Bash is off by default; the action itself allows git add/commit/rm
