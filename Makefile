@@ -107,7 +107,7 @@ ci_tree: | $(BUILD_DIR)
 	# with device nodes, which tar cannot recreate ("Cannot mknod") and which
 	# find -type f does not see through (it trusts the directory entry)
 	git ls-files -z --cached --others --exclude-standard -- . ':!secret' \
-	  | while IFS= read -r -d '' f; do [ -f "$$f" ] || continue; cp --parents "$$f" $(CI_TREE) || exit 1; done
+	  | xargs -0 sh -c 'for f; do [ -f "$$f" ] || continue; cp --parents "$$f" "$$0" || exit 1; done' $(CI_TREE)
 
 ci_check: ci_tree
 	nix build -L --no-link $(CI_NIX_FLAGS) "path:$(CURDIR)/$(CI_TREE)#nixosConfigurations.$(TARGET).config.system.build.toplevel"
