@@ -79,6 +79,12 @@ jobs:
           extra_nix_config: |
             accept-flake-config = true
 
+      # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB runs the commands Claude executes inside
+      # bubblewrap, which the runner image lacks (Claude Code refuses to start
+      # without it)
+      - name: install bubblewrap for the subprocess env scrub
+        run: sudo apt-get install -y --no-install-recommends bubblewrap
+
       - uses: anthropics/claude-code-action@v1
         with:
           # a `claude setup-token` token: Claude Max plan usage, model requests only
