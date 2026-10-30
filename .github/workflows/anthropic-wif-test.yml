@@ -1,0 +1,51 @@
+# Smoke test for the Claude workload identity federation: fetch the job's
+# GitHub OIDC token and exchange it for an Anthropic access token under the
+# federation rule. Never runs on its own; start it by hand:
+#
+#   gh workflow run anthropic-wif-test.yml
+#
+# The ids below are identifiers, not credentials. The rule's match conditions
+# (subject, repository, actor_id) decide whether the exchange succeeds; on a
+# 401 the reason is in the Console under Workload identity -> history.
+name: anthropic-wif-test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  call-claude:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch GitHub OIDC token
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const token = await core.getIDToken('https://api.anthropic.com');
+            core.setSecret(token);
+            core.exportVariable('JWT', token);
+            // the claims the federation rule matches against
+            const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
+            for (const k of ['sub', 'aud', 'repository', 'repository_id', 'repository_owner',
+                             'repository_owner_id', 'actor', 'actor_id', 'ref', 'event_name',
+                             'job_workflow_ref']) {
+              core.info(`${k} = ${claims[k]}`);
+            }
+
+      - name: Exchange for an Anthropic access token
+        run: |
+          curl -sS --fail-with-body https://api.anthropic.com/v1/oauth/token \
+            -H "content-type: application/json" \
+            --data @- <<JSON | jq 'with_entries(if (.key | test("token$")) then .value = "<redacted>" else . end)'
+          {
+            "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+            "assertion": "$JWT",
+            "federation_rule_id": "fdrl_012jriT8dRYtjzKV3hZTzN83",
+            "organization_id": "4620bbeb-5071-42f9-b9fd-8fafb663a617",
+            "service_account_id": "svac_01CzCqkam6rWF5tWzKfF4P7i",
+            "workspace_id": "wrkspc_01RTpknaC1EDYttZ5oiH8LLM"
+          }
+          JSON
