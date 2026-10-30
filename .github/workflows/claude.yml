@@ -80,10 +80,16 @@ jobs:
             accept-flake-config = true
 
       # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB runs the commands Claude executes inside
-      # bubblewrap, which the runner image lacks (Claude Code refuses to start
-      # without it)
-      - name: install bubblewrap for the subprocess env scrub
-        run: sudo apt-get install -y --no-install-recommends bubblewrap
+      # a bubblewrap sandbox. The runner image lacks bubblewrap and socat, and
+      # Ubuntu 24.04 blocks unprivileged user namespaces, which the sandbox
+      # needs; without all three Claude Code refuses to start or Bash fails.
+      # Same recipe as the action uses when it installs these itself.
+      - name: sandbox dependencies for the subprocess env scrub
+        run: |
+          sudo apt-get install -y --no-install-recommends bubblewrap socat
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
 
       - uses: anthropics/claude-code-action@v1
         with:
