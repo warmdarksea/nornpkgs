@@ -102,10 +102,12 @@ CI_TREE=$(BUILD_DIR)/ci-tree
 .PHONY: ci_tree ci_check ci_eval
 ci_tree: | $(BUILD_DIR)
 	rm -rf $(CI_TREE) && mkdir -p $(CI_TREE)
-	# regular files only: the Claude Code sandbox masks dotfiles in the checkout
-	# root with device nodes, which a plain tar of . cannot recreate ("Cannot mknod")
-	find . \( -path ./.git -o -path ./$(BUILD_DIR) -o -path ./secret \) -prune -o -type f -print0 \
-	  | tar --null -T - -cf - | tar -xf - -C $(CI_TREE)
+	# the tracked tree plus untracked unignored files, copied one by one after
+	# a real stat: the Claude Code sandbox masks dotfiles in the checkout root
+	# with device nodes, which tar cannot recreate ("Cannot mknod") and which
+	# find -type f does not see through (it trusts the directory entry)
+	git ls-files -z --cached --others --exclude-standard -- . ':!secret' \
+	  | while IFS= read -r -d '' f; do [ -f "$$f" ] || continue; cp --parents "$$f" $(CI_TREE) || exit 1; done
 
 ci_check: ci_tree
 	nix build -L --no-link $(CI_NIX_FLAGS) "path:$(CURDIR)/$(CI_TREE)#nixosConfigurations.$(TARGET).config.system.build.toplevel"
