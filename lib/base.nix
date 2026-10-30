@@ -76,6 +76,7 @@
     man-pages
     man-pages-posix
     tmux
+    ripgrep
     lshw
     pciutils
     usbutils
