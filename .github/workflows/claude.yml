@@ -4,13 +4,18 @@
 # claude/... branch (or the PR's branch) and reports in a comment. It does
 # not open PRs itself; for an issue it leaves a "create PR" link.
 #
-# Who can trigger it: only users with write access to this repository (the
-# action checks before Claude starts), and the workload identity federation
-# rule additionally pins the token exchange to the owner's actor_id, so a
-# run anybody else managed to start could not authenticate. There is no
-# Anthropic credential in the repository: the job trades its GitHub OIDC
-# token for a ten-minute service-account token (anthropic-wif-test.yml
-# exercises the same rule by hand).
+# Who can trigger it: the repository owner (the job's if:), re-checked by
+# the action's own write-access test before Claude starts.
+#
+# Billing: the owner's Claude Max plan, through a token from `claude
+# setup-token` in the CLAUDE_CODE_OAUTH_TOKEN secret. The token can only
+# make model requests (no claude.ai sessions or connectors), expires after
+# a year, and is scrubbed from the environment of every command Claude runs
+# (CLAUDE_CODE_SUBPROCESS_ENV_SCRUB). Not workload identity federation: the
+# plan's promotional API credit does not cover Claude Code, which this
+# action counts as, so a federated service-account token gets 400 "Credit
+# balance is too low" (anthropic-wif-test.yml, 2026-10-30). Purchased
+# credit would work with the federation inputs instead.
 #
 # Nix is installed so Claude can evaluate and build; CLAUDE.md tells it how.
 # No magic-nix-cache here: with the account over its Actions-cache egress
@@ -34,8 +39,8 @@ jobs:
     # Only the repository owner: github.actor is whoever caused the event (the
     # commenter, the reviewer, the issue author or assigner). GitHub has no
     # custom roles on a personal repository, so this is the wheel group. Two
-    # more layers sit behind it: the action re-checks write access, and the
-    # federation rule refuses a token for any other actor_id.
+    # more layers sit behind it: the action re-checks write access, and only
+    # the owner can start a run with the CLAUDE_CODE_OAUTH_TOKEN secret at all.
     if: |
       github.actor == github.repository_owner &&
       (
@@ -54,12 +59,15 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
-      id-token: write   # the OIDC token for the federation exchange, and the GitHub App auth
+      id-token: write   # the action's GitHub App authentication
       actions: read     # lets Claude read the build workflow's results on a PR
     env:
       # same as build.yml: the hosts' private modules allow their unfree
       # packages, the ci stub does not
       NIXPKGS_ALLOW_UNFREE: "1"
+      # scrub CLAUDE_CODE_OAUTH_TOKEN and the GitHub token from the environment
+      # of the commands Claude runs, so a prompt-injected `echo $...` gets nothing
+      CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -73,15 +81,11 @@ jobs:
 
       - uses: anthropics/claude-code-action@v1
         with:
-          # workload identity federation: identifiers, not credentials
-          anthropic_federation_rule_id: fdrl_012jriT8dRYtjzKV3hZTzN83
-          anthropic_organization_id: 4620bbeb-5071-42f9-b9fd-8fafb663a617
-          anthropic_service_account_id: svac_01CzCqkam6rWF5tWzKfF4P7i
-          anthropic_workspace_id: wrkspc_01RTpknaC1EDYttZ5oiH8LLM
-          # TEMPORARY diagnostic: the first run failed inside Claude Code within
-          # 400 ms with its output hidden; this prints it. Remove once the
-          # error is known (logs are public on this repository).
-          show_full_output: true
+          # a `claude setup-token` token: Claude Max plan usage, model requests only
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Claude reads only the owner's comments and its own: a stranger's text in
+          # a thread you @claude is never in its context
+          include_comments_by_actor: warmdarksea,claude[bot]
           additional_permissions: |
             actions: read
           # Bash is off by default; the action itself allows git add/commit/rm
