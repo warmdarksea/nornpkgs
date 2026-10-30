@@ -103,9 +103,12 @@ jobs:
           show_full_output: true
           additional_permissions: |
             actions: read
+          # With the env scrub on, Claude Code forces permission mode "default", so
+          # the action's acceptEdits auto-approval of edits in the checkout no longer
+          # applies; allow the edit tools explicitly, scoped to the checkout (./**).
           # Bash is off by default; the action itself allows git add/commit/rm
           # and its push wrapper. nix and make are what this repo is driven
           # with, the read-only git commands let Claude see what it changed.
           claude_args: |
             --max-turns 60
-            --allowedTools "Bash(nix:*),Bash(make:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+            --allowedTools "Edit(./**),MultiEdit(./**),Write(./**),Bash(nix:*),Bash(make:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
