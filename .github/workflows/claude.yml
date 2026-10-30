@@ -1,0 +1,83 @@
+# Claude Code on issues and pull requests: mention @claude in an issue (title
+# or body when opening it, or any later comment), a PR comment, or a PR
+# review, and Claude works in a checkout on the runner, pushes to a
+# claude/... branch (or the PR's branch) and reports in a comment. It does
+# not open PRs itself; for an issue it leaves a "create PR" link.
+#
+# Who can trigger it: only users with write access to this repository (the
+# action checks before Claude starts), and the workload identity federation
+# rule additionally pins the token exchange to the owner's actor_id, so a
+# run anybody else managed to start could not authenticate. There is no
+# Anthropic credential in the repository: the job trades its GitHub OIDC
+# token for a ten-minute service-account token (anthropic-wif-test.yml
+# exercises the same rule by hand).
+#
+# Nix is installed so Claude can evaluate and build; CLAUDE.md tells it how.
+name: claude
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # one run at a time per issue or PR; a second mention queues behind the first
+    concurrency:
+      group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write   # the OIDC token for the federation exchange, and the GitHub App auth
+      actions: read     # lets Claude read the build workflow's results on a PR
+    env:
+      # same as build.yml: the hosts' private modules allow their unfree
+      # packages, the ci stub does not
+      NIXPKGS_ALLOW_UNFREE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          # trust the flake's nixConfig (cache.nixos-cuda.org)
+          extra_nix_config: |
+            accept-flake-config = true
+
+      # GitHub Actions cache for what Claude builds (runner-only), as in build.yml
+      - uses: DeterminateSystems/magic-nix-cache-action@v15
+        with:
+          use-gha-cache: true
+          use-flakehub: false
+          diagnostic-endpoint: ""
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          # workload identity federation: identifiers, not credentials
+          anthropic_federation_rule_id: fdrl_012jriT8dRYtjzKV3hZTzN83
+          anthropic_organization_id: 4620bbeb-5071-42f9-b9fd-8fafb663a617
+          anthropic_service_account_id: svac_01CzCqkam6rWF5tWzKfF4P7i
+          anthropic_workspace_id: wrkspc_01RTpknaC1EDYttZ5oiH8LLM
+          additional_permissions: |
+            actions: read
+          # Bash is off by default; the action itself allows git add/commit/rm
+          # and its push wrapper. nix and make are what this repo is driven
+          # with, the read-only git commands let Claude see what it changed.
+          claude_args: |
+            --max-turns 60
+            --allowedTools "Bash(nix:*),Bash(make:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
