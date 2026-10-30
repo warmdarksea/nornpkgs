@@ -27,11 +27,22 @@ on:
 
 jobs:
   claude:
+    # Two gates before a runner even starts: who, and whether @claude was said.
+    # The who-gate is the GitHub-side wheel group: the repository owner plus any
+    # logins in the CLAUDE_SUDOERS repository variable, a JSON array such as
+    # ["alice","bob"] (Settings -> Secrets and variables -> Actions -> Variables;
+    # unset means owner only). github.actor is whoever caused the event: the
+    # commenter, the reviewer, the issue author or assigner. Two more layers
+    # sit behind this one: the action re-checks write access, and the
+    # federation rule refuses a token for any other actor_id.
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      (github.actor == github.repository_owner || contains(fromJSON(vars.CLAUDE_SUDOERS || '[]'), github.actor)) &&
+      (
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+        (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 90
     # one run at a time per issue or PR; a second mention queues behind the first
