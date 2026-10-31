@@ -49,14 +49,29 @@ claiming a fix works.
 
 ## committing
 
-When the owner asks you to commit, commit to `master` directly, authored
-and committed as `Claude <claude@anthropic.com>`:
+Two contexts, two sets of rules. Tell them apart by `CLAUDE_CODE_ACTION`,
+which the GitHub action sets to `1` in your environment.
 
-```sh
-git -c user.name=Claude -c user.email=claude@anthropic.com commit ...
-```
+### interactive session with the owner
 
-Do not push; the owner fetches, reviews, and pushes. Note that this
-checkout's `master` is usually ahead of `github/master`, and the GitHub
-mirror sometimes has merge commits of its own, so do not try to fast-forward
-or rebase it yourself.
+Author and commit as `Claude <claude@anthropic.com>`, please. Thank you.
+
+### GitHub Actions run (an @claude mention)
+
+* Push the branch with the action's push wrapper after every commit, not
+  once at the end.
+* Never end a run with uncommitted or unpushed work. If you have to stop
+  early, commit whatever is consistent, push it, and say in your comment
+  exactly what is left; a later mention can continue from the branch.
+* You cannot change anything under `.github/workflows` from a run: the
+  action's app token is not allowed to push workflow changes. Say so and
+  leave that part to the owner instead of attempting it.
+* If the tool allowlist denies a command, say so in your comment rather
+  than trying variants; the owner can widen `--allowedTools`.
+* Evaluate all hosts in one shell loop that writes results to a file, not
+  one command per host; each command is a turn. A single evaluation of a
+  desktop host can exceed the Bash tool's default two-minute timeout, so
+  pass a longer `timeout` for those.
+* `cheese` and `dusk` fail to evaluate on `master` as of 2026-10-31
+  (conflicting `console.font` definitions). Do not spend turns on them
+  unless the task is to fix that.
