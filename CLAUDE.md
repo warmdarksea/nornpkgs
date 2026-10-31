@@ -46,3 +46,17 @@ claiming a fix works.
 * Hosts are deployed by the owner with `make deploy_*`; nothing in CI deploys.
 * Prefer the existing conventions over introducing new helpers: look at a
   sibling host or module first.
+
+## committing
+
+When the owner asks you to commit, commit to `master` directly, authored
+and committed as `Claude <claude@anthropic.com>`:
+
+```sh
+git -c user.name=Claude -c user.email=claude@anthropic.com commit ...
+```
+
+Do not push; the owner fetches, reviews, and pushes. Note that this
+checkout's `master` is usually ahead of `github/master`, and the GitHub
+mirror sometimes has merge commits of its own, so do not try to fast-forward
+or rebase it yourself.

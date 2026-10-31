@@ -106,6 +106,13 @@ jobs:
           # Bash is off by default; the action itself allows git add/commit/rm
           # and its push wrapper. nix and make are what this repo is driven
           # with, the read-only git commands let Claude see what it changed.
+          # Pinned: without --model the action ran Sonnet 5.5 (runs 41139710070,
+          # 41140266129), not the plan's Opus 5.5 default. Opus is twice Sonnet
+          # per token (API-rate equivalent, drawn from the Max plan's usage
+          # windows); the smoke-test runs were $0.09-0.13 on Sonnet. Opus 5.5
+          # defaults to medium effort, so set it too.
           claude_args: |
+            --model claude-opus-5-5
+            --effort high
             --max-turns 60
             --allowedTools "Edit(./**),MultiEdit(./**),Write(./**),Bash(nix:*),Bash(make:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
