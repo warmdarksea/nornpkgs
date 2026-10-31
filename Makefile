@@ -74,9 +74,6 @@ $(BUILD_DIR)/img-%:
 $(BUILD_DIR)/iso-%:
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.iso-$*.config.system.build.isoImage
 
-$(BUILD_DIR)/env-%:
-	nix build $(NIX_FLAGS) -o "$@" .#packages.x86_64-linux.$*
-
 #
 
 .PHONY: build_sys_closure
@@ -330,26 +327,6 @@ gc_remote: remote_assert
 cleanup_system_generations:
 	bash bin/nix-cleanup-generations.sh
 	$(SUDO) $(SUDO_FLAGS) /nix/var/nix/profiles/system/bin/switch-to-configuration boot
-
-#
-
-.PHONY: run_vm_closure
-run_vm_closure: \
-	build_vm_closure
-	QEMU_NET_OPTS="hostfwd=tcp::2221-:22,hostfwd=tcp::8080-:80" ../build/vm-closure-$(TARGET)/bin/run-nixos-vm
-
-.PHONY: query_config
-query_config:
-	nix-instantiate --eval sys/$(TARGET).nix -A $(OPTION)
-
-#
-
-.PHONY: why_depends_sys
-why_depends_sys:
-	nix why-depends -I nixos-config=sys/$(TARGET).nix $(NIX_FLAGS) --attr system sys/$(TARGET).nix
-
-#
-
 
 #
 

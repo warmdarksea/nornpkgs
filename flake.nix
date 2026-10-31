@@ -32,11 +32,6 @@
       };
     };
 
-    nixpak = {
-      url = "github:nixpak/nixpak";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     nix-minecraft = {
       url = "github:Infinidoge/nix-minecraft";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -64,8 +59,6 @@
     emacs-overlay,
     home-manager,
     lanzaboote,
-
-    nixpak,
 
     nix-minecraft,
 
@@ -210,10 +203,7 @@
     # see home/audio-plugins.nix for the mechanics.
     homeManagerModules.audioPlugins = import ./home/audio-plugins.nix;
     homeManagerModules.magician = { config, lib, pkgs, ... }: {
-      imports = [ ./home/common.nix ./home/magician.nix self.homeManagerModules.audioPlugins ];
-      _module.args = {
-        nixpak = nixpak;
-      };
+      imports = [ ./home/common.nix self.homeManagerModules.audioPlugins ];
       # The -compat builds (older glibc), so the plugins also load into the
       # Bitwig flatpak's freedesktop runtime.
       audioPlugins.packages = [
@@ -772,11 +762,6 @@
     # conformance harness), from our OpenUtau fork's openutau-vst branch.
     # Built from the compat pin for the same Bitwig-flatpak reason.
     packages.x86_64-linux.openutau-bridge = pkgsCompat.callPackage ./pkgs/openutau-bridge { };
-
-    packages.x86_64-linux.claude-env = pkgs.buildEnv {
-      name = "claude-env";
-      paths = with pkgs; [ nix gitMinimal bash coreutils ];
-    };
 
     # NanoKVM boot-control tooling.
     packages.x86_64-linux.uefi_trampoline =
