@@ -760,10 +760,6 @@
     # Built from the compat pin for the same Bitwig-flatpak reason.
     packages.x86_64-linux.openutau-bridge = pkgsCompat.callPackage ./pkgs/openutau-bridge { };
 
-    packages.x86_64-linux.claude-env = pkgs.buildEnv {
-      name = "claude-env";
-      paths = with pkgs; [ nix gitMinimal bash coreutils ];
-    };
 
     # NanoKVM boot-control tooling.
     packages.x86_64-linux.uefi_trampoline =
