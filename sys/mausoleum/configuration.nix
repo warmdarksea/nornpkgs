@@ -1,7 +1,5 @@
 { config, lib, pkgs, modulesPath, ... }: {
   boot.loader.systemd-boot.enable = true;
-  #boot.loader.grub.enable = true;
-  #boot.loader.grub.device = "/dev/disk/by-uuid/REDACTED";
   boot.loader.efi.canTouchEfiVariables = true;
 
   networking.networkmanager.enable = true;
@@ -42,9 +40,6 @@
     isNormalUser = true;
     extraGroups = ["wheel" "video"];
   };
-  users.users."root".openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA redacted"
-  ];
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget

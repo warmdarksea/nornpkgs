@@ -10,28 +10,14 @@ import <nixpkgs/nixos> {
       ../session/icewm.nix
     ];
 
-    fileSystems."/" = {
-      device = "/dev/disk/by-uuid/REDACTED";
-      fsType = "ext4";
-    };
-
-    fileSystems."/boot" = {
-      device = "/dev/disk/by-uuid/REDACTED";
-      fsType = "ext4";
-    };
-
-    boot.initrd.luks.devices."hark".device = "/dev/disk/by-uuid/REDACTED";
-
     swapDevices = [ ];
 
     boot.loader.grub.enable = true;
     boot.loader.grub.version = 2;
-    boot.loader.grub.device = "/dev/disk/by-id/REDACTED";
 
   boot.kernelPackages = pkgs.linuxPackages_latest;
   boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
 
-  networking.hostId = "AAAAAAAA";
   networking.hostName = "scarlet";
   services.nscd.enable = true;
 

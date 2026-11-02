@@ -32,23 +32,6 @@ in import <nixpkgs/nixos> {
     boot.extraModulePackages = [  ];
     boot.kernelParams = ["debug"];
 
-    fileSystems."/" = {
-      device = "/dev/disk/by-uuid/REDACTED";
-      fsType = "ext4";
-    };
-
-    boot.initrd.luks.devices."regard0".device = "/dev/disk/by-uuid/REDACTED";
-
-    fileSystems."/boot" = {
-      device = "/dev/disk/by-uuid/REDACTED";
-      fsType = "ext4";
-    };
-
-    fileSystems."/boot/EFI" = {
-      device = "/dev/disk/by-partuuid/REDACTED";
-      fsType = "vfat";
-    };
-
     swapDevices = [ ];
 
     powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";

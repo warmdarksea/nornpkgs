@@ -3,10 +3,6 @@
 
   boot.kernelParams = ["zfs.zfs_arc_min=536870912" "zfs.zfs_arc_max=2147483648"];
 
-  # Note: setting fileSystems is generally not
-  # necessary, since nixos-generate-config figures them out
-  # automatically in hardware-configuration.nix.
-  #fileSystems."/".device = "/dev/disk/by-label/REDACTED";
   # Enable the OpenSSH server.
   services.sshd.enable = true;
 

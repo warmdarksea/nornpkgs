@@ -78,7 +78,9 @@
   boot.initrd.network = {
     enable = true;
     ssh = {
-      enable = true;
+      # the authorized keys come from gensokyo-private, which the ci stub
+      # does not have, and initrd ssh will not evaluate without one
+      enable = !config.gensokyo.ci;
       port = 2222;  # different port so your normal known_hosts entry doesn't conflict
       # the real key path lives in gensokyo-private.nixosModules.library; this
       # placeholder only keeps the public/ci stubs evaluating (it is a string
@@ -86,8 +88,6 @@
       hostKeys = lib.mkDefault [ "/var/secret/initrd/ssh_host_ed25519_key" ];
     };
   };
-
-  # the root key lives in lib/server.nix
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
 

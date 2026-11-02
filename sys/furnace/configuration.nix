@@ -23,97 +23,12 @@ rec {
 
   networking.useDHCP = lib.mkDefault true;
 
-  networking.firewall.allowedUDPPorts = [
-    config.networking.wireguard.interfaces.wg-redacted.listenPort
-  ];
-
   networking.nftables.enable = true;
   networking.iproute2.enable = true;
   
   # this means we don't need reverse-routes for everything in the routing table
   networking.firewall.checkReversePath = "loose";
   networking.firewall.rejectPackets = true;
-
-  #networking.firewall.extraCommands = ''
-  #    iptables -I INPUT -i lxdbr0 -d 0.0.0.0/8,0.0.0.0/12,0.0.0.0/16 -j DROP
-  #    iptables -I INPUT -i lxdbr0 -d 0.0.0.0/24 -j ACCEPT
-  #  # allow dhcp/dns traffic on lxd bridge
-  #  # iptables -A INPUT -i lxdbr0 -p udp --dport 67:68 --sport 67:68 -j ACCEPT
-  #  # iptables -A INPUT -i lxdbr0 -p udp --dport 53 --sport 53 -j ACCEPT
-  #  # iptables -I INPUT -i lxdbr0 -j ACCEPT
-  #'';
-   networking.iproute2.rttablesExtraConfig = ''
-         # 109 rt_redacted
-         # 247 rt_redacted
-         # 176 rt_redacted
-         75 rt_redacted
-       '';
-
-  #networking.bridges = {
-  # egress: wg1 (redacted redacted)
-  # wgbr1 = {
-  #   interfaces = [ ]; # gets NAT forwarded to wg1
-  # };
-  #};
-
-  # systemd.services."wireguard-wg1".after = ["wgbr1-netdev.service"];
-  # networking.interfaces.wgbr1 = {
-  #   useDHCP = false;
-  #   ipv4.addresses = [
-  #     {
-  #       address = "0.0.0.0";
-  #       prefixLength = 24;
-  #     }
-  #  ];
-  # ipv4.routes = [ {options.scope = "link";} ];
-
-   # ipv4.routes = [
-   #   {
-   #     address = "0.0.0.0";
-   #     prefixLength = 16;
-   #     options.table = "rt_redacted";
-   #   }
-   # ];
-  networking.wireguard.interfaces = {
-    wg-redacted = {
-      # remember to open the port for this in allowedUDPPorts
-      listenPort = 51820;
-
-      # make sure this is a string, not a file path, or it'll end up in the
-      # store
-      privateKeyFile = "/var/secret/wg/redacted/privkey";
-
-      # we need to set route weights, so do it manually
-      allowedIPsAsRoutes = false;
-
-      # ips, peers & routes (VPN-internal addressing, peer public keys,
-      # endpoints) live in gensokyo-private.nixosModules.furnace
-          #   postSetup = ''
-    #     ${pkgs.iproute2}/bin/ip route del 0.0.0.0/24 dev wgbr1 || true
-    #     ${pkgs.iproute2}/bin/ip route add 0.0.0.0/24 dev wgbr1 table rt_redacted || true
-    #     ${pkgs.iproute2}/bin/ip route add 0.0.0.0/32 dev wg1 table rt_redacted
-    #     ${pkgs.iproute2}/bin/ip route add default via 0.0.0.0 dev wg1 table rt_redacted
-    #     ${pkgs.iproute2}/bin/ip rule add iif wgbr1 lookup rt_redacted
-    #     ${pkgs.iproute2}/bin/ip rule add oif wgbr1 lookup rt_redacted
-    #     ${pkgs.iproute2}/bin/ip rule add iif wg1 lookup rt_redacted
-    #     ${pkgs.iproute2}/bin/ip rule add oif wg1 lookup rt_redacted
-    #     ${pkgs.iptables}/bin/iptables -A FORWARD -i wgbr1 -o wg1 -j ACCEPT
-    #     ${pkgs.iptables}/bin/iptables -A FORWARD -o wg1 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-    #     ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -o wg1 -j MASQUERADE
-    #   '';
-    #   postShutdown = ''
-    #     ${pkgs.iproute2}/bin/ip route del 0.0.0.0/32 dev wg1 table rt_redacted || true
-    #     ${pkgs.iproute2}/bin/ip route del default via 0.0.0.0 dev wg1 table rt_redacted || true
-    #     ${pkgs.iproute2}/bin/ip rule del iif wgbr1 lookup rt_redacted || true
-    #     ${pkgs.iproute2}/bin/ip rule del oif wgbr1 lookup rt_redacted || true
-    #     ${pkgs.iproute2}/bin/ip rule del iif wg1 lookup rt_redacted || true
-    #     ${pkgs.iproute2}/bin/ip rule del oif wg1 lookup rt_redacted || true
-    #     ${pkgs.iptables}/bin/iptables -D FORWARD -i wgbr1 -o wg1 -j ACCEPT || true
-    #     ${pkgs.iptables}/bin/iptables -D FORWARD -o wg1 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT || true
-    #     ${pkgs.iptables}/bin/iptables -t nat -D POSTROUTING -o wg1 -j MASQUERADE || true
-    #   '';
-    };
-  };
 
   services.vector = {
     enable = true;

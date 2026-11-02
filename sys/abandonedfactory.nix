@@ -18,10 +18,6 @@
   
   # Enable SSH for remote access
   services.openssh.enable = true;
-  users.users.root.openssh.authorizedKeys.keys = [
-    # Add your SSH public key here
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA redacted"
-  ];
 
   # Optional: Add a regular user
   users.users.nixos = {

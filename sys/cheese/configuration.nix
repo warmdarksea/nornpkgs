@@ -5,7 +5,6 @@
     consoleFont = "latarcyrheb-sun32";
   };
 
-  #networking.hostId = "AAAAAAAA";
   networking.networkmanager.enable = true;  # Easiest to use and most distros use this by default.
 
   # Enable the X11 windowing system.
