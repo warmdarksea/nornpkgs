@@ -1,8 +1,9 @@
 # Claude Code on issues and pull requests: mention @claude in an issue (title
-# or body when opening it, or any later comment), a PR comment, or a PR
-# review, and Claude works in a checkout on the runner, pushes to a
-# claude/... branch (or the PR's branch) and reports in a comment. It does
-# not open PRs itself; for an issue it leaves a "create PR" link.
+# or body when opening it, or any later comment), a PR (its description when
+# opening it, a comment, or a review), and Claude works in a checkout on the
+# runner, pushes to a claude/... branch (or the PR's branch) and reports in
+# a comment. It does not open PRs itself; for an issue it leaves a "create
+# PR" link; mention @claude in that PR's description and it carries on there.
 #
 # Who can trigger it: the repository owner (the job's if:), re-checked by
 # the action's own write-access test before Claude starts.
@@ -31,6 +32,8 @@ on:
     types: [created]
   issues:
     types: [opened, assigned]
+  pull_request:
+    types: [opened]
   pull_request_review:
     types: [submitted]
 
@@ -48,6 +51,7 @@ jobs:
         (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
         (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
         (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+        (github.event_name == 'pull_request' && (contains(github.event.pull_request.body, '@claude') || contains(github.event.pull_request.title, '@claude'))) ||
         (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
       )
     runs-on: ubuntu-latest
