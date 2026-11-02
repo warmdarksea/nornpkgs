@@ -21,37 +21,7 @@ rec {
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  #networking.hostName = "furnace"; # Define your hostname.
-
-  # Configure network connections interactively with nmcli or nmtui.
-  
   networking.useDHCP = lib.mkDefault true;
-  #networking.networkmanager.enable = true;
-
-  #services.diod = {
-  #  enable = true;
-  #  listen = [ "0.0.0.0:564" ];
-
-  #  exports = [ "/yet/vid" ];
-  #};
-
-  # Set your time zone.
-  # time.timeZone = "Europe/Amsterdam";
-
-  # Configure network proxy if necessary
-  # networking.proxy.default = "http://user:password@proxy:port/";
-  # networking.proxy.noProxy = "0.0.0.0,localhost,internal.domain";
-
-  # Select internationalisation properties.
-  # i18n.defaultLocale = "en_US.UTF-8";
-  # console = {
-  #   font = "Lat2-Terminus16";
-  #   keyMap = "us";
-  #   useXkbConfig = true; # use xkb.options in tty.
-  # };
-
-  # Enable the X11 windowing system.
-  # services.xserver.enable = true;
 
   networking.firewall.allowedUDPPorts = [
     config.networking.wireguard.interfaces.wg-redacted.listenPort
@@ -64,8 +34,6 @@ rec {
   networking.firewall.checkReversePath = "loose";
   networking.firewall.rejectPackets = true;
 
-    # nuclear option, do not use
-  #networking.firewall.trustedInterfaces = [ "lxdbr0" "virbr0" ];
   #networking.firewall.extraCommands = ''
   #    iptables -I INPUT -i lxdbr0 -d 0.0.0.0/8,0.0.0.0/12,0.0.0.0/16 -j DROP
   #    iptables -I INPUT -i lxdbr0 -d 0.0.0.0/24 -j ACCEPT
@@ -74,12 +42,6 @@ rec {
   #  # iptables -A INPUT -i lxdbr0 -p udp --dport 53 --sport 53 -j ACCEPT
   #  # iptables -I INPUT -i lxdbr0 -j ACCEPT
   #'';
-  #networking.firewall.extraForwardRules = ''
-  #  iifname "lxdbr0" accept
-  #  oifname "lxdbr0" accept
-  #'';
-
-
    networking.iproute2.rttablesExtraConfig = ''
          # 109 rt_redacted
          # 247 rt_redacted
@@ -112,7 +74,6 @@ rec {
    #     options.table = "rt_redacted";
    #   }
    # ];
-
   networking.wireguard.interfaces = {
     wg-redacted = {
       # remember to open the port for this in allowedUDPPorts
@@ -151,7 +112,6 @@ rec {
     #     ${pkgs.iptables}/bin/iptables -D FORWARD -o wg1 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT || true
     #     ${pkgs.iptables}/bin/iptables -t nat -D POSTROUTING -o wg1 -j MASQUERADE || true
     #   '';
-
     };
   };
 
@@ -189,7 +149,6 @@ rec {
   virtualisation.docker = {
     enable = true;
 
-    #enableNvidia = true;
     storageDriver = "zfs";
     daemon.settings = {
       storage-opts = [ "zfs.fsname=fern/docker" ];
@@ -197,31 +156,12 @@ rec {
   };
   virtualisation.podman = {
     enable = true;
-    #enableNvidia = true;
     extraPackages = with pkgs; [
       dive
       podman-compose
       podman-tui
     ];
   };
-
-  # Configure keymap in X11
-  # services.xserver.xkb.layout = "us";
-  # services.xserver.xkb.options = "eurosign:e,caps:escape";
-
-  # Enable CUPS to print documents.
-  # services.printing.enable = true;
-
-  # Enable sound.
-  # services.pulseaudio.enable = true;
-  # OR
-  # services.pipewire = {
-  #   enable = true;
-  #   pulse.enable = true;
-  # };
-
-  # Enable touchpad support (enabled default in most desktopManager).
-  # services.libinput.enable = true;
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.rin = {
@@ -244,9 +184,6 @@ rec {
 
     isNormalUser = true;
     extraGroups = [ "wheel" "docker" "podman" ]; # Enable ‘sudo’ for the user.
-    #   packages = with pkgs; [
-    #     tree
-    #   ];
   };
 
   users.users.www-jellyfin = {
@@ -284,39 +221,15 @@ rec {
   };
   users.groups.rtorrent.gid = users.users.rtorrent.uid;
 
-  # programs.firefox.enable = true;
-
   # List packages installed in system profile.
   # You can use https://search.nixos.org/ to find more packages (and options).
   environment.systemPackages = with pkgs; [
     vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
-    #   wget
     sbctl
   ];
 
-  # Some programs need SUID wrappers, can be configured further or are
-  # started in user sessions.
-  # programs.mtr.enable = true;
-  # programs.gnupg.agent = {
-  #   enable = true;
-  #   enableSSHSupport = true;
-  # };
-
-  # List services that you want to enable:
-
-  # Enable the OpenSSH daemon.
-  # services.openssh.enable = true;
-
   # Open ports in the firewall.
   networking.firewall.allowedTCPPorts = [ 443 9081 ];
-  # networking.firewall.allowedUDPPorts = [ ... ];
-  # Or disable the firewall altogether.
-  # networking.firewall.enable = false;
-
-  # Copy the NixOS configuration file and link it from the resulting system
-  # (/run/current-system/configuration.nix). This is useful in case you
-  # accidentally delete configuration.nix.
-  # system.copySystemConfiguration = true;
 
   # This option defines the first version of NixOS you have installed on this particular machine,
   # and is used to maintain compatibility with application data (e.g. databases) created on older NixOS versions.

@@ -241,7 +241,6 @@
         self.nixosModules.base
         (gensokyo-private.nixosModules.abandonedfactory or {})
         lanzaboote.nixosModules.lanzaboote
-        #"${nixpkgs}/nixos/modules/installer/sd-card/sd-image-x86_64.nix"
         ./hw/lattepanda_v1.nix
         ./sys/abandonedfactory/hardware-configuration.nix
         ./sys/abandonedfactory.nix
@@ -607,9 +606,6 @@
 
     devShells.x86_64-linux.littledevil = pkgs.mkShell {
       packages = with pkgs; [
-        #aliyun-cli
-        #awscli2
-        #azure-cli
         bruno
         libvirt
         m4
@@ -621,9 +617,6 @@
           p.hashicorp_null
           p.hashicorp_tls
           p.dmacvicar_libvirt
-          #p.hashicorp_aws
-          #p.hashicorp_azurerm
-          #p.aliyun_alicloud
           p.oracle_oci
           p.cloudflare_cloudflare
         ]))
@@ -670,7 +663,7 @@
         }
         self.nixosModules.base
         ./sys/minimal.nix
-        ./sys/recovery.nix   # the new module
+        ./sys/recovery.nix
       ];
     };
 
@@ -760,14 +753,12 @@
     # Built from the compat pin for the same Bitwig-flatpak reason.
     packages.x86_64-linux.openutau-bridge = pkgsCompat.callPackage ./pkgs/openutau-bridge { };
 
-
     # NanoKVM boot-control tooling.
     packages.x86_64-linux.uefi_trampoline =
       pkgs.callPackage "${uefiTrampolineSrc}/default.nix" { }; # .override { bootId = N; }
     packages.x86_64-linux.nanokvm = nornpkgs.nanokvm;
     packages.x86_64-linux.nanokvmctl = nornpkgs.nanokvmctl;
 
-    # and, mirroring your existing packages.<arch>.images.<name> pattern:
     images.gensokyo-recovery =
       self.nixosConfigurations.gensokyo-recovery.config.system.build.image;
     };

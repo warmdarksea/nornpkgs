@@ -1,23 +1,14 @@
 { config, lib, pkgs, ... }: {
-  imports = [
-  ];
-
   nixpkgs.config.allowUnfreePredicate = pkg: (builtins.elem (lib.getName pkg) [
     "corefonts"
     "nvidia-x11"
     "nvidia-persistenced"
     "nvidia-settings"
     "cudnn"
-    #    "cuda_cudart"
-    #    "cuda_cccl"
-    #    "libcublas"
-    #    "nvtop"
     "vcv-rack"
   ]) || (builtins.all (license:
     license.free || builtins.elem license.shortName [
       "CUDA EULA"
-      #    "cuDNN EULA"
-      #    "cuTENSOR EULA"
       "NVidia OptiX EULA"
     ]
   ) (if builtins.isList pkg.meta.license then pkg.meta.license else [ pkg.meta.license ]));
@@ -103,12 +94,6 @@
   swapDevices = [ ];
   
   networking.useDHCP = lib.mkDefault true;
-  #networking.dhcpcd.enable = false;
-  #networking.interfaces.enp6s0.ipv4.addresses = [
-  #  { address = "0.0.0.0"; prefixLength = 24; }
-  #];
-  #networking.defaultGateway = "0.0.0.0";
-  #networking.nameservers = ["0.0.0.0"];
 
   virtualisation.docker = {
     enable = true;
@@ -137,8 +122,6 @@
     "-a always,exit -F arch=b64 -S execve -F uid=${builtins.toString config.users.users.claude.uid} -k claude-exec"
   ];
 
-  #nix.settings.allowed-users = [ "claude" ];
-
   programs.nix-required-mounts = {
     enable = true;
     presets.nvidia-gpu.enable = true;
@@ -150,8 +133,5 @@
     sbctl
   ];
 
-  #system.copySystemConfiguration = true;
-
-  #system.stateVersion = "23.05"; # Did you read the comment?
   system.stateVersion = "26.11"; # Did you read the comment?
 }

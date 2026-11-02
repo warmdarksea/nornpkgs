@@ -14,7 +14,6 @@
   # "i915" is a kernel driver, not an X11 driver; modesetting is the right one
   services.xserver.videoDrivers = [ "modesetting" ];
 
-  # hardware.enableAllFirmware = true;
   hardware.enableRedistributableFirmware = true;
   hardware.firmware = [ pkgs.wireless-regdb ]; # is this necessary?
 

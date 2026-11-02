@@ -198,9 +198,6 @@ libvirt_plan_oci: $(BUILD_DIR)/oci-bootstrap-qcow2 $(BUILD_DIR)/ovmf | $(STATE_D
 libvirt_deploy_oci: $(BUILD_DIR)/oci-bootstrap-qcow2 $(BUILD_DIR)/ovmf | $(STATE_DIR)
 	$(TOFU) apply $(TOFU_FLAGS) -target=null_resource.test_libvirt -var=libvirt_bootstrap_img_path=$(realpath $(wildcard $(BUILD_DIR)/oci-bootstrap-qcow2/*.qcow2))
 
-#libvirt_plan_live: $(BUILD_DIR)/libvirt-live-drv | $(STATE_DIR)
-#	$(TOFU) plan $(TOFU_FLAGS) -var=disk_img_path=$(realpath $(wildcard $</*.qcow2))
-
 libvirt_deploy_live: $(BUILD_DIR)/libvirt-live-drv
 	nix-copy-closure $(LIBVIRT_HOST) "$(realpath $<)"
 	ssh $(LIBVIRT_HOST) "$(realpath $<)/bin/switch-to-configuration switch && nix-collect-garbage -d"

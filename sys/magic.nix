@@ -1,23 +1,14 @@
 { config, lib, pkgs, ... }: {
-  imports = [
-  ];
-
   nixpkgs.config.allowUnfreePredicate = pkg: (builtins.elem (lib.getName pkg) [
     "corefonts"
     "nvidia-x11"
     "nvidia-persistenced"
     "nvidia-settings"
     "cudnn"
-    #    "cuda_cudart"
-    #    "cuda_cccl"
-    #    "libcublas"
-    #    "nvtop"
     "vcv-rack"
   ]) || (builtins.all (license:
     license.free || builtins.elem license.shortName [
       "CUDA EULA"
-      #    "cuDNN EULA"
-      #    "cuTENSOR EULA"
       "NVidia OptiX EULA"
     ]
   ) (if builtins.isList pkg.meta.license then pkg.meta.license else [ pkg.meta.license ]));
@@ -109,7 +100,6 @@
 
   nixpkgs.config.allowUnfree = true;
 
-  #networking.hostName = "magic";
   #networking.hostId = "AAAAAAAA";
   networking.useDHCP = lib.mkDefault true;
   #networking.dhcpcd.enable = false;
@@ -118,17 +108,6 @@
   #];
   #networking.defaultGateway = "0.0.0.0";
   #networking.nameservers = ["0.0.0.0"];
-
-  # virtualisation.docker = {
-  #   enable = true;
-  #   enableNvidia = true;
-
-  #   # overlayfs backed by zfs is broken, you need to use zfs proper for it to work
-  #   storageDriver = "zfs";
-  #   daemon.settings = {
-  #     storage-opts = [ "zfs.fsname=alloy/docker" ];
-  #   };
-  # };
 
   users.users.marisa = {
     isNormalUser = true;
@@ -141,8 +120,6 @@
     docker-compose
     dtach
   ];
-
-  #system.copySystemConfiguration = true;
 
   system.stateVersion = "23.05"; # Did you read the comment?
 }

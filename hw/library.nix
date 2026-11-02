@@ -34,9 +34,5 @@
     nvidiaSettings = false;
 
     nvidiaPersistenced = true;
-
-    # Optionally, you may need to select the appropriate driver version for your specific GPU.
-    # package = config.boot.kernelPackages.nvidiaPackages;
-    #package = config.boot.kernelPackages.nvidiaPackages.production;
   };
 }

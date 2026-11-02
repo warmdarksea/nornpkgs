@@ -31,10 +31,6 @@
   ];
 
   boot.supportedFilesystems = ["zfs"];
-  #boot.kernelParams = [ "console=ttyUSB0,115200" "console=tty0" ];
-  
-  # Enable getty on ttyUSB0
-  #systemd.services."serial-getty@ttyUSB0".enable = true;
   
   boot.loader.grub.memtest86.enable = true;
   boot.loader.systemd-boot.memtest86.enable = true;

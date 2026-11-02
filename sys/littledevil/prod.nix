@@ -23,41 +23,6 @@
 
   services.postgresql.dataDir = "/data/postgres/postgres${config.services.postgresql.package.psqlSchema}";
 
-  # services.vector = {
-  #   enable = true;
-  #   journaldAccess = true;
-  #   validateConfig = false;
-
-  #   settings = {
-  #     sources.journal = {
-  #       type = "journald";
-  #     };
-
-  #     sinks.grafana_loki = {
-  #       type = "loki";
-  #       inputs = [ "journal" ];
-  #       endpoint = "\${LOKI_ENDPOINT}";
-  #       encoding.codec = "json";
-
-  #       auth = {
-  #         strategy = "basic";
-  #         user = "\${GRAFANA_USER}";
-  #         password = "\${GRAFANA_LOKI_KEY}";
-  #       };
-
-  #       labels = {
-  #         host = "littledevil-prod";
-  #         service_name = "{{ SYSLOG_IDENTIFIER }}";
-  #       };
-  #     };
-  #   };
-  # };
-
-  # # Load the API key from your secrets file into the Vector service
-  # systemd.services.vector.serviceConfig.EnvironmentFile = [
-  #   "/var/secret/grafana/env"
-  # ];
-
   services.alloy = {
     enable = true;
     environmentFile = "/var/secret/grafana/env";
@@ -115,7 +80,6 @@
   # (only the aarch64 oci-live imports nix-minecraft, which declares it)
 
   systemd.tmpfiles.rules = [
-    #"d /data 0755 root root -"
     "d ${config.services.postgresql.dataDir} 0750 postgres postgres -"
     "d /data/akkoma 0750 akkoma akkoma -"
     "L+ /var/lib/akkoma - - - - /data/akkoma"

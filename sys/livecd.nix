@@ -30,8 +30,6 @@
     firewall.enable = true;
   };
 
-  # Enable sound
-  # sound.enable = true;
   hardware.pulseaudio.enable = false;
 
   # Enable touchpad support
@@ -57,9 +55,6 @@
   # Automatically detect and mount filesystems
   services.gvfs.enable = true;
   services.udisks2.enable = true;
-
-  # Enable firmware with common wireless drivers
-  #hardware.enableAllFirmware = true;
 
   # Enable bluetooth
   hardware.bluetooth.enable = true;

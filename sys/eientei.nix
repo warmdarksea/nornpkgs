@@ -2,22 +2,10 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-# import <nixpkgs/nixos> {
-#   system = "i686-linux";
-#   configuration = let
-#     localpkgs = import <localpkgs> { };
-#   in { config, lib, pkgs, ... }: {
-#     imports = [
-# #      /cfg/base.nix
-# #      /cfg/opt/crypt.nix
-#       ../profile/base.nix
-#       ../module/crypt.nix
-#     ];
 { config, lib, pkgs, ... }: {
   nixpkgs.config.allowUnfree = true;
 
   # machine specs live in hw/eeepc.nix
-  #  boot.kernelPackages = pkgs.linuxPackages_latest;
 
   fileSystems."/" =
     { device = "ember";
@@ -38,32 +26,6 @@
     { device = "ember/home";
       fsType = "zfs";
     };
-
-  # boot.crypt = {
-  #   enable = true;
-  #   initramfs = "/boot/header.gz";
-  #   header = "/eientei.h";
-  #   image = "/eientei.img";
-  #   image_type = "ext4";
-  #   devices = ["ember0"];
-  #   pools = ["ember"];
-  #   root = "ember";
-  #   root_type = "zfs";
-  # };
-
-  # fixme: boot.crypt came from a custom module (../module/crypt.nix) that
-  # never made it into this repo; re-import it before deploying
-  # boot.crypt = {
-  #   enable = true;
-  #   initramfs = "/boot/header.gz";
-  #   header = "/boot/eientei.h";
-  #   image = "/boot/eientei.img";
-  #   image_type = "ext4";
-  #   devices = ["ember0"];
-  #   pools = ["ember"];
-  #   root = "ember";
-  #   root_type = "zfs";
-  # };
 
   swapDevices = [ ];
 
@@ -126,23 +88,12 @@
     ];
     fontconfig = {
       hinting.autohint = false;
-      #      penultimate.enable = false;
       useEmbeddedBitmaps = true;
       defaultFonts.serif = [ "Liberation Serif" "Times New Roman" ];
       defaultFonts.sansSerif = [ "Liberation Sans" "Arial" "Ubuntu" ];
       defaultFonts.monospace = [ "Ubuntu Mono" ];
     };
   };
-
-  # nixpkgs.config =
-  #   {
-  #     packageOverrides = super:
-  #       let
-  #         self = super.pkgs;
-  #       in {
-  #         dwm = localpkgs.dwm;
-  #       };
-  #   };
 
   users.users.kaguya = {
     isNormalUser = true;

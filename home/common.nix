@@ -10,55 +10,15 @@
   cudaEnabled = pkgs.config.cudaSupport or false;
   ci = osConfig.gensokyo.ci or false;
 in {
-#let
-  # myEmacs = (pkgs.emacsWithPackagesFromUsePackage {
-  #   package = pkgs.emacs29-pgtk;  # replace with pkgs.emacsPgtk, or another version if desired.
-  #   config = ../../emacs/config.el;
-  #   defaultInitFile = false;
-
-  #   # Optionally provide extra packages not in the configuration file.
-  #   extraEmacsPackages = epkgs: [
-  #     epkgs.use-package
-  #     pkgs.chez
-  #     pkgs.terraform-ls
-  #   ];
-
-  #   # Optionally override derivations.
-  #   # override = epkgs: epkgs // {
-  #   #   somePackage = epkgs.melpaPackages.somePackage.overrideAttrs(old: {
-  #   #      # Apply fixes here
-  #   #   });
-  #   # };
-  # });
-  #  local_infra = import ./local_pkgs.nix { inherit pkgs; };
- 
-  #in {
-  #nixpkgs.overlays = [
-  #  emacs-overlay.overlays.default
-  #];
-  #home.packages = with pkgs; [emacs29-pgtk];
   home.sessionVariables = {
     "QT_QPA_PLATFORM" = "wayland";
-    #  "QT_WAYLAND_FORCE_DPI" = "physical";
-    #  "ECORE_EVAS_ENGINE" = "wayland_egl";
-    #  "ELM_ENGINE" = "wayland_egl";
     "SDL_VIDEODRIVER" = "wayland";
     "_JAVA_AWT_WM_NONREPARENTING" = "1";
     "MOZ_ENABLE_WAYLAND" = "1";
     "SAL_USE_VCLPLUGIN" = "gtk3";
     "PATH" ="$HOME/.local/bin:$PATH";
-    #  "COLORTERM" = "truecolor"; # it is the year two-thousand and twenty-three
     "GLFW_IM_MODULE" = "ibus";
   };
-
-  # i18n.inputMethod = {
-  #   enabled = "fcitx5";
-  #   fcitx5.addons = with pkgs; [
-  #     fcitx5-mozc
-  #     fcitx5-gtk
-  #   ];
-  #   #ibus.engines = with pkgs.ibus-engines; [ anthy ];
-  # };
 
   programs.home-manager.enable = true;
 
@@ -173,9 +133,6 @@ in {
         p.hashicorp_azurerm
         p.aliyun_alicloud
       ]))
-      # retired / parked: audacity calibre inkscape gzdoom prismlauncher
-      # element-desktop evolution okular filezilla hexchat docker
-      # docker-compose vscodium qemu ddd gdb ghc-via-emacs terraform.withPlugins
     ];
     # CUDA builds (cycles/optix, nvenc): hours to build, so only with the
     # cache-friendly default cudaCapabilities, never on the runner.
@@ -183,14 +140,8 @@ in {
       blender
       obs-studio
     ];
-    shell_scripts = [
-      # fixme: mktemp_home / random_passwd / random_hex lived in the old
-      # gensokyo-dotfiles repo, which is no longer an input. inline the
-      # scripts here (bin/) if they're still wanted.
-    ];
   in lib.concatLists [
     small_pkgs
-    shell_scripts
     (lib.optionals (!ci) large_pkgs)
     (lib.optionals (cudaEnabled && !ci) cuda_pkgs)
   ];
@@ -202,10 +153,6 @@ in {
       PROMPT_COMMAND='printf "\e]0;%s@%s: %s\a" "$USER" "$HOSTNAME" "''${PWD/#$HOME/\~}"'
     '';
   };
-
-  # shellAliases = {
-  #   example = "true";
-  # };
 
   programs.emacs = {
     enable = true;
@@ -237,7 +184,6 @@ in {
       };
     in epkgs: [
       pkgs.chez
-      #pkgs.terraform-ls
       pkgs.haskell-language-server
       pkgs.ghc
       pkgs.llvmPackages_19.clang
@@ -281,17 +227,6 @@ in {
     '';
   };
 
-  # programs.neovim = {
-  #   enable = true;
-  #   plugins = with pkgs.vimPlugins; [
-  #     nvim-tree-lua
-  #     nvim-web-devicons
-  #     nvim-lspconfig
-  #     lean-nvim
-  #   ];
-  #   extraPackages = with pkgs; [ lean4 ];
-  # };
-
   programs.firefox = {
     enable = true;
     policies = {
@@ -300,28 +235,6 @@ in {
       };
     };
   };
-
-  # programs.vscode = {
-  #   enable = true;
-  #   package = pkgs.vscodium;
-  #   extensions = with pkgs.vscode-extensions; [
-  #     dracula-theme.theme-dracula
-  #     vscodevim.vim
-  #     yzhang.markdown-all-in-one
-      
-  #   ] ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
-  #     {
-  #       name = "lean4";
-  #       publisher = "leanprover";
-  #       version = "0.0.177";
-  #       sha256 = "sha256-4roh1M5F4eIX0UNNDCfO47zgJAL+nRnHUAD///4hbok=";
-  #     }
-  #   ];
-  #   userSettings = {
-  #     "lean4.elanPath" = "${pkgs.elan}/bin/elan";
-  #     "lean4.executablePath" = "${pkgs.lean4}/bin/lean";
-  #   };
-  # };
 
   manual.manpages.enable = true;
 

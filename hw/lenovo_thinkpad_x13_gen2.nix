@@ -9,12 +9,4 @@
 
   hardware.enableRedistributableFirmware = lib.mkDefault true;
   hardware.cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
-
-  # dormant experiments from the pre-refactor version of this file; opt back
-  # in if the backlight/keyboard bits are still wanted:
-  # imports = [ ./amdgpu.nix ./uhk.nix ];
-  # ty https://discourse.nixos.org/t/creating-a-bootable-usb-with-custom-firmware-support/15343
-  # boot.kernelParams = ["acpi_backlight=native"];
-  # boot.extraModulePackages = with config.boot.kernelPackages; [ acpi_call ];
-  # boot.kernelModules = ["acpi_call"];
 }

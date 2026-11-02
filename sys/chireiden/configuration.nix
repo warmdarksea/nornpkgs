@@ -1,23 +1,12 @@
 { config, lib, pkgs, ... }: {
-  imports = [
-    # Include the results of the hardware scan.
-    #./hardware-configuration.nix
-  ];
-
   nixpkgs.config.allowlistedLicenses = with lib.licenses; [ bsl11 ];
 
   boot.kernelParams = ["zfs.zfs_arc_min=536870912" "zfs.zfs_arc_max=2147483648"];
-
-  #boot.loader.grub.device = "/dev/sdd";   # (for BIOS systems only)
-  #boot.loader.systemd-boot.enable = true; # (for UEFI systems only)
 
   # Note: setting fileSystems is generally not
   # necessary, since nixos-generate-config figures them out
   # automatically in hardware-configuration.nix.
   #fileSystems."/".device = "/dev/disk/by-label/REDACTED";
-
-  #networking.hostName = "chireiden";
-
   # Enable the OpenSSH server.
   services.sshd.enable = true;
 
@@ -34,10 +23,6 @@
   # for now.
   boot.loader.systemd-boot.enable = lib.mkForce false;
   boot.loader.systemd-boot.memtest86.enable = true;
-  #boot.loader.systemd-boot.extraEntries."Windows 11" = ''
-  #  title Windows 11
-  #  efi /EFI/Microsoft/Boot/bootmgfw.efi
-  #'';
 
   networking.wireguard.interfaces = {
     wg2 = {
@@ -68,27 +53,7 @@
   programs.sway = {
     enable = true;
     wrapperFeatures.gtk = true; # so that gtk works properly
-    extraPackages = with pkgs; [
-      #       swaylock
-      #       swayidle
-      #       wl-clipboard
-      #       mako # notification daemon
-      #       alacritty # Alacritty is the default terminal in the config
-
-      #       waybar
-
-      #       nwg-menu
-      # #      nwg-panel
-      #       nwg-drawer
-      #       nwg-wrapper
-      #       nwg-launchers
-
-      #       grim
-      #       slurp
-      
-      #       wlogout
-      #       hicolor-icon-theme
-    ];
+    extraPackages = [ ];
   };
 
   programs.wireshark.enable = true;
@@ -103,11 +68,9 @@
   systemd.services."autovt@tty1".enable = false;
 
   hardware.pulseaudio.enable = false;
-  # sound.enableOSSEmulation = true;
   # rtkit + pipewire live in lib/desktop.nix
   services.pipewire.systemWide = true;
 
-  #virtualisation.lxd.enable = true;
   virtualisation.podman.enable = true;
   virtualisation.docker.storageDriver = "zfs";
   virtualisation.docker = {
@@ -123,19 +86,10 @@
       package = pkgs.qemu_kvm;
       runAsRoot = true;
       swtpm.enable = true;
-      # ovmf = {
-      #   enable = true;
-      #   packages = [(pkgs.OVMF.override {
-      #     secureBoot = true;
-      #     tpmSupport = true;
-      #   }).fd];
-      # };
     };
   };
 
   environment.systemPackages = with pkgs; [
-    #      gcc
-    #      libsForQt5.bismuth
     hicolor-icon-theme
     adwaita-icon-theme
     podman

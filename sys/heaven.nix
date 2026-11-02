@@ -9,32 +9,12 @@
 # nix system expr:
 let overlays = [
       (self: super: import /home/satori/tmp/emacs-overlay-master/default.nix self super)
-      # (self: super: {
-      #   krita = (import <nixpkgs> {
-      #     overlays = [(self: super: {
-      #       qt5 = super.qt5.overrideScope (self: super: {
-      #         qtbase = super.qtbase.overrideAttrs (o: {
-      #           patches = o.patches ++ [../patches/0001-Fix-highdpi-conversion-of-QTabletEvent-coordinates-o.patch];
-      #         });
-      #       });
-      #     })];
-      #   }).krita;
-      # })
-      
-#      (self: super: with self; {
-#        gnome = super.gnome.overrideScope' (gself: gsuper: with gself; {
-#          mutter = gsuper.mutter.overrideAttrs (o: {
-#            src = /home/satori/src/mutter;
-#          });
-#        });
-#      })
       ];
 in import <nixpkgs/nixos> {
   system = "x86_64-linux";
   configuration = { config, lib, pkgs, modulesPath, ... }: let
     inherit overlays;
     lanzaboote = import <lanzaboote>;
-    #pkgs' = import nixpkgs { inherit system; overlays = overlays; };
   in {
     imports = [
       <home-manager/nixos>
@@ -51,7 +31,6 @@ in import <nixpkgs/nixos> {
     boot.kernelModules = [ "kvm-intel" "pinctrl_sunrisepoint" ];
     boot.extraModulePackages = [  ];
     boot.kernelParams = ["debug"];
-    #dyndbg="file ec.c +p"
 
     fileSystems."/" = {
       device = "/dev/disk/by-uuid/REDACTED";
@@ -72,30 +51,22 @@ in import <nixpkgs/nixos> {
 
     swapDevices = [ ];
 
-    # hardware.enableAllFirmware = true;
     powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";
     hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
-    # high-resolution display
-    # hardware.video.hidpi.enable = lib.mkDefault true;
 
     # Use the systemd-boot EFI boot loader.
-    #boot.loader.systemd-boot.enable = true;
     boot.loader.systemd-boot.enable = lib.mkForce false;
 
     boot.lanzaboote = {
       enable = true;
       # this is relative to the remote system, these files are not stored in
       # the nix store (duh)
-      #pkiBundle = "/home/satori/creds/sky/secureboot";
       pkiBundle = "/etc/secureboot";
     };
     boot.loader.efi.canTouchEfiVariables = true;
     boot.loader.efi.efiSysMountPoint = "/boot/EFI";
 
-    #boot.kernelPackages = pkgs.linuxPackages_latest;
-
     networking.hostName = "heaven"; # Define your hostname.
-    # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
     services.xserver.enable = true;
     services.xserver.displayManager.defaultSession = lib.mkForce "gnome";
     services.xserver.displayManager.gdm = {
@@ -107,7 +78,7 @@ in import <nixpkgs/nixos> {
     systemd.services."iptsd".serviceConfig.Restart = lib.mkForce "always";
 
     systemd.services."iptsd".serviceConfig.RestartSec = "5";
-    
+
     hardware.opentabletdriver.enable = true;
     services.xserver.wacom.enable = true;
     systemd.extraConfig = ''
@@ -121,51 +92,22 @@ in import <nixpkgs/nixos> {
     # Per-interface useDHCP will be mandatory in the future, so this generated config
     # replicates the default behaviour.
     networking.useDHCP = false;
-    #networking.interfaces.enp0s20f0u1u4.useDHCP = false;
-    #networking.interfaces.wlp1s0.useDHCP = false;
-    #networking.interfaces.wwp0s20f0u2.useDHCP = false;
 
     users.users.tenshi = {
       isNormalUser = true;
       extraGroups = ["wheel" "video"];
     };
 
-    # Enable the X11 windowing system.
-    # services.xserver.enable = true;
-
-
-    
-
-    # Configure keymap in X11
-    # services.xserver.layout = "us";
-    # services.xserver.xkbOptions = "eurosign:e";
-
-    # Enable CUPS to print documents.
-    # services.printing.enable = true;
-
     # Enable sound.
     sound.enable = true;
     hardware.pulseaudio.enable = false;
     services.acpid.enable = true;
 
-    #programs.ssh.askPassword = lib.mkForce pkgs.seahorse;
     programs.ssh.askPassword = "${pkgs.x11_ssh_askpass}/libexec/x11-ssh-askpass";
-
-    # Enable touchpad support (enabled default in most desktopManager).
-    # services.xserver.libinput.enable = true;
-
-    # Define a user account. Don't forget to set a password with ‘passwd’.
-    # users.users.jane = {
-    #   isNormalUser = true;
-    #   extraGroups = [ "wheel" ]; # Enable ‘sudo’ for the user.
-    # };
 
     # List packages installed in system profile. To search, run:
     # $ nix search wget
     environment.systemPackages = with pkgs; [
-    #   vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
-    #   wget
-    #   firefox
       pkgs.sbctl
       gcc
       libsForQt5.bismuth
@@ -191,18 +133,8 @@ in import <nixpkgs/nixos> {
           pkgs.chez
           pkgs.terraform-ls
         ];
-
-        # Optionally override derivations.
-        # override = epkgs: epkgs // {
-        #   somePackage = epkgs.melpaPackages.somePackage.overrideAttrs(old: {
-        #      # Apply fixes here
-        #   });
-        # };
       });
       local_infra = import ../default.nix { inherit pkgs; };
-      foo = lib.debug.traceSeq {
-        foobar = pkgs.gedit;
-      } [];
     in {
       home.packages = with local_infra; lib.subtractLists [pkgs.chromium pkgs.element-desktop-wayland] (basepkgs ++ desktop_pkgs ++ [myEmacs pkgs.coq_8_16 pkgs.sshfs] ++ dev_pkgs ++ local_pkgs);
       home.sessionVariables = {
@@ -227,68 +159,7 @@ in import <nixpkgs/nixos> {
       '';
     };
 
-    nixpkgs.overlays = overlays; #[
-#      (self: super: import /home/satori/tmp/emacs-overlay-master/default.nix self super)
-      #    # (import (builtins.fetchTarball {
-      #    #   url = https://github.com/nix-community/emacs-overlay/archive/master.tar.gz;
-      #    # }))
-      # (self: super: {
-      #   krita = super.krita.override {
-      #   libsForQt5.qt5.qtbase.overrideAttrs = super.libsForQt5.qt5.qtbase.overrideAttrs (o: {
-      #     patches = (o.patches or []) ++ [../patches/0001-Fix-highdpi-conversion-of-QTabletEvent-coordinates-o.patch];
-      #   });
-      # };
-      # })
-      # (self: super: {
-      #   krita = (import <nixpkgs> {
-      #     overlays = [(self: super: {
-      #       libsForQt5.qt5.qtbase = super.libsForQt5.qt5.qtbase.overrideAttrs (o: {
-      #         patches = o.patches ++ [../patches/0001-Fix-highdpi-conversion-of-QTabletEvent-coordinates-o.patch];
-      #       });
-      #     })];
-      #   }).krita;
-      # })
-      # (self: super: {
-      #   krita = (import <nixpkgs> {
-      #     overlays = [(self: super: {
-      #       qt5 = super.qt5.overrideScope (self: super: {
-      #         qtbase = super.qtbase.overrideAttrs (o: {
-      #           patches = o.patches ++ [../patches/0001-Fix-highdpi-conversion-of-QTabletEvent-coordinates-o.patch];
-      #         });
-      #       });
-      #     })];
-      #   }).krita;
-      # })
-      # (self: super: {
-      #   krita = super.krita.overrideScope (self: super: {
-      #     qt5 = super.qt5.overrideScope (self: super: {
-      #       qtbase = super.qtbase.overrideAttrs (o: {
-      #         patches = o.patches ++ [../patches/0001-Fix-highdpi-conversion-of-QTabletEvent-coordinates-o.patch];
-      #       });
-      #     });
-      #   });
-      # })
-      
-      # (self: super: with self; {
-      #   gnome = super.gnome.overrideScope' (gself: gsuper: with gself; {
-      #     mutter = gsuper.mutter.overrideAttrs (o: {
-      #       src = /home/satori/src/mutter;
-      #     });
-      #   });
-      # })
-      # (self: super: {
-      #   gnome = super.gnome.overrideAttrs (o: {
-      #     mutter = super.mutter.overrideAttrs (o: {
-      #       src = /home/satori/src/mutter;
-      #     });
-      #   });
-      # })
-      # (self: super: {
-      #   gnome.mutter = super.mutter.overrideAttrs (o: {
-      #     src = /home/satori/src/mutter;
-      #   });
-      # })
-#    ];
+    nixpkgs.overlays = overlays;
 
     system.stateVersion = "22.05"; # Did you read the comment?
   };
