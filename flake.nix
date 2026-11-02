@@ -432,7 +432,7 @@
         (gensokyo-private.nixosModules.magic or {})
         lanzaboote.nixosModules.lanzaboote
         ./hw/magic.nix
-        ./sys/magic/configuration.nix
+        ./sys/magic.nix
       ];
     };
 
