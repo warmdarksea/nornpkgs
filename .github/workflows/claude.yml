@@ -18,9 +18,10 @@
 # credit would work with the federation inputs instead.
 #
 # Nix is installed so Claude can evaluate and build; CLAUDE.md tells it how.
-# No magic-nix-cache here: with the account over its Actions-cache egress
-# limit the action hangs at startup (run 41124231785), and the only cost of
-# going without is slower nix builds inside the run.
+# The GitHub Actions cache step is the same opt-in as build.yml's
+# (NIX_GHA_CACHE repository variable): over the account's cache egress
+# allowance it hangs instead of degrading (run 41124231785), so it is
+# bounded by a timeout and never fails the job.
 name: claude
 
 on:
@@ -68,6 +69,11 @@ jobs:
       # scrub CLAUDE_CODE_OAUTH_TOKEN and the GitHub token from the environment
       # of the commands Claude runs, so a prompt-injected `echo $...` gets nothing
       CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
+      # Claude's Bash tool kills a command at BASH_DEFAULT_TIMEOUT_MS unless the
+      # call asks for longer, up to BASH_MAX_TIMEOUT_MS. The CLI defaults (2 and
+      # 10 minutes) are too short for evaluating or building a host.
+      BASH_DEFAULT_TIMEOUT_MS: "600000"
+      BASH_MAX_TIMEOUT_MS: "3600000"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -78,6 +84,15 @@ jobs:
           # trust the flake's nixConfig (cache.nixos-cuda.org)
           extra_nix_config: |
             accept-flake-config = true
+
+      - uses: DeterminateSystems/magic-nix-cache-action@v15
+        if: vars.NIX_GHA_CACHE == 'true'
+        timeout-minutes: 5
+        continue-on-error: true
+        with:
+          use-gha-cache: true
+          use-flakehub: false
+          diagnostic-endpoint: ""
 
       # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB runs the commands Claude executes inside
       # a bubblewrap sandbox. The runner image lacks bubblewrap and socat, and
@@ -101,11 +116,11 @@ jobs:
           additional_permissions: |
             actions: read
           # With the env scrub on, Claude Code forces permission mode "default", so
-          # the action's acceptEdits auto-approval of edits in the checkout no longer
-          # applies; allow the edit tools explicitly, scoped to the checkout (./**).
-          # Bash is off by default; the action itself allows git add/commit/rm
-          # and its push wrapper. nix and make are what this repo is driven
-          # with, the read-only git commands let Claude see what it changed.
+          # the action's acceptEdits auto-approval no longer applies; allow the edit
+          # tools and Bash outright. The runner is disposable, the tokens are
+          # scrubbed, and only the owner's text reaches Claude, so a command
+          # allowlist bought nothing and cost the 2026-10-31 runs on #16 dozens
+          # of denials (21 in run 41239936199) in the middle of verifying.
           # Pinned: without --model the action ran Sonnet 5.5 (runs 41139710070,
           # 41140266129), not the plan's Opus 5.5 default. Opus is twice Sonnet
           # per token (API-rate equivalent, drawn from the Max plan's usage
@@ -115,4 +130,4 @@ jobs:
             --model claude-opus-5-5
             --effort high
             --max-turns 300
-            --allowedTools "Edit(./**),MultiEdit(./**),Write(./**),Bash(nix:*),Bash(make:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+            --allowedTools "Edit,MultiEdit,Write,Bash"

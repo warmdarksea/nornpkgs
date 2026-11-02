@@ -60,18 +60,29 @@ Author and commit as `Claude <claude@anthropic.com>`, please. Thank you.
 
 * Push the branch with the action's push wrapper after every commit, not
   once at the end.
-* Never end a run with uncommitted or unpushed work. If you have to stop
-  early, commit whatever is consistent, push it, and say in your comment
-  exactly what is left; a later mention can continue from the branch.
+* Do not end your turn while your checklist still has items you can do.
+  There is nobody to tell you to continue; the run ends with your last
+  message. Run 41239936199 stopped in the middle of stage 2 with three
+  commits unpushed and the comment still saying "in progress".
+* If you do have to stop early, commit whatever is consistent, push it, and
+  update the comment with exactly what is left; a later mention can
+  continue from the branch.
+* On an issue every run starts a new branch from `master` and cannot reach
+  an earlier run's branch. On a pull request you are checked out on the
+  PR's branch with its history: continue from it, do not redo it.
 * You cannot change anything under `.github/workflows` from a run: the
   action's app token is not allowed to push workflow changes. Say so and
   leave that part to the owner instead of attempting it.
-* If the tool allowlist denies a command, say so in your comment rather
-  than trying variants; the owner can widen `--allowedTools`.
 * Evaluate all hosts in one shell loop that writes results to a file, not
-  one command per host; each command is a turn. A single evaluation of a
-  desktop host can exceed the Bash tool's default two-minute timeout, so
-  pass a longer `timeout` for those.
+  one command per host; each command is a turn.
+* The Bash tool kills a command at ten minutes unless the call asks for
+  longer, with `timeout` in milliseconds, up to an hour. Building a host's
+  toplevel (`make ci_check`) needs that; evaluating a desktop host can
+  take several minutes, so give those room too.
+* When the `NIX_GHA_CACHE` repository variable is on, nix in the run reads
+  and writes the GitHub Actions cache, so a rebuild of something an earlier
+  run built is cheap. The variable is off when the cache step is missing
+  from the job log.
 * `cheese` and `dusk` fail to evaluate on `master` as of 2026-10-31
   (conflicting `console.font` definitions). Do not spend turns on them
   unless the task is to fix that.
