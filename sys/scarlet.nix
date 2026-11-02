@@ -57,6 +57,6 @@ import <nixpkgs/nixos> {
     user_allow_other
   '';};
 
-  system.stateVersion = "21.05"; # Did you read the comment?
+  system.stateVersion = "21.05";
  };
 }

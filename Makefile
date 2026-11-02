@@ -219,7 +219,6 @@ remote_pull_pkg: $(BUILD_DIR)/remote-pkg-$(PKG_NAME)
 push_closure: $(BUILD_DIR)/sys-$(TARGET)
 	nix copy --to "ssh://root@$(HOST)" "$<"
 
-# ah, memories
 #
 # REMOTE_STORE_PATH should be missing the final /nix, so e.g. /mnt/nix should be
 # /mnt

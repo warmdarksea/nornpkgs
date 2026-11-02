@@ -35,10 +35,6 @@ in {
     pkiBundle = "/var/secret/secureboot";
   };
 
-  # Lanzaboote currently replaces the systemd-boot module.
-  # This setting is usually set to true in configuration.nix
-  # generated at installation time. So we force it to false
-  # for now.
   boot.loader.systemd-boot.enable = lib.mkForce false;
   boot.loader.systemd-boot.memtest86.enable = true;
 
@@ -126,7 +122,6 @@ in {
   networking.firewall.checkReversePath = "loose";
   networking.firewall.rejectPackets = true;
 
-  # Enable the OpenSSH server.
   services.sshd.enable = true;
   services.guix.enable = true;
 
@@ -303,7 +298,7 @@ in {
     virt-viewer
     smartmontools
     libimobiledevice
-    ifuse # optional, to mount using 'ifuse'
+    ifuse
     lean4
     gamescope
     please-cli
@@ -376,5 +371,5 @@ in {
 
   nix.settings.allowed-users = [ "claude" ];
 
-  system.stateVersion = "24.11"; # Did you read the comment?
+  system.stateVersion = "24.11";
 }

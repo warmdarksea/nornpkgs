@@ -1,8 +1,6 @@
 { config, lib, pkgs, self, inputs, ... }: {
-  # Basic system configuration
   system.stateVersion = "23.11";
 
-  # Use the systemd-boot EFI boot loader.
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.systemd-boot.enable = lib.mkForce false;
   boot.initrd.systemd.enable = true;
@@ -16,23 +14,19 @@
     pkiBundle = "/var/lib/sbctl";
   };
   
-  # Enable SSH for remote access
   services.openssh.enable = true;
 
-  # Optional: Add a regular user
   users.users.nixos = {
     isNormalUser = true;
     extraGroups = [ "wheel" "networkmanager" ];
     initialPassword = "nixos";
   };
 
-  # Enable sudo without password for wheel group
   security.sudo.wheelNeedsPassword = false;
 
-  # Basic networking
   networking.useDHCP = lib.mkDefault true;
   environment.systemPackages = with pkgs; [
-    vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+    vim
     sbctl
     tpm2-tss
     tpm2-tools

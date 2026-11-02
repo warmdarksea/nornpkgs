@@ -1,11 +1,9 @@
 { config, lib, pkgs, self, inputs, ... }: {
-  # Basic system configuration
   networking = {
     firewall.enable = true;
     firewall.allowedTCPPorts = [ 22 ];
   };
   
-  # Enable SSH service
   services.openssh = {
     enable = true;
     settings = {
@@ -14,7 +12,6 @@
     };
   };
   
-  # Include necessary packages
   environment.systemPackages = with pkgs; [
     vim
     git

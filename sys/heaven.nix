@@ -6,7 +6,6 @@
 # 5. irm https://massgrave.dev/get | iex
 # https://www.howtogeek.com/323390/how-to-fix-windows-and-linux-showing-different-times-when-dual-booting/
 
-# nix system expr:
 let overlays = [
       (self: super: import /home/satori/tmp/emacs-overlay-master/default.nix self super)
       ];
@@ -37,7 +36,6 @@ in import <nixpkgs/nixos> {
     powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";
     hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 
-    # Use the systemd-boot EFI boot loader.
     boot.loader.systemd-boot.enable = lib.mkForce false;
 
     boot.lanzaboote = {
@@ -49,7 +47,7 @@ in import <nixpkgs/nixos> {
     boot.loader.efi.canTouchEfiVariables = true;
     boot.loader.efi.efiSysMountPoint = "/boot/EFI";
 
-    networking.hostName = "heaven"; # Define your hostname.
+    networking.hostName = "heaven";
     services.xserver.enable = true;
     services.xserver.displayManager.defaultSession = lib.mkForce "gnome";
     services.xserver.displayManager.gdm = {
@@ -68,12 +66,8 @@ in import <nixpkgs/nixos> {
       DefaultTimeoutStopSec=5s
     '';
 
-    # Set your time zone.
     time.timeZone = "America/New_York";
 
-    # The global useDHCP flag is deprecated, therefore explicitly set to false here.
-    # Per-interface useDHCP will be mandatory in the future, so this generated config
-    # replicates the default behaviour.
     networking.useDHCP = false;
 
     users.users.tenshi = {
@@ -81,15 +75,12 @@ in import <nixpkgs/nixos> {
       extraGroups = ["wheel" "video"];
     };
 
-    # Enable sound.
     sound.enable = true;
     hardware.pulseaudio.enable = false;
     services.acpid.enable = true;
 
     programs.ssh.askPassword = "${pkgs.x11_ssh_askpass}/libexec/x11-ssh-askpass";
 
-    # List packages installed in system profile. To search, run:
-    # $ nix search wget
     environment.systemPackages = with pkgs; [
       pkgs.sbctl
       gcc
@@ -106,11 +97,10 @@ in import <nixpkgs/nixos> {
     home-manager.users."tenshi" = let
       # TODO: factor this out, the hard part is the overlay...
       myEmacs = (pkgs.emacsWithPackagesFromUsePackage {
-        package = pkgs.emacsPgtk;  # replace with pkgs.emacsPgtk, or another version if desired.
+        package = pkgs.emacsPgtk;
         config = ../../emacs/config.el;
         defaultInitFile = false;
 
-        # Optionally provide extra packages not in the configuration file.
         extraEmacsPackages = epkgs: [
           epkgs.use-package
           pkgs.chez
@@ -144,6 +134,6 @@ in import <nixpkgs/nixos> {
 
     nixpkgs.overlays = overlays;
 
-    system.stateVersion = "22.05"; # Did you read the comment?
+    system.stateVersion = "22.05";
   };
 }

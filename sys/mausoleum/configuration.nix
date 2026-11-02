@@ -13,7 +13,6 @@
     alsa.enable = true;
     alsa.support32Bit = true;
     pulse.enable = true;
-    # If you want to use JACK applications, uncomment this
     jack.enable = true;
 
     wireplumber.enable = true;
@@ -41,10 +40,8 @@
     extraGroups = ["wheel" "video"];
   };
 
-  # List packages installed in system profile. To search, run:
-  # $ nix search wget
   environment.systemPackages = with pkgs; [
-    vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+    vim
     gnumake
     wget
     sbctl
@@ -54,5 +51,5 @@
     hydrus
   ];
 
-  system.stateVersion = "23.05"; # Did you read the comment?
+  system.stateVersion = "23.05";
 }

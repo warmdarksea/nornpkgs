@@ -5,9 +5,8 @@
     consoleFont = "latarcyrheb-sun32";
   };
 
-  networking.networkmanager.enable = true;  # Easiest to use and most distros use this by default.
+  networking.networkmanager.enable = true;
 
-  # Enable the X11 windowing system.
   services.xserver.enable = true;
   # "iris" is a mesa driver, not an X11 driver; modesetting is the right one
   services.xserver.videoDrivers = ["modesetting"];
@@ -23,13 +22,13 @@
 
   programs.sway = {
     enable = true;
-    wrapperFeatures.gtk = true; # so that gtk works properly
+    wrapperFeatures.gtk = true;
     extraPackages = with pkgs; [
       swaylock
       swayidle
       wl-clipboard
       mako # notification daemon
-      alacritty # Alacritty is the default terminal in the config
+      alacritty
 
       waybar
 
@@ -52,19 +51,9 @@
     extraGroups = ["wheel"];
   };
 
-  # List services that you want to enable:
-
-  # Enable the OpenSSH daemon.
   services.openssh.enable = true;
 
-  # Or disable the firewall altogether.
   networking.firewall.enable = true;
 
-  # This value determines the NixOS release from which the default
-  # settings for stateful data, like file locations and database versions
-  # on your system were taken. It’s perfectly fine and recommended to leave
-  # this value at the release version of the first install of this system.
-  # Before changing this value read the documentation for this option
-  # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "23.05"; # Did you read the comment?
+  system.stateVersion = "23.05";
 }

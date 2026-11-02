@@ -16,10 +16,6 @@
   nix.settings.keep-failed = true;
   nixpkgs.config.allowUnfree = true;
 
-  # Lanzaboote currently replaces the systemd-boot module.
-  # This setting is usually set to true in configuration.nix
-  # generated at installation time. So we force it to false
-  # for now.
   boot.loader.systemd-boot.enable = lib.mkForce false;
 
   boot.lanzaboote = {
@@ -133,5 +129,5 @@
     sbctl
   ];
 
-  system.stateVersion = "26.11"; # Did you read the comment?
+  system.stateVersion = "26.11";
 }
