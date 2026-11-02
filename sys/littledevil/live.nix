@@ -2,13 +2,6 @@
   services.postgresql = {
     enable = true;
     package = pkgs.postgresql_18;
-    #ensureDatabases = [ "test" ];
-    #ensureUsers = [
-    #  {
-    #    name = "test";
-    #    ensureDBOwnership = true;
-    #  }
-    #];
     authentication = lib.mkOverride 10 ''
       local all postgres          peer
       local all akkoma            peer
@@ -30,15 +23,6 @@
           createrole = false;
         };
       }
-      # {
-      #   name = "synapse";
-      #   ensureClauses = {
-      #     login = true;
-      #     superuser = false;
-      #     createdb = false;
-      #     createrole = false;
-      #   };
-      # }
     ];
   };
 
@@ -66,9 +50,6 @@
     # workaround: this is kind of broken and i cannot get it to work
     initDb.enable = true;
     initDb.username = lib.mkForce "postgres";
-    #initDb.password = {
-    #  _secret = "/var/secret/akkoma/dbpassword";
-    #};
     frontends = {
       primary = {
         package = pkgs.buildPackages.akkoma-fe;
@@ -76,11 +57,6 @@
         ref = "stable";
       };
     };
-    #extraStatic = {
-    #  "index.html" = pkgs.writeText "index.html" ''
-    #    <html>backend is working</html>
-    #  '';
-    #};
 
     config = lib.recursiveUpdate {
       ":pleroma" = {
@@ -104,7 +80,6 @@
           socket_dir = "/run/postgresql";
           username = "akkoma";
           database = "akkoma";
-          #password = { _secret = "/var/secret/akkoma/dbpassword"; };
         };
 
         "Pleroma.Upload" = {
@@ -144,14 +119,6 @@
       ":joken".":default_signer" = { _secret = "/var/secret/akkoma/joken_default_signer"; };
     };
   };
-
-  #services.matrix-synapse = {
-  #  enable = true;
-  #};
-
-  #services.znc = {
-  #  enable = true;
-  #};
 
   environment.systemPackages = with pkgs; [
     tcpdump

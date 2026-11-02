@@ -40,10 +40,7 @@ stdenv.mkDerivation (finalAttrs: {
   # project() version at the pinned revision; 2.2.28 is not tagged yet
   version = "2.2.28-unstable-2026-10-29";
 
-  # Our fork, 88emu-vst branch, from the local checkout for now.
-  # TODO: once the fork is pushed, switch to the GitHub copy:
-  #   url = "https://github.com/<username>/gearmulator.git";
-  # (same ref/rev scheme; or fetchFromGitHub with fetchSubmodules = true).
+  # Our fork, 88emu-vst branch.
   # Upstream base: github:dsp56300/gearmulator @ 0ed1fc73 (2.2.28 pre-release).
   src = builtins.fetchGit {
     url = "https://github.com/warmdarksea/gearmulator.git";

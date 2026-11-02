@@ -15,14 +15,4 @@
 
   # QEMU guest agent for IP reporting
   services.qemuGuest.enable = true;
-
-  networking.interfaces.eth0 = {
-    useDHCP = false;
-    ipv4.addresses = [ {
-      address = "0.0.0.0";
-      prefixLength = 24;
-    } ];
-  };
-  networking.defaultGateway = "0.0.0.0";
-  networking.nameservers = [ "0.0.0.0" ];  # or whatever your DNS is
 }

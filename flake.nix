@@ -32,11 +32,6 @@
       };
     };
 
-    nixpak = {
-      url = "github:nixpak/nixpak";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     nix-minecraft = {
       url = "github:Infinidoge/nix-minecraft";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -65,8 +60,6 @@
     home-manager,
     lanzaboote,
 
-    nixpak,
-
     nix-minecraft,
 
     gensokyo-private,
@@ -92,7 +85,6 @@
         ldModules = {
           bootstrap = import ./sys/littledevil/bootstrap.nix;
           live = import ./sys/littledevil/live.nix;
-          live_test = import ./sys/littledevil/live_test.nix;
           prod = import ./sys/littledevil/prod.nix;
           oci = import ./sys/littledevil/oci.nix;
           libvirt = import ./sys/littledevil/libvirt.nix;
@@ -203,17 +195,12 @@
 
     # home manager modules
 
-    homeManagerModules.common = { config, lib, pkgs, ... }: {
-      imports = [ ./home/common.nix ];
-    };
+    homeManagerModules.common = import ./home/common.nix;
     # Audio plugins (VST3/VST2/CLAP/LV2) from packages into ~/.vst3 & friends,
     # see home/audio-plugins.nix for the mechanics.
     homeManagerModules.audioPlugins = import ./home/audio-plugins.nix;
-    homeManagerModules.magician = { config, lib, pkgs, ... }: {
-      imports = [ ./home/common.nix ./home/magician.nix self.homeManagerModules.audioPlugins ];
-      _module.args = {
-        nixpak = nixpak;
-      };
+    homeManagerModules.magician = {
+      imports = [ self.homeManagerModules.common self.homeManagerModules.audioPlugins ];
       # The -compat builds (older glibc), so the plugins also load into the
       # Bitwig flatpak's freedesktop runtime.
       audioPlugins.packages = [
@@ -254,7 +241,6 @@
         self.nixosModules.base
         (gensokyo-private.nixosModules.abandonedfactory or {})
         lanzaboote.nixosModules.lanzaboote
-        #"${nixpkgs}/nixos/modules/installer/sd-card/sd-image-x86_64.nix"
         ./hw/lattepanda_v1.nix
         ./sys/abandonedfactory/hardware-configuration.nix
         ./sys/abandonedfactory.nix
@@ -429,7 +415,7 @@
         (gensokyo-private.nixosModules.library or {})
         lanzaboote.nixosModules.lanzaboote
         ./hw/library.nix
-        ./sys/library/configuration.nix
+        ./sys/library.nix
       ];
     };
 
@@ -445,7 +431,7 @@
         (gensokyo-private.nixosModules.magic or {})
         lanzaboote.nixosModules.lanzaboote
         ./hw/magic.nix
-        ./sys/magic/configuration.nix
+        ./sys/magic.nix
       ];
     };
 
@@ -620,9 +606,6 @@
 
     devShells.x86_64-linux.littledevil = pkgs.mkShell {
       packages = with pkgs; [
-        #aliyun-cli
-        #awscli2
-        #azure-cli
         bruno
         libvirt
         m4
@@ -634,9 +617,6 @@
           p.hashicorp_null
           p.hashicorp_tls
           p.dmacvicar_libvirt
-          #p.hashicorp_aws
-          #p.hashicorp_azurerm
-          #p.aliyun_alicloud
           p.oracle_oci
           p.cloudflare_cloudflare
         ]))
@@ -683,7 +663,7 @@
         }
         self.nixosModules.base
         ./sys/minimal.nix
-        ./sys/recovery.nix   # the new module
+        ./sys/recovery.nix
       ];
     };
 
@@ -773,18 +753,12 @@
     # Built from the compat pin for the same Bitwig-flatpak reason.
     packages.x86_64-linux.openutau-bridge = pkgsCompat.callPackage ./pkgs/openutau-bridge { };
 
-    packages.x86_64-linux.claude-env = pkgs.buildEnv {
-      name = "claude-env";
-      paths = with pkgs; [ nix gitMinimal bash coreutils ];
-    };
-
     # NanoKVM boot-control tooling.
     packages.x86_64-linux.uefi_trampoline =
       pkgs.callPackage "${uefiTrampolineSrc}/default.nix" { }; # .override { bootId = N; }
     packages.x86_64-linux.nanokvm = nornpkgs.nanokvm;
     packages.x86_64-linux.nanokvmctl = nornpkgs.nanokvmctl;
 
-    # and, mirroring your existing packages.<arch>.images.<name> pattern:
     images.gensokyo-recovery =
       self.nixosConfigurations.gensokyo-recovery.config.system.build.image;
     };

@@ -14,11 +14,9 @@
   hardware.graphics.enable = true;
   hardware.graphics.enable32Bit = true;
 
-  # Load nvidia driver for Xorg and Wayland
   services.xserver.videoDrivers = [ "nvidia" ];
 
   hardware.nvidia = {
-    # Modesetting is required.
     modesetting.enable = true;
 
     # Nvidia power management. Experimental, and can cause sleep/suspend to fail.
@@ -34,9 +32,5 @@
     nvidiaSettings = false;
 
     nvidiaPersistenced = true;
-
-    # Optionally, you may need to select the appropriate driver version for your specific GPU.
-    # package = config.boot.kernelPackages.nvidiaPackages;
-    #package = config.boot.kernelPackages.nvidiaPackages.production;
   };
 }

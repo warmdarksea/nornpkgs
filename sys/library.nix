@@ -1,23 +1,14 @@
 { config, lib, pkgs, ... }: {
-  imports = [
-  ];
-
   nixpkgs.config.allowUnfreePredicate = pkg: (builtins.elem (lib.getName pkg) [
     "corefonts"
     "nvidia-x11"
     "nvidia-persistenced"
     "nvidia-settings"
     "cudnn"
-    #    "cuda_cudart"
-    #    "cuda_cccl"
-    #    "libcublas"
-    #    "nvtop"
     "vcv-rack"
   ]) || (builtins.all (license:
     license.free || builtins.elem license.shortName [
       "CUDA EULA"
-      #    "cuDNN EULA"
-      #    "cuTENSOR EULA"
       "NVidia OptiX EULA"
     ]
   ) (if builtins.isList pkg.meta.license then pkg.meta.license else [ pkg.meta.license ]));
@@ -25,10 +16,6 @@
   nix.settings.keep-failed = true;
   nixpkgs.config.allowUnfree = true;
 
-  # Lanzaboote currently replaces the systemd-boot module.
-  # This setting is usually set to true in configuration.nix
-  # generated at installation time. So we force it to false
-  # for now.
   boot.loader.systemd-boot.enable = lib.mkForce false;
 
   boot.lanzaboote = {
@@ -49,7 +36,7 @@
       pin = pkgs.writeShellApplication {
         name = "boot-order-assert";
         runtimeInputs = with pkgs; [ efibootmgr gawk gnused gnugrep coreutils ];
-        text = builtins.readFile ../../lib/boot-order-assert.sh;
+        text = builtins.readFile ../lib/boot-order-assert.sh;
       };
     in {
       description = "Pin UEFI BootOrder with the NanoKVM entry first";
@@ -87,7 +74,9 @@
   boot.initrd.network = {
     enable = true;
     ssh = {
-      enable = true;
+      # the authorized keys come from gensokyo-private, which the ci stub
+      # does not have, and initrd ssh will not evaluate without one
+      enable = !config.gensokyo.ci;
       port = 2222;  # different port so your normal known_hosts entry doesn't conflict
       # the real key path lives in gensokyo-private.nixosModules.library; this
       # placeholder only keeps the public/ci stubs evaluating (it is a string
@@ -96,19 +85,11 @@
     };
   };
 
-  # the root key lives in lib/server.nix
-
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
 
   swapDevices = [ ];
   
   networking.useDHCP = lib.mkDefault true;
-  #networking.dhcpcd.enable = false;
-  #networking.interfaces.enp6s0.ipv4.addresses = [
-  #  { address = "0.0.0.0"; prefixLength = 24; }
-  #];
-  #networking.defaultGateway = "0.0.0.0";
-  #networking.nameservers = ["0.0.0.0"];
 
   virtualisation.docker = {
     enable = true;
@@ -137,8 +118,6 @@
     "-a always,exit -F arch=b64 -S execve -F uid=${builtins.toString config.users.users.claude.uid} -k claude-exec"
   ];
 
-  #nix.settings.allowed-users = [ "claude" ];
-
   programs.nix-required-mounts = {
     enable = true;
     presets.nvidia-gpu.enable = true;
@@ -150,8 +129,5 @@
     sbctl
   ];
 
-  #system.copySystemConfiguration = true;
-
-  #system.stateVersion = "23.05"; # Did you read the comment?
-  system.stateVersion = "26.11"; # Did you read the comment?
+  system.stateVersion = "26.11";
 }

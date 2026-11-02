@@ -21,8 +21,6 @@
     "cache.nixos-cuda.org:74DUi4Ye579gUqzH4ziL9IyiJBlDpMRn9MBN8oNan9M="
   ];
 
-  #nixpkgs.config.allowlistedLicenses = with lib.licenses; [ bsl11 ];
-
   systemd.services.nixos-upgrade.path = [ pkgs.git ];
 
   boot.kernelParams = ["boot.shell_on_fail" "console=tty1"];
@@ -40,21 +38,9 @@
 
     llmnr = "false";
 
-    #services.resolved.extraConfig = ''
-    #[Resolve]
-    #DNS=0.0.0.0
-    #Domains=~gensokyo.internal
-    #'';
-
     settings.Resolve.DNS = [ "10.217.37.1" ];
     settings.Resolve.Domains = [ "~gensokyo.internal" ];
   };
-
-  #security.pki.certificateFiles = [
-  #  ../etc/certs/gensokyo.internal.ca.pem
-  #];
-
-  #environment.etc."pki/ca-trust/source/anchors/gensokyo.internal.ca.pem".source = ../etc/certs/gensokyo.internal.ca.pem;
 
   services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = false;
@@ -184,11 +170,4 @@
     keyMap = "${mykeymap}";
     font = "default8x16";
   };
-
-  # systemd.services.setconsole = {
-  #   script = ''
-  #     ${pkgs.busybox}/bin/setconsole /dev/tty1
-  #   '';
-  #   wantedBy = [ "multi-user.target" ];
-  # };
 }

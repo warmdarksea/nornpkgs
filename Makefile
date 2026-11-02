@@ -74,9 +74,6 @@ $(BUILD_DIR)/img-%:
 $(BUILD_DIR)/iso-%:
 	nix build $(NIX_FLAGS) -o "$@" .#nixosConfigurations.iso-$*.config.system.build.isoImage
 
-$(BUILD_DIR)/env-%:
-	nix build $(NIX_FLAGS) -o "$@" .#packages.x86_64-linux.$*
-
 #
 
 .PHONY: build_sys_closure
@@ -222,7 +219,6 @@ remote_pull_pkg: $(BUILD_DIR)/remote-pkg-$(PKG_NAME)
 push_closure: $(BUILD_DIR)/sys-$(TARGET)
 	nix copy --to "ssh://root@$(HOST)" "$<"
 
-# ah, memories
 #
 # REMOTE_STORE_PATH should be missing the final /nix, so e.g. /mnt/nix should be
 # /mnt

@@ -7,9 +7,5 @@
 
   networking.firewall.allowedTCPPorts = [ 22 ];
 
-  #environment.systemPackages = with pkgs; [
-  #  tcpdump
-  #];
-
   system.stateVersion = "24.11";
 }

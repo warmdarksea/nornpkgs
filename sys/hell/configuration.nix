@@ -2,11 +2,6 @@
   unfreePkgNames = [
     "corefonts"
     "vcv-rack"
-    # fixme: i don't actually want this directly in the system derivation... i
-    # only want the sandbox launcher in the system derivation
-    "bitwig-studio"
-    "bitwig-studio-unwrapped"
-    "bitwig-studio-unwrapped-6.0"
   ];
 
   # fixme: is there really no clean way to modularize this
@@ -15,15 +10,9 @@
     "nvidia-persistenced"
     "nvidia-settings"
     "cudnn"
-    #    "cuda_cudart"
-    #    "cuda_cccl"
-    #    "libcublas"
-    #    "nvtop"
   ];
   nvidiaLicenses = [
     "CUDA EULA"
-    #    "cuDNN EULA"
-    #    "cuTENSOR EULA"
     "NVidia OptiX EULA"
   ];
   nvidiaUnfreePredicate = let
@@ -36,49 +25,24 @@
       license.free || builtins.elem license.shortName nvidiaLicenses) pkgLicenses;
   in pkg: (nvidiaNamePred pkg) || (nvidiaLicensePred pkg);
 
-in rec {
+in {
   nixpkgs.config.allowUnfreePredicate = let
     unfreePredicate = pkg: builtins.elem (lib.getName pkg) unfreePkgNames;
   in pkg: (nvidiaUnfreePredicate pkg) || (unfreePredicate pkg);
-
-  nixpkgs.overlays = [
-    # (self: super: {
-    #   linuxPackages_6_14 = super.linuxPackages_6_14.extend (lpself: lpsuper: {
-    #     zfs_unstable = lpsuper.zfs_unstable.overrideAttrs (oldAttrs: {
-    #       meta = oldAttrs.meta // { broken = true; }; # remove whenever you feel like it
-    #     });
-    #   });
-    #   my_zfs = super.zfs_unstable.overrideAttrs(old: {
-    #     kernelCompatible = true;
-    #     #meta.broken = false;
-    #     #rev = "301da593ade391fa78a660c7b42325cd2ace593a";
-    #   });
-    # })
-  ];
 
   boot.lanzaboote = {
     enable = true;
     pkiBundle = "/var/secret/secureboot";
   };
 
-  # Lanzaboote currently replaces the systemd-boot module.
-  # This setting is usually set to true in configuration.nix
-  # generated at installation time. So we force it to false
-  # for now.
   boot.loader.systemd-boot.enable = lib.mkForce false;
   boot.loader.systemd-boot.memtest86.enable = true;
-  #boot.loader.systemd-boot.extraEntries."Windows 11" = ''
-  #  title Windows 11
-  #  efi /EFI/Microsoft/Boot/bootmgfw.efi
-  #'';
 
   boot.kernelParams = [
     "zfs.zfs_arc_min=536870912"
     "zfs.zfs_arc_max=2147483648"
     "cgroup_enable=memory"
     "systemd.unified_cgroup_hierarchy=1"
-    # found online, might reduce stuttering?
-    # "amdgpu.preempt_mm=0"
     "amdgpu.dcdebugmask=0x10"
   ];
 
@@ -88,21 +52,10 @@ in rec {
 
   boot.blacklistedKernelModules = [ "dvb_usb_rtl28xxu" ];
 
-  #boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
-
-  #system.nixos.tags = [ "lts-kernel" ];
   # linuxPackages refers to latest lts kernel
   boot.kernelPackages = pkgs.linuxPackages;
   # at the time of writing, this is equal to zfs_unstable
   boot.zfs.package = pkgs.zfs_unstable;
-
-  #specialisation = {
-    # stable refers to latest (per nixpkgs) stable branch kernel
-    #stable.configuration = {
-      #boot.kernelPackages = pkgs.linuxPackages_latest;
-      #system.nixos.tags = lib.mkForce [ "stable-kernel" ];
-    #};
-  #};
 
   # hardware.bluetooth lives in lib/desktop.nix
   hardware.sensor.iio.enable = true;
@@ -143,31 +96,19 @@ in rec {
 
     # reserve core 0
     AllowedCPUs = "1-15";
-    #CPUShares = "512";
     CPUWeight = 50;         # Lower than default (100)
-    #CPUSchedulingPolicy = "idle";
 
     MemoryHigh = "16G";
     MemoryMax = "20G";
 
     IOWeight = 50;          # Lower than default (100)
-    #IOSchedulingClass = "idle";
 
     Slice = "swap-allowed.slice";
   };
   nix.daemonCPUSchedPolicy = "idle";
   nix.daemonIOSchedClass = "idle";
 
-  # 
-
   networking.firewall.trustedInterfaces = [ "incusbr0" ];
-  # networking.firewall.interfaces.incusbr0 = {
-  #   allowedUDPPorts = [ 53 67 ];
-  # };
-  # networking.firewall.extraForwardRules = ''
-  #   iifname "incusbr0" accept
-  #   oifname "incusbr0" ct state established,related accept
-  # '';
 
   networking.nftables.enable = true;
 
@@ -181,13 +122,6 @@ in rec {
   networking.firewall.checkReversePath = "loose";
   networking.firewall.rejectPackets = true;
 
-  #i18n.supportedLocales = [
-  #  "en_US.UTF-8/UTF-8"
-  #  "ja_JP.UTF-8/UTF-8"
-  #  "ja_JP.SJIS"
-  #];
-
-  # Enable the OpenSSH server.
   services.sshd.enable = true;
   services.guix.enable = true;
 
@@ -196,11 +130,8 @@ in rec {
     drivers = [pkgs.hplip pkgs.brlaser];
   };
   
-  #programs.adb.enable = true;
   programs.wireshark.enable = true;
-  #services.fprintd.enable = lib.mkForce false;
   powerManagement.enable = true;
-  #services.tlp.enable = true;
   services.flatpak.enable = true;
   
   services.displayManager.gdm.enable = true;
@@ -219,7 +150,6 @@ in rec {
   };
 
   services.pulseaudio.enable = false;
-  # sound.enableOSSEmulation = true;
   # rtkit + pipewire live in lib/desktop.nix
 
   gtk.iconCache.enable = true;
@@ -257,7 +187,6 @@ in rec {
     mplus-outline-fonts.githubRelease
     dina-font
     proggyfonts
-    # nerdfonts
     corefonts
     ultimate-oldschool-pc-font-pack
   ];
@@ -297,7 +226,6 @@ in rec {
     enable = true;
     package = pkgs.incus;
     ui.enable = true;
-    #bucketSupport = false;
   };
   virtualisation.podman = {
     enable = true;
@@ -340,15 +268,12 @@ in rec {
   };
 
   environment.systemPackages = with pkgs; [
-    #      gcc
-    #      libsForQt5.bismuth
     hicolor-icon-theme
     adwaita-icon-theme
     gnomeExtensions.workspace-matrix
     gnomeExtensions.appindicator
     gnomeExtensions.screen-rotate
     gnomeExtensions.bing-wallpaper-changer
-    #gnomeExtensions.kimpanel
     gnomeExtensions.gtk4-desktop-icons-ng-ding
     gnomeExtensions.week-start-modifier
     gnome-terminal
@@ -366,16 +291,14 @@ in rec {
     iotop
     smem
     gnome-tweaks
-    #memtree
     sqlite
     sqlitebrowser
     lyx
     nftables
     virt-viewer
-    #freecad
     smartmontools
     libimobiledevice
-    ifuse # optional, to mount using 'ifuse'
+    ifuse
     lean4
     gamescope
     please-cli
@@ -422,22 +345,6 @@ in rec {
   ];
   users.users.clownpiece = {
     uid = 1000;
-    # subUidRanges = [
-    #   { startUid = 100000; count = 16777216; }
-    #   { startUid = config.users.users.clownpiece-audio.uid; count = 1; }
-    #   { startUid = config.users.users.flandre.uid; count = 1; }
-    #   { startUid = config.users.users.claude.uid; count = 1; }
-    # ];
-    # subGidRanges = [
-    #   { startGid = 100000; count = 16777216; }  # Default range
-    #   { startGid = config.ids.gids.audio; count = 1; }
-    #   { startGid = config.ids.gids.video; count = 1; }
-    #   { startGid = config.ids.gids.render; count = 1; }
-    #   { startGid = config.users.groups.agent.gid; count = 1; }
-    #   { startGid = config.users.groups.kvm.gid; count = 1; }
-    #   { startGid = config.users.groups.games.gid; count = 1; }
-    #   { startGid = config.users.users.clownpiece-audio.uid; count = 1; }
-    # ];
     extraGroups = [ "magician" "wheel" "audio" "video" "sudo" "render" "networkmanager" "docker" "podman" "libvirtd" "wireshark" "incus" "incus-admin" "input" "games" "plugdev" "pipewire" "lp" "scanner" "adbusers" "kvm"];
     isNormalUser = true;
   };
@@ -464,5 +371,5 @@ in rec {
 
   nix.settings.allowed-users = [ "claude" ];
 
-  system.stateVersion = "24.11"; # Did you read the comment?
+  system.stateVersion = "24.11";
 }

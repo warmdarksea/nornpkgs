@@ -14,14 +14,6 @@
 
   services.logind.lidSwitch = "ignore";
 
-#  services.xserver.synaptics.enable = true;
-#  services.xserver.synaptics.tapButtons = false;
-  #services.xserver.libinput.mouse.tapping = false;
-  #services.xserver.libinput.touchpad.tapping = false;
-  #environment.etc."udev/hwdb.d/10-local.hwdb".text = ''
-  #  libinput:name:SynPS/2 Synaptics TouchPad:dmi:*svnLENOVO:*:pvrThinkPadX230Tablet*
-  #  LIBINPUT_MODEL_LENOVO_X230=1
-  #'';
   services.xserver.wacom.enable = true;
   services.xserver.modules = [pkgs.xorg.xf86inputlibinput];
 }

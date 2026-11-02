@@ -14,10 +14,6 @@
     };
   };
 
-  users.users.root.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA redacted"
-  ];
-
   # man caches take minutes to build; servers don't need them
   documentation.man.generateCaches = lib.mkForce false;
 }

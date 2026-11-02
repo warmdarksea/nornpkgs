@@ -5,8 +5,6 @@
 # (this used to live on the nixos-hardware fork as
 # microsoft/surface/surface-pro-5.)
 {
-  #services.xserver.wacom.package = pkgs.libwacom-surface;
-
   nixpkgs.overlays = lib.mkDefault [
     (self: super: {
       libwacom = super.libwacom-surface;
