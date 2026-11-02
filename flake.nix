@@ -32,11 +32,6 @@
       };
     };
 
-    nixpak = {
-      url = "github:nixpak/nixpak";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     nix-minecraft = {
       url = "github:Infinidoge/nix-minecraft";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -65,8 +60,6 @@
     home-manager,
     lanzaboote,
 
-    nixpak,
-
     nix-minecraft,
 
     gensokyo-private,
@@ -92,7 +85,6 @@
         ldModules = {
           bootstrap = import ./sys/littledevil/bootstrap.nix;
           live = import ./sys/littledevil/live.nix;
-          live_test = import ./sys/littledevil/live_test.nix;
           prod = import ./sys/littledevil/prod.nix;
           oci = import ./sys/littledevil/oci.nix;
           libvirt = import ./sys/littledevil/libvirt.nix;
@@ -210,10 +202,7 @@
     # see home/audio-plugins.nix for the mechanics.
     homeManagerModules.audioPlugins = import ./home/audio-plugins.nix;
     homeManagerModules.magician = { config, lib, pkgs, ... }: {
-      imports = [ ./home/common.nix ./home/magician.nix self.homeManagerModules.audioPlugins ];
-      _module.args = {
-        nixpak = nixpak;
-      };
+      imports = [ ./home/common.nix self.homeManagerModules.audioPlugins ];
       # The -compat builds (older glibc), so the plugins also load into the
       # Bitwig flatpak's freedesktop runtime.
       audioPlugins.packages = [
