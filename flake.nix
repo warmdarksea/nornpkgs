@@ -195,14 +195,12 @@
 
     # home manager modules
 
-    homeManagerModules.common = { config, lib, pkgs, ... }: {
-      imports = [ ./home/common.nix ];
-    };
+    homeManagerModules.common = import ./home/common.nix;
     # Audio plugins (VST3/VST2/CLAP/LV2) from packages into ~/.vst3 & friends,
     # see home/audio-plugins.nix for the mechanics.
     homeManagerModules.audioPlugins = import ./home/audio-plugins.nix;
-    homeManagerModules.magician = { config, lib, pkgs, ... }: {
-      imports = [ ./home/common.nix self.homeManagerModules.audioPlugins ];
+    homeManagerModules.magician = {
+      imports = [ self.homeManagerModules.common self.homeManagerModules.audioPlugins ];
       # The -compat builds (older glibc), so the plugins also load into the
       # Bitwig flatpak's freedesktop runtime.
       audioPlugins.packages = [
