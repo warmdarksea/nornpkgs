@@ -416,7 +416,7 @@
         (gensokyo-private.nixosModules.library or {})
         lanzaboote.nixosModules.lanzaboote
         ./hw/library.nix
-        ./sys/library/configuration.nix
+        ./sys/library.nix
       ];
     };
 

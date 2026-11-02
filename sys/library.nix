@@ -49,7 +49,7 @@
       pin = pkgs.writeShellApplication {
         name = "boot-order-assert";
         runtimeInputs = with pkgs; [ efibootmgr gawk gnused gnugrep coreutils ];
-        text = builtins.readFile ../../lib/boot-order-assert.sh;
+        text = builtins.readFile ../lib/boot-order-assert.sh;
       };
     in {
       description = "Pin UEFI BootOrder with the NanoKVM entry first";
