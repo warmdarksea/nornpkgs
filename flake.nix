@@ -210,16 +210,25 @@
       ];
     };
 
-    # systems
+    # generic systems: sys/<host> plus its roles and users, no hardware, disks,
+    # bootloader or hostname. what the boot tests (checks.*.boot-<host>) run.
+    nixosModules.gensokyo.systems = {
+      base = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+        ];
+      };
+    };
 
-    # The smallest system this flake expresses: lib/base.nix on a placeholder
-    # disk, nothing else. Never deployed. CI builds it on every push (cheap,
-    # nearly all cache hits), and it is a quick local check of lib/base.nix:
-    #   make build_sys_closure TARGET=base
+    # instances: a generic system plus hw/, the private module and inst/<fqdn>.
+    # what `make build_sys_closure TARGET=<host>` builds and deploys.
+
+    # base on a placeholder disk, never deployed; CI builds it on every push
     nixosConfigurations.base = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
+        self.nixosModules.gensokyo.systems.base
         {
           networking.hostName = "base";
           fileSystems."/" = { device = "/dev/disk/by-label/base-root"; fsType = "ext4"; };
@@ -227,7 +236,6 @@
           boot.loader.efi.canTouchEfiVariables = true;
           system.stateVersion = "26.11";
         }
-        self.nixosModules.base
       ];
     };
 
