@@ -6,6 +6,11 @@
 #   nixpkgs.config = { cudaSupport = true; };
 # (no cudaCapabilities: the default set is what cache.nixos-cuda.org builds;
 # the gencode flags below therefore cover every supported arch)
+# The GPU side of the sandbox (cudatoolkit, the driver's userspace, nvidia-uvm,
+# the nvcc flags) follows nixpkgs.config.cudaSupport, so a host without it --
+# and the CI build, which sets cudaSupport = !gensokyo.ci -- gets a CPU-only
+# sandbox. The agents themselves are large leaves CI never runs, so
+# gensokyo.ci leaves them out as well.
 #
 # One-time, as the user (rootless secrets are per-user):
 #   gensokyo-agent claude setup-token            # browser flow, prints a 1-year token
@@ -22,6 +27,7 @@ let
   cfg = config.gensokyo-agent;
   u = config.users.users.claude;
   g = config.users.groups.agent;
+  cudaSupport = pkgs.config.cudaSupport or false;
   cuda = pkgs.cudaPackages;
   gencode = lib.concatStringsSep " " cuda.flags.gencode;
   uid = toString u.uid;
@@ -36,7 +42,9 @@ let
       coreutils findutils gnused gnugrep gawk diffutils which file tree less
       curl wget netcat nmap
       procps util-linux jq ripgrep fd
+    ] ++ lib.optionals (!config.gensokyo.ci) [
       claude-code codex opencode
+    ] ++ lib.optionals cudaSupport [
       cuda.cudatoolkit
       config.hardware.nvidia.package.bin
     ];
@@ -95,8 +103,6 @@ let
         --gidmap 0:0:1 --gidmap ${gid}:@${gid}:1 --gidmap ${kvm}:@${kvm}:1
         --user ${uid}:${gid} --group-add ${kvm}
         --device /dev/kvm
-        --device /dev/nvidiactl --device /dev/nvidia0
-        --device /dev/nvidia-uvm --device /dev/nvidia-uvm-tools
         -v gensokyo-agent-home:${home}:U
         --mount "type=tmpfs,destination=/tmp,tmpfs-mode=1777,tmpfs-size=8g"
         -v /nix:/nix:ro
@@ -108,9 +114,15 @@ let
         -e NIX_PATH=nixpkgs=${pkgs.path}
         -e SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
         -e LD_LIBRARY_PATH=/run/opengl-driver/lib
-        -e CUDA_PATH=${env}
-        -e NVCC_PREPEND_FLAGS="-ccbin ${cuda.backendStdenv.cc}/bin/g++ -I${env}/include ${gencode}"
       )
+      ${lib.optionalString cudaSupport ''
+        args+=(
+          --device /dev/nvidiactl --device /dev/nvidia0
+          --device /dev/nvidia-uvm --device /dev/nvidia-uvm-tools
+          -e CUDA_PATH=${env}
+          -e NVCC_PREPEND_FLAGS="-ccbin ${cuda.backendStdenv.cc}/bin/g++ -I${env}/include ${gencode}"
+        )
+      ''}
       ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: var: ''
         podman secret exists ${name} && args+=(--secret "${name},type=env,target=${var}")
       '') secrets)}
@@ -151,7 +163,7 @@ in
       subGidRanges = [ { startGid = cfg.gid; count = 1; } { startGid = config.ids.gids.kvm; count = 1; } ];
     };
 
-    boot.kernelModules = [ "nvidia-uvm" ];
+    boot.kernelModules = lib.optional cudaSupport "nvidia-uvm";
     virtualisation.podman.enable = true;
     environment.systemPackages = [ wrapper ];
   };
