@@ -649,6 +649,15 @@
     nixosConfigurations.littledevil-prod-bootstrap = self.littledevil.aarch64.nixosConfigurations.oci-bootstrap;
     nixosConfigurations.littledevil-prod = self.littledevil.aarch64.nixosConfigurations.oci-live;
 
+    # opentofu with tf/'s providers; the devShell below and `make test_tf` share it
+    packages.x86_64-linux.tofu = pkgs.opentofu.withPlugins (p: [
+      p.hashicorp_null
+      p.hashicorp_tls
+      p.dmacvicar_libvirt
+      p.oracle_oci
+      p.cloudflare_cloudflare
+    ]);
+
     devShells.x86_64-linux.littledevil = pkgs.mkShell {
       packages = with pkgs; [
         bruno
@@ -658,16 +667,11 @@
         wireshark
         wrangler
         zap
-        (opentofu.withPlugins (p: [
-          p.hashicorp_null
-          p.hashicorp_tls
-          p.dmacvicar_libvirt
-          p.oracle_oci
-          p.cloudflare_cloudflare
-        ]))
+        self.packages.x86_64-linux.tofu
       ];
 
-      shellHook = ". secret/credentials.sh";
+      # the credentials are the owner's; the shell is still useful without them
+      shellHook = "[ -r secret/credentials.sh ] && . secret/credentials.sh";
     };
 
     # iso derivations
