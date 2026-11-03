@@ -188,6 +188,8 @@
         # older glibc pin, not whatever pkgs this overlay lands on.
         gearmulator = final.callPackage ./pkgs/gearmulator { };
         openutau-bridge = final.callPackage ./pkgs/openutau-bridge { };
+        # key-chatter filter for interception-tools (hw/asus_x13_flow.nix)
+        interception-debounce = final.callPackage ./pkgs/interception-debounce { };
       })
       emacs-overlay.overlays.default
       emacs-overlay.overlays.package
@@ -741,6 +743,9 @@
     # microQ/XT, Nord Lead 2x, JP-8000, MT-32/Sound Canvas) as audio plugins.
     # pkgs/gearmulator is written nixpkgs-style so it can be upstreamed as-is.
     packages.x86_64-linux.gearmulator = nornpkgs.gearmulator;
+
+    # interception-tools plugin that filters key chatter (issue #23).
+    packages.x86_64-linux.interception-debounce = nornpkgs.interception-debounce;
 
     # The same plugins and lsp-plugins from the glibc-2.40 pin (pkgsCompat in
     # the let above), for hosts whose process runs an older libc - the Bitwig
