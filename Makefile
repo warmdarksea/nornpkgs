@@ -132,8 +132,7 @@ ci_%: ci_tree
 # the authenticated tofu plan against the real state is plan_oci_live
 # (Makefile.littledevil), not a test
 
-# what `make test` boots and builds on a host of each arch; a hosted ci runner
-# has ~14 GB of disk, so only the small closures until the rest are trimmed
+# what `make test` boots and builds on a host of each arch
 NIX_HOSTS_AMD64=base hell library furnace
 NIX_HOSTS_AARCH64=littledevil
 NIX_TEMPLATES_AMD64=py-hello rust-hello lean4-hello
