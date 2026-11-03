@@ -168,6 +168,6 @@
     enable = true;
     earlySetup = true;
     keyMap = "${mykeymap}";
-    font = "default8x16";
+    font = lib.mkDefault "default8x16"; # hw/ modules override it for hidpi panels
   };
 }
