@@ -30,41 +30,21 @@ in {
     unfreePredicate = pkg: builtins.elem (lib.getName pkg) unfreePkgNames;
   in pkg: (nvidiaUnfreePredicate pkg) || (unfreePredicate pkg);
 
-  boot.lanzaboote = {
-    enable = true;
-    pkiBundle = "/var/secret/secureboot";
-  };
-
-  boot.loader.systemd-boot.enable = lib.mkForce false;
-  boot.loader.systemd-boot.memtest86.enable = true;
-
   boot.kernelParams = [
-    "zfs.zfs_arc_min=536870912"
-    "zfs.zfs_arc_max=2147483648"
     "cgroup_enable=memory"
     "systemd.unified_cgroup_hierarchy=1"
-    "amdgpu.dcdebugmask=0x10"
   ];
 
   boot.kernel.sysctl = {
     "vm.min_free_kbytes" = 524288;
   };
 
-  boot.blacklistedKernelModules = [ "dvb_usb_rtl28xxu" ];
-
   # linuxPackages refers to latest lts kernel
   boot.kernelPackages = pkgs.linuxPackages;
-  # at the time of writing, this is equal to zfs_unstable
-  boot.zfs.package = pkgs.zfs_unstable;
 
   # hardware.bluetooth lives in lib/desktop.nix
   hardware.sensor.iio.enable = true;
   hardware.rtl-sdr.enable = true;
-  hardware.nvidia = {
-    package = config.boot.kernelPackages.nvidiaPackages.stable;
-    prime.amdgpuBusId = "PCI:1:0:0";
-    prime.nvidiaBusId = "PCI:105:0:0";
-  };
 
   nix.settings.experimental-features = [ "nix-command" "flakes" "cgroups" ];
   nix.settings.use-cgroups = true;
@@ -221,7 +201,6 @@ in {
   systemd.services."getty@tty1".enable = false;
   systemd.services."autovt@tty1".enable = false;
 
-  hardware.nvidia-container-toolkit.enable = true;
   virtualisation.incus = {
     enable = true;
     package = pkgs.incus;
@@ -229,7 +208,6 @@ in {
   };
   virtualisation.podman = {
     enable = true;
-    enableNvidia = true;
     extraPackages = with pkgs; [
       dive
       podman-compose
@@ -238,12 +216,6 @@ in {
   };
   virtualisation.docker = {
     enable = true;
-
-    enableNvidia = true;
-    storageDriver = "zfs";
-    daemon.settings = {
-      storage-opts = [ "zfs.fsname=bell/docker" ];
-    };
   };
   virtualisation.libvirtd = {
     enable = true;
@@ -251,19 +223,6 @@ in {
       package = pkgs.qemu_kvm;
       runAsRoot = true;
       swtpm.enable = true;
-    };
-  };
-
-  services.sanoid = {
-    enable = true;
-    datasets."bell/workspace/miu" = {
-      autosnap = true;
-      autoprune = true;
-      frequently = 4;
-      frequent_period = 15;
-      hourly = 36;
-      daily = 30;
-      monthly = 3;
     };
   };
 
@@ -370,6 +329,4 @@ in {
   };
 
   nix.settings.allowed-users = [ "claude" ];
-
-  system.stateVersion = "24.11";
 }

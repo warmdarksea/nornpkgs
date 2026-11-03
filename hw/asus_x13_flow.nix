@@ -12,11 +12,26 @@
   boot.initrd.availableKernelModules = [ "nvme" "xhci_pci" "thunderbolt" "usbhid" "usb_storage" "sd_mod" "sdhci_pci" ];
   boot.kernelModules = [ "kvm-amd" ];
 
+  boot.kernelParams = [ "amdgpu.dcdebugmask=0x10" ];
+  boot.blacklistedKernelModules = [ "dvb_usb_rtl28xxu" ];
+
   hardware.enableRedistributableFirmware = lib.mkDefault true;
 
   services.xserver.videoDrivers = [ "amdgpu" ];
 
+  # the dgpu, used through prime offload (lib/nvidia.nix)
+  hardware.nvidia = {
+    package = config.boot.kernelPackages.nvidiaPackages.stable;
+    prime.amdgpuBusId = "PCI:1:0:0";
+    prime.nvidiaBusId = "PCI:105:0:0";
+  };
+
   # AMD has better battery life with PPD over TLP:
   # https://community.frame.work/t/responded-amd-7040-sleep-states/38101/13
   services.power-profiles-daemon.enable = lib.mkDefault true;
+
+  # the dgpu for containers
+  hardware.nvidia-container-toolkit.enable = true;
+  virtualisation.podman.enableNvidia = true;
+  virtualisation.docker.enableNvidia = true;
 }

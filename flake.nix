@@ -219,6 +219,148 @@
           self.nixosModules.base
         ];
       };
+
+      abandonedfactory = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          ./sys/abandonedfactory
+        ];
+      };
+
+      cheese = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          self.nixosModules.desktop
+          ./sys/cheese
+          home-manager.nixosModules.home-manager {
+            home-manager.useUserPackages = true;
+            home-manager.useGlobalPkgs = true;
+            home-manager.users.nazrin = self.homeManagerModules.magician;
+          }
+        ];
+      };
+
+      chireiden = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          self.nixosModules.desktop
+          ./sys/chireiden
+          home-manager.nixosModules.home-manager {
+            home-manager.useUserPackages = true;
+            home-manager.useGlobalPkgs = true;
+            home-manager.users."satori" = self.homeManagerModules.magician;
+          }
+        ];
+      };
+
+      dusk = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          self.nixosModules.desktop
+          ./sys/dusk
+          home-manager.nixosModules.home-manager {
+            home-manager.useUserPackages = true;
+            home-manager.useGlobalPkgs = true;
+            home-manager.users."rumia" = self.homeManagerModules.magician;
+          }
+        ];
+      };
+
+      eientei = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          ./sys/eientei
+        ];
+      };
+
+      furnace = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          ./sys/furnace
+        ];
+      };
+
+      hell = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          self.nixosModules.agent
+          self.nixosModules.desktop
+          ./sys/hell
+          home-manager.nixosModules.home-manager {
+            home-manager.useUserPackages = true;
+            home-manager.useGlobalPkgs = true;
+
+            home-manager.users.clownpiece = self.homeManagerModules.magician;
+            home-manager.users.seiran = self.homeManagerModules.common;
+          }
+        ];
+        gensokyo-agent = {
+          enable = true;
+          user = "clownpiece";
+        };
+        # no cudaCapabilities: narrowing them changes the hash of every CUDA
+        # derivation and misses cache.nixos-cuda.org, which builds the
+        # default set (see nixConfig at the top)
+        nixpkgs.config = {
+          # the CUDA builds are host-only; the runner builds the structure
+          cudaSupport = !ci;
+        };
+      };
+
+      library = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          self.nixosModules.agent
+          self.nixosModules.server
+          ./sys/library
+        ];
+        gensokyo-agent = {
+          enable = true;
+          user = "patchouli";
+        };
+        nixpkgs.config = {
+          cudaSupport = !ci; # see hell
+          # no cudaCapabilities, see hell
+        };
+      };
+
+      magic = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          ./sys/magic
+        ];
+      };
+
+      mausoleum = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          ./sys/mausoleum
+        ];
+      };
+
+      sea = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          self.nixosModules.desktop
+          ./sys/sea
+          home-manager.nixosModules.home-manager {
+            home-manager.useUserPackages = true;
+            home-manager.useGlobalPkgs = true;
+            home-manager.users."seija" = self.homeManagerModules.magician;
+          }
+        ];
+      };
     };
 
     # instances: a generic system plus hw/, the private module and inst/<fqdn>.
@@ -242,118 +384,66 @@
     nixosConfigurations.abandonedfactory = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "abandonedfactory";
-        }
-        self.nixosModules.base
+        self.nixosModules.gensokyo.systems.abandonedfactory
         (gensokyo-private.nixosModules.abandonedfactory or {})
         lanzaboote.nixosModules.lanzaboote
         ./hw/lattepanda_v1.nix
         ./inst/abandonedfactory.gensokyo.internal
-        ./sys/abandonedfactory
       ];
     };
  
 
     nixosConfigurations.cheese = lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          { nixpkgs.overlays = [ self.overlays.default ]; }
-          {
-            networking.hostName = "cheese";
-            networking.hostId = lib.mkDefault "00000000";
-          }
-          self.nixosModules.base
-          (gensokyo-private.nixosModules.cheese or {})
-          self.nixosModules.desktop
-          nixos-hardware.nixosModules.gpd-pocket-3
-          ./hw/gpd_pocket_3.nix
-          ./sys/cheese
-          ./inst/cheese.gensokyo.internal
-          home-manager.nixosModules.home-manager {
-            home-manager.useUserPackages = true;
-            home-manager.useGlobalPkgs = true;
-            home-manager.users.nazrin = self.homeManagerModules.magician;
-          }
-        ];
-      };
+      system = "x86_64-linux";
+      modules = [
+        self.nixosModules.gensokyo.systems.cheese
+        (gensokyo-private.nixosModules.cheese or {})
+        nixos-hardware.nixosModules.gpd-pocket-3
+        ./hw/gpd_pocket_3.nix
+        ./inst/cheese.gensokyo.internal
+      ];
+    };
 
     nixosConfigurations.chireiden = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "chireiden";
-          networking.hostId = lib.mkDefault "00000000";
-        }
-        self.nixosModules.base
+        self.nixosModules.gensokyo.systems.chireiden
         (gensokyo-private.nixosModules.chireiden or {})
-        self.nixosModules.desktop
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.lenovo-thinkpad-x13-amd
         ./hw/lenovo_thinkpad_x13_gen2.nix
-        ./sys/chireiden
         ./inst/chireiden.gensokyo.internal
-        home-manager.nixosModules.home-manager {
-          home-manager.useUserPackages = true;
-          home-manager.useGlobalPkgs = true;
-          home-manager.users."satori" = self.homeManagerModules.magician;
-        }
       ];
     };
 
     nixosConfigurations.dusk = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "dusk";
-          networking.hostId = lib.mkDefault "00000000";
-        }
-        self.nixosModules.base
+        self.nixosModules.gensokyo.systems.dusk
         (gensokyo-private.nixosModules.dusk or {})
-        self.nixosModules.desktop
         lanzaboote.nixosModules.lanzaboote
         ./hw/gpd_pocket_2.nix
-        ./sys/dusk
         ./inst/dusk.gensokyo.internal
-        home-manager.nixosModules.home-manager {
-          home-manager.useUserPackages = true;
-          home-manager.useGlobalPkgs = true;
-          home-manager.users."rumia" = self.homeManagerModules.magician;
-        }
       ];
     };
 
     nixosConfigurations.eientei = lib.nixosSystem {
-      system = "i686-linux";
+      # i686: nixpkgs.hostPlatform in sys/eientei
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "eientei";
-          networking.hostId = lib.mkDefault "00000000";
-        }
-        self.nixosModules.base
+        self.nixosModules.gensokyo.systems.eientei
         (gensokyo-private.nixosModules.eientei or {})
         ./hw/eeepc.nix
-        ./sys/eientei
+        ./inst/eientei.gensokyo.internal
       ];
     };
 
     nixosConfigurations.furnace = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "furnace";
-          networking.hostId = lib.mkDefault "00000000";
-        }
-        self.nixosModules.base
-        lanzaboote.nixosModules.lanzaboote
+        self.nixosModules.gensokyo.systems.furnace
         (gensokyo-private.nixosModules.furnace or {})
+        lanzaboote.nixosModules.lanzaboote
         ./hw/ugreen_dxp2800.nix
-        ./sys/furnace
         ./inst/furnace.gensokyo.internal
       ];
     };
@@ -361,100 +451,49 @@
     nixosConfigurations.hell = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "hell";
-          networking.hostId = lib.mkDefault "00000000";
-          gensokyo-agent = {
-            enable = true;
-            user = "clownpiece";
-          };
-          # no cudaCapabilities: narrowing them changes the hash of every CUDA
-          # derivation and misses cache.nixos-cuda.org, which builds the
-          # default set (see nixConfig at the top)
-          nixpkgs.config = {
-            # the CUDA builds are host-only; the runner builds the structure
-            cudaSupport = !ci;
-          };
-        }
-        self.nixosModules.base
-        self.nixosModules.agent
-        self.nixosModules.desktop
-        self.nixosModules.nvidia
+        self.nixosModules.gensokyo.systems.hell
         (gensokyo-private.nixosModules.hell or {})
         lanzaboote.nixosModules.lanzaboote
+        # prime offload onto the dgpu: hardware, so not part of the generic system
+        self.nixosModules.nvidia
         nixos-hardware.nixosModules.common-cpu-amd
         nixos-hardware.nixosModules.common-cpu-amd-pstate
         nixos-hardware.nixosModules.common-gpu-amd
         nixos-hardware.nixosModules.common-pc-laptop
         nixos-hardware.nixosModules.common-pc-laptop-ssd
         ./hw/asus_x13_flow.nix
-        ./sys/hell
         ./inst/hell.gensokyo.internal
-        home-manager.nixosModules.home-manager {
-          home-manager.useUserPackages = true;
-          home-manager.useGlobalPkgs = true;
-
-          home-manager.users.clownpiece = self.homeManagerModules.magician;
-          home-manager.users.seiran = self.homeManagerModules.common;
-        }
       ];
     };
 
     nixosConfigurations.library = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "library";
-          networking.hostId = lib.mkDefault "00000000";
-          gensokyo-agent = {
-            enable = true;
-            user = "patchouli";
-          };
-          nixpkgs.config = {
-            cudaSupport = !ci; # see hell
-            # no cudaCapabilities, see hell
-          };
-        }
-        self.nixosModules.base
-        self.nixosModules.agent
-        self.nixosModules.server
+        self.nixosModules.gensokyo.systems.library
         (gensokyo-private.nixosModules.library or {})
         lanzaboote.nixosModules.lanzaboote
         ./hw/library.nix
-        ./sys/library
+        ./inst/library.gensokyo.internal
       ];
     };
 
     nixosConfigurations.magic = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "magic";
-          networking.hostId = lib.mkDefault "00000000";
-        }
-        self.nixosModules.base
+        self.nixosModules.gensokyo.systems.magic
         (gensokyo-private.nixosModules.magic or {})
         lanzaboote.nixosModules.lanzaboote
         ./hw/magic.nix
-        ./sys/magic
+        ./inst/magic.gensokyo.internal
       ];
     };
 
     nixosConfigurations.mausoleum = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "mausoleum";
-          networking.hostId = lib.mkDefault "00000000";
-        }
-        self.nixosModules.base
+        self.nixosModules.gensokyo.systems.mausoleum
         (gensokyo-private.nixosModules.mausoleum or {})
         ./hw/mausoleum.nix
-        ./sys/mausoleum
         ./inst/mausoleum.gensokyo.internal
       ];
     };
@@ -462,24 +501,12 @@
     nixosConfigurations.sea = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "sea";
-          networking.hostId = lib.mkDefault "00000000";
-        }
-        self.nixosModules.base
+        self.nixosModules.gensokyo.systems.sea
         (gensokyo-private.nixosModules.sea or {})
-        self.nixosModules.desktop
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.dell-xps-13-9310
         ./hw/dell_xps_13_9310.nix
-        ./sys/sea
         ./inst/sea.gensokyo.internal
-        home-manager.nixosModules.home-manager {
-          home-manager.useUserPackages = true;
-          home-manager.useGlobalPkgs = true;
-          home-manager.users."seija" = self.homeManagerModules.magician;
-        }
       ];
     };
 

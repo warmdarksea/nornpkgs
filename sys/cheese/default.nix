@@ -1,10 +1,6 @@
 # https://gpd.hk/gpdpocket3firmware
 
 { config, lib, pkgs, ... }: {
-  i18n = {
-    consoleFont = "latarcyrheb-sun32";
-  };
-
   networking.networkmanager.enable = true;
 
   services.xserver.enable = true;
@@ -54,6 +50,4 @@
   services.openssh.enable = true;
 
   networking.firewall.enable = true;
-
-  system.stateVersion = "23.05";
 }

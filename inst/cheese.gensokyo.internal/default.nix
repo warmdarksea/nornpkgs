@@ -65,4 +65,9 @@
       preLVM = true;
     };
   };
+
+  networking.hostName = "cheese";
+  networking.hostId = lib.mkDefault "00000000";
+
+  system.stateVersion = "23.05";
 }

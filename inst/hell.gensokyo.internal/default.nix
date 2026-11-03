@@ -92,4 +92,43 @@
   #networking.hostId = "AAAAAAAA";
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+
+  networking.hostName = "hell";
+  networking.hostId = lib.mkDefault "00000000";
+
+  boot.lanzaboote = {
+    enable = true;
+    pkiBundle = "/var/secret/secureboot";
+  };
+
+  boot.loader.systemd-boot.enable = lib.mkForce false;
+  boot.loader.systemd-boot.memtest86.enable = true;
+
+  boot.kernelParams = [
+    "zfs.zfs_arc_min=536870912"
+    "zfs.zfs_arc_max=2147483648"
+  ];
+
+  # at the time of writing, this is equal to zfs_unstable
+  boot.zfs.package = pkgs.zfs_unstable;
+
+  virtualisation.docker.storageDriver = "zfs";
+  virtualisation.docker.daemon.settings = {
+    storage-opts = [ "zfs.fsname=bell/docker" ];
+  };
+
+  services.sanoid = {
+    enable = true;
+    datasets."bell/workspace/miu" = {
+      autosnap = true;
+      autoprune = true;
+      frequently = 4;
+      frequent_period = 15;
+      hourly = 36;
+      daily = 30;
+      monthly = 3;
+    };
+  };
+
+  system.stateVersion = "24.11";
 }

@@ -15,29 +15,7 @@
 
   nix.settings.keep-failed = true;
 
-  boot.loader.efi.efiSysMountPoint = "/boot/EFI";
-  boot.loader.grub.efiSupport = true;
-  boot.loader.grub.efiInstallAsRemovable = true;
-  boot.loader.grub.device = "nodev";
-
-  boot.initrd.kernelModules = [ ];
-  boot.extraModulePackages = [ ];
-
-    fileSystems."/" =
-    { device = "story";
-      fsType = "zfs";
-    };
-
-  fileSystems."/nix" =
-    { device = "story/nix";
-      fsType = "zfs";
-    };
-
-  swapDevices = [ ];
-
   nixpkgs.config.allowUnfree = true;
-
-  networking.useDHCP = lib.mkDefault true;
 
   users.users.marisa = {
     isNormalUser = true;
@@ -50,6 +28,4 @@
     docker-compose
     dtach
   ];
-
-  system.stateVersion = "23.05";
 }
