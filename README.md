@@ -118,3 +118,27 @@ need kvm. `.github/workflows/test.yml` runs `make test`'s targets, a step
 each, on an amd64 and an arm64 runner on every push, and any Makefile target on dispatch:
 `gh workflow run test.yml -f make='test_vm VM_TARGETS=hell'`. eientei is i686
 and has no VM test.
+
+## bumping
+
+```sh
+make bump                         # every input; nixpkgs to the newest good revision of the last 7 days
+make bump NIX_BUMP_DAYS=0         # unconditionally, now (security fixes)
+make bump NIX_BUMP_DAYS=14        # a wider window
+bin/nixpkgs_maximize_cache.sh --all   # just the table: every candidate and what it misses
+```
+
+`bin/nixpkgs_maximize_cache.sh` walks hydra's `nixos:unstable` evaluations whose
+`tested` job passed (the revisions the channel has pointed at), newest
+first, and for each one asks cache.nixos.org and cache.nixos-cuda.org for
+the packages in `lib/bigpkgs.nix`: the ones that cost hours to build
+on a host or do not fit the CI runner (vector and its rust toolchain,
+lean4, ghc, the CUDA builds of blender, torch and the toolkit). The first
+revision with nothing missing wins. If none of the window qualifies the
+script fails, and `make bump` then updates every input unconditionally
+once the lock is older than `NIX_BUMP_DAYS`, or gives up until next time
+while it is younger. Add a package to the list when a bump turns out to
+build it from source. `.github/workflows/bump.yml` runs `make bump` every
+monday, opens a `bump-<date>` pull request against master, dispatches the
+tests on it, and hands a failed run to Claude, who pushes fixes to the
+branch until the tests pass (three attempts, then it is yours).

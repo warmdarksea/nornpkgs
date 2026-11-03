@@ -117,6 +117,33 @@ ci_%: ci_tree
 	$(MAKE) $* FLAKE=path:$(CURDIR)/$(CI_TREE) NIX_FLAGS="$(NIX_FLAGS) $(CI_NIX_FLAGS)"
 
 #
+# bumping
+#
+#   make bump                   bump every input. nixpkgs goes to the newest
+#                               nixos-unstable revision of the last NIX_BUMP_DAYS
+#                               days whose expensive packages (lib/bigpkgs.nix)
+#                               the binary caches have, so the bump downloads
+#                               instead of building (bin/nixpkgs_maximize_cache.sh).
+#                               when no revision of the window qualifies: fails
+#                               while the lock is younger than NIX_BUMP_DAYS,
+#                               updates unconditionally once it is older
+#   make bump NIX_BUMP_DAYS=0   unconditionally, now (security fixes)
+#   make bump NIX_BUMP_DAYS=14  a wider window
+#
+# .github/workflows/bump.yml runs it weekly and opens the pull request.
+NIX_BUMP_DAYS?=7
+export NIX_BUMP_DAYS
+.PHONY: bump
+bump:
+	@if rev=$$(bin/nixpkgs_maximize_cache.sh); then \
+	  nix flake update --override-input nixpkgs "github:nixos/nixpkgs/$$rev"; \
+	elif [ $$(( ($$(date +%s) - $$(jq -r '.nodes[.nodes.root.inputs.nixpkgs].locked.lastModified' flake.lock)) / 86400 )) -gt $(NIX_BUMP_DAYS) ]; then \
+	  echo "bump: no cached revision in the window and the lock is older than $(NIX_BUMP_DAYS) days, updating every input" >&2; \
+	  nix flake update; \
+	else \
+	  echo "bump: no cached revision in the window and the lock is younger than $(NIX_BUMP_DAYS) days, nothing to do" >&2; exit 1; \
+	fi
+
 # testing
 #
 # every target goes through $(FLAKE); `make ci_<target>` points it at the ci copy

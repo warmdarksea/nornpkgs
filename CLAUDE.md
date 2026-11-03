@@ -56,9 +56,10 @@ the arm64 runner).
 
 * Commit messages: lowercase, `area: what changed`, as in `git log`.
   One change per commit.
-* Do not edit `flake.lock` unless the task is to bump an input. Do not touch
-  `secret/`, `Makefile.private`, or the filesystem, LUKS and bootloader
-  settings under `inst/*/default.nix` (they describe real disks).
+* Do not edit `flake.lock` unless the task is to bump an input; a nixpkgs
+  bump is `make bump` (bin/nixpkgs_maximize_cache.sh picks a cached revision).
+  Do not touch `secret/`, `Makefile.private`, or the filesystem, LUKS and
+  bootloader settings under `inst/*/default.nix` (they describe real disks).
 * Do not add binary caches, trusted keys, or CI secrets. Do not loosen
   `permissions:` in any workflow.
 * Hosts are deployed by the owner with `make deploy_*`; nothing in CI deploys.
