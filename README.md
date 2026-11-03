@@ -4,8 +4,15 @@ repository for managing my digital life. mostly nix, some terraform/cloudflare s
 
 * `flake.nix` — self-explanatory
   littledevil image builds under `packages.<arch>`
-* `hw/` — per-machine hardware modules
-* `sys/` — per-host system config
+* `hw/` — per-machine hardware modules (kernel modules, firmware, gpu)
+* `sys/<host>/` — the generic system: roles, services, users, and the
+  arch when it is not x86_64 (`nixpkgs.hostPlatform`); no disks,
+  bootloader or hostname. `nixosModules.gensokyo.systems.<host>`, and
+  what boots in the VM tests
+* `inst/<host>.gensokyo.internal/` — the instance: hostname, hostId,
+  filesystems, LUKS, bootloader, pool-specific paths. together with the
+  hardware and the private module it is `nixosConfigurations.<host>`,
+  the thing that gets deployed
 * `lib/` — `base`, `desktop`, `server` role modules, the
   `gensokyo.disks` option, `models.nix` behind
   `lib.fetchModel` / `lib.fetchHuggingFace`, and `jupyter.nix`
@@ -88,3 +95,25 @@ make logs ; make stop
 make copy HOST=hell   # just the closure
 make remote HOST=hell # the closure, then the oneshot over ssh
 ```
+
+## testing
+
+```sh
+make test               # all of the below
+make test_nix_lint      # parse every .nix file
+make test_tf            # tofu validate, no credentials
+make test_nix_check     # every flake output to a .drv (nix flake check --no-build)
+make test_vm            # boot every generic system in a VM; VM_TARGETS="base hell" for some
+make test_templates     # copy, build, run and test the templates; TEMPLATES= for the heavy ones
+make run_vm TARGET=hell # the same VM, interactively
+make plan_oci_live      # tofu plan against the real state (authenticated, not a test)
+make ci_<target>        # any of them against the public inputs + gensokyo-private's ci branch
+```
+
+The VM tests are `checks.<system>.boot-<host>`: the generic system
+plus the NixOS test framework's qemu machinery, waited for until its
+default target, failed units logged. A check under `checks.<system>` runs
+on a host of that system, littledevil (aarch64) on an arm64 runner. They
+need kvm. `.github/workflows/test.yml`
+runs the cheap subset on every push (x86_64 and an arm64 runner) and boots
+any one system on dispatch. eientei is i686 and has no VM test.
