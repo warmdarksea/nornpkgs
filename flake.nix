@@ -242,7 +242,7 @@
         (gensokyo-private.nixosModules.abandonedfactory or {})
         lanzaboote.nixosModules.lanzaboote
         ./hw/lattepanda_v1.nix
-        ./sys/abandonedfactory/hardware-configuration.nix
+        ./inst/abandonedfactory.gensokyo.internal
         ./sys/abandonedfactory
       ];
     };
@@ -262,7 +262,7 @@
           nixos-hardware.nixosModules.gpd-pocket-3
           ./hw/gpd_pocket_3.nix
           ./sys/cheese
-          ./sys/cheese/hardware-configuration.nix
+          ./inst/cheese.gensokyo.internal
           home-manager.nixosModules.home-manager {
             home-manager.useUserPackages = true;
             home-manager.useGlobalPkgs = true;
@@ -286,7 +286,7 @@
         nixos-hardware.nixosModules.lenovo-thinkpad-x13-amd
         ./hw/lenovo_thinkpad_x13_gen2.nix
         ./sys/chireiden
-        ./sys/chireiden/hardware-configuration.nix
+        ./inst/chireiden.gensokyo.internal
         home-manager.nixosModules.home-manager {
           home-manager.useUserPackages = true;
           home-manager.useGlobalPkgs = true;
@@ -309,7 +309,7 @@
         lanzaboote.nixosModules.lanzaboote
         ./hw/gpd_pocket_2.nix
         ./sys/dusk
-        ./sys/dusk/hardware-configuration.nix
+        ./inst/dusk.gensokyo.internal
         home-manager.nixosModules.home-manager {
           home-manager.useUserPackages = true;
           home-manager.useGlobalPkgs = true;
@@ -346,7 +346,7 @@
         (gensokyo-private.nixosModules.furnace or {})
         ./hw/ugreen_dxp2800.nix
         ./sys/furnace
-        ./sys/furnace/hardware-configuration.nix
+        ./inst/furnace.gensokyo.internal
       ];
     };
 
@@ -382,7 +382,7 @@
         nixos-hardware.nixosModules.common-pc-laptop-ssd
         ./hw/asus_x13_flow.nix
         ./sys/hell
-        ./sys/hell/hardware-configuration.nix
+        ./inst/hell.gensokyo.internal
         home-manager.nixosModules.home-manager {
           home-manager.useUserPackages = true;
           home-manager.useGlobalPkgs = true;
@@ -447,7 +447,7 @@
         (gensokyo-private.nixosModules.mausoleum or {})
         ./hw/mausoleum.nix
         ./sys/mausoleum
-        ./sys/mausoleum/hardware-configuration.nix
+        ./inst/mausoleum.gensokyo.internal
       ];
     };
 
@@ -466,7 +466,7 @@
         nixos-hardware.nixosModules.dell-xps-13-9310
         ./hw/dell_xps_13_9310.nix
         ./sys/sea
-        ./sys/sea/hardware-configuration.nix
+        ./inst/sea.gensokyo.internal
         home-manager.nixosModules.home-manager {
           home-manager.useUserPackages = true;
           home-manager.useGlobalPkgs = true;
