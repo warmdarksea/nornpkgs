@@ -104,7 +104,7 @@ in {
   networking.firewall.rejectPackets = true;
 
   services.sshd.enable = true;
-  services.guix.enable = true;
+  services.guix.enable = !config.gensokyo.ci; # 0.6 GB the runner's VM has no use for
 
   services.printing = {
     enable = true;
@@ -249,7 +249,6 @@ in {
     nvtopPackages.full
     nethogs
     iotop
-    smem
     gnome-tweaks
     sqlite
     sqlitebrowser
@@ -259,7 +258,6 @@ in {
     smartmontools
     libimobiledevice
     ifuse
-    lean4
     gamescope
     please-cli
     libsecret
@@ -272,17 +270,20 @@ in {
     hunspell
     hunspellDicts.en_US
     rtl-sdr
-    gqrx
     element
-    element-desktop
     android-tools
-    tor-browser
     ghostty
     foot
     xorg.xauth
   ] ++ lib.optionals (!config.gensokyo.ci) [
-    # large, uncached builds (zotero drags its own firefox-esr in); the
-    # home profile's large_pkgs is the same idea
+    # the big leaves, same idea as the home profile's large_pkgs: lean4
+    # (3 GB), gqrx (2.3 GB, two copies of uhd), electron and firefox
+    # runtimes, zotero's own firefox-esr, which is also an uncached build
+    lean4
+    gqrx
+    smem # a python env with numpy and matplotlib
+    element-desktop
+    tor-browser
     zotero
   ];
 
