@@ -80,7 +80,7 @@
   ];
 
   console = let 
-    inherit (pkgs) lib stdenv writeText kbd;
+    inherit (pkgs) lib writeText kbd;
     mykeymap = writeText "keymap" ''
       include "${kbd}/share/keymaps/i386/qwerty/us.map.gz"
 

@@ -63,10 +63,9 @@
     nix-minecraft,
 
     gensokyo-private,
-      ... }@inputs: let
+      ... }: let
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         lib = nixpkgs.lib;
-        system = "x86_64-linux";
         # pkgs with overlays.default applied; the packages.* outputs for our
         # own packages come from here so they match what the hosts install.
         nornpkgs = pkgs.extend self.overlays.default;
