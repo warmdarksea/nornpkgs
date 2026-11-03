@@ -1,5 +1,6 @@
 { config, lib, pkgs, ... }: let
   unfreePkgNames = [
+    "claude-code" # lib/agent.nix
     "corefonts"
     "vcv-rack"
   ];
