@@ -31,6 +31,11 @@ in {
     unfreePredicate = pkg: builtins.elem (lib.getName pkg) unfreePkgNames;
   in pkg: (nvidiaUnfreePredicate pkg) || (unfreePredicate pkg);
 
+  # zotero bundles firefox-esr 140, end of life since October 2026 and marked
+  # insecure in nixpkgs. The exact version keeps the permit from outliving it:
+  # zotero's next bump fails evaluation again until the entry is updated.
+  nixpkgs.config.permittedInsecurePackages = [ "firefox-esr-140-bin-unwrapped-140.17.0esr" ];
+
   boot.kernelParams = [
     "cgroup_enable=memory"
     "systemd.unified_cgroup_hierarchy=1"
