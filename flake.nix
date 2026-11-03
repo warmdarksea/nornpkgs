@@ -198,11 +198,12 @@
     # Audio plugins (VST3/VST2/CLAP/LV2) from packages into ~/.vst3 & friends,
     # see home/audio-plugins.nix for the mechanics.
     homeManagerModules.audioPlugins = import ./home/audio-plugins.nix;
-    homeManagerModules.magician = {
+    homeManagerModules.magician = { lib, osConfig ? { }, ... }: {
       imports = [ self.homeManagerModules.common self.homeManagerModules.audioPlugins ];
       # The -compat builds (older glibc), so the plugins also load into the
-      # Bitwig flatpak's freedesktop runtime.
-      audioPlugins.packages = [
+      # Bitwig flatpak's freedesktop runtime. Not on the CI runner: they are
+      # built from the second nixpkgs pin, so nothing of them is cached.
+      audioPlugins.packages = lib.optionals (!(osConfig.gensokyo.ci or false)) [
         self.packages.x86_64-linux.gearmulator-compat
         self.packages.x86_64-linux.lsp-plugins-compat
         self.packages.x86_64-linux.openutau-bridge
