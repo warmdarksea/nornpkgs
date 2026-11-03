@@ -35,8 +35,10 @@
     "-a always,exit -F arch=b64 -S execve -F uid=${builtins.toString config.users.users.claude.uid} -k claude-exec"
   ];
 
+  # the gpu for nix builds. the preset drags mesa and llvm in (1.8 GB) for a
+  # runner VM that has no gpu, so it follows gensokyo.ci like cudaSupport
   programs.nix-required-mounts = {
-    enable = true;
+    enable = !config.gensokyo.ci;
     presets.nvidia-gpu.enable = true;
   };
 
