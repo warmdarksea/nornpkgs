@@ -361,6 +361,16 @@
           }
         ];
       };
+
+      littledevil = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          ldModules.bootstrap
+          ldModules.live
+          self.nixosModules.server
+        ];
+        boot.isContainer = false;
+      };
     };
 
     # instances: a generic system plus hw/, the private module and inst/<fqdn>.
