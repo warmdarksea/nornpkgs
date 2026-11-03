@@ -768,19 +768,51 @@
     #   nix run .#gc-model-sources -- --dry-run /nix/store/...-f16.gguf
     packages.x86_64-linux.gc-model-sources = (modelLib pkgs).gc-model-sources;
 
-    # Regression guard for the transformers pin in lib/models.nix. llama.cpp
-    # rejects any BPE tokenizer whose digest is missing from its table, and
-    # transformers 5.x shifts that digest for every LlamaTokenizerFast model --
-    # a class that includes deepseek-llm, deepseek-coder and their descendants,
-    # while leaving GPT2/Qwen2 tokenizers alone. So pick a llama-tokenizer
-    # model, and convert vocab-only: no weights are fetched or read, which puts
-    # the whole check at a few MB and a couple of seconds.
-    checks.x86_64-linux.llama-tokenizer =
-      ((modelLib pkgs).fetchHuggingFace {
-        src = "hf:deepseek-ai/deepseek-coder-1.3b-instruct@e063262dac8366fc1f28a4da0ff3c50ea66259ca";
-        files = [ "*.json" ];
-        hash = "sha256-Zu8WFs3xBEEpMuccy3A27iCGAxE4XFwOM3lD282DSaA=";
-      }).gguf.convert { vocabOnly = true; };
+    # boot tests: checks.<system>.boot-<host> boots the generic system as a
+    # NixOS test VM on a host of that system and waits for its default target.
+    # eientei is i686 and has none.
+    checks = let
+      bootTestHosts = {
+        x86_64-linux = builtins.attrNames (removeAttrs self.nixosModules.gensokyo.systems [ "eientei" "littledevil" ]);
+        aarch64-linux = [ "littledevil" ];
+      };
+      bootTest = hostPkgs: name: hostPkgs.testers.runNixOSTest {
+        name = "boot-${name}";
+        # the systems set nixpkgs.overlays and nixpkgs.config themselves
+        node.pkgsReadOnly = false;
+        nodes.machine = { config, lib, ... }: {
+          imports = [ self.nixosModules.gensokyo.systems.${name} ];
+          virtualisation.memorySize = 2048;
+          virtualisation.cores = 2;
+          # the instance side of the VM
+          system.stateVersion = lib.mkDefault config.system.nixos.release;
+        };
+        testScript = ''
+          machine.start()
+          machine.wait_for_unit("multi-user.target")
+          target = machine.succeed("systemctl get-default").strip()
+          machine.wait_for_unit(target)
+          failed = machine.execute("systemctl list-units --state=failed --no-legend --plain")[1].strip()
+          print(f"${name}: reached {target}" + (f", failed units:\n{failed}" if failed else ", no failed units"))
+        '';
+      };
+    in lib.mapAttrs (hostSystem: names:
+      lib.genAttrs' names (name: lib.nameValuePair "boot-${name}" (bootTest nixpkgs.legacyPackages.${hostSystem} name))
+      // lib.optionalAttrs (hostSystem == "x86_64-linux") {
+        # Regression guard for the transformers pin in lib/models.nix. llama.cpp
+        # rejects any BPE tokenizer whose digest is missing from its table, and
+        # transformers 5.x shifts that digest for every LlamaTokenizerFast model --
+        # a class that includes deepseek-llm, deepseek-coder and their descendants,
+        # while leaving GPT2/Qwen2 tokenizers alone. So pick a llama-tokenizer
+        # model, and convert vocab-only: no weights are fetched or read, which puts
+        # the whole check at a few MB and a couple of seconds.
+        llama-tokenizer =
+          ((modelLib pkgs).fetchHuggingFace {
+            src = "hf:deepseek-ai/deepseek-coder-1.3b-instruct@e063262dac8366fc1f28a4da0ff3c50ea66259ca";
+            files = [ "*.json" ];
+            hash = "sha256-Zu8WFs3xBEEpMuccy3A27iCGAxE4XFwOM3lD282DSaA=";
+          }).gguf.convert { vocabOnly = true; };
+      }) bootTestHosts;
 
     # Gearmulator: classic VA synths & sound modules (Access Virus, Waldorf
     # microQ/XT, Nord Lead 2x, JP-8000, MT-32/Sound Canvas) as audio plugins.
