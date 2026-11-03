@@ -134,7 +134,7 @@ ci_%: ci_tree
 
 # what `make test` boots and builds on a host of each arch; a hosted ci runner
 # has ~14 GB of disk, so only the small closures until the rest are trimmed
-NIX_HOSTS_AMD64=base
+NIX_HOSTS_AMD64=base hell library furnace
 NIX_HOSTS_AARCH64=littledevil
 NIX_TEMPLATES_AMD64=py-hello rust-hello lean4-hello
 NIX_TEMPLATES_AARCH64=

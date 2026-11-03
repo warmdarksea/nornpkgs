@@ -12,7 +12,8 @@
 #
 # the runner has ~14 GB free; a desktop closure needs the disk-space step.
 # in ci mode the generic systems are hell 12 GB, furnace 7 GB (4.6 GB of it
-# the uncached vector build), library 3 GB, so one runner boots one desktop.
+# the uncached vector build), library 3 GB, 16 GB for all three together, so
+# the step's df decides whether one runner boots them all.
 # kvm is opened to the nix build users before nix is installed, and nix is
 # told to offer it to builds; without it qemu emulates.
 name: test
