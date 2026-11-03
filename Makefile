@@ -112,6 +112,99 @@ ci_check: ci_tree
 ci_eval: ci_tree
 	nix eval $(CI_NIX_FLAGS) "path:$(CURDIR)/$(CI_TREE)#nixosConfigurations.$(TARGET).config.system.build.toplevel.drvPath"
 
+# any other target against the same copy and inputs: make ci_test_nix_check
+ci_%: ci_tree
+	$(MAKE) $* FLAKE=path:$(CURDIR)/$(CI_TREE) NIX_FLAGS="$(NIX_FLAGS) $(CI_NIX_FLAGS)"
+
+#
+# testing
+#
+# every target goes through $(FLAKE); `make ci_<target>` points it at the ci copy
+#
+#   make test               everything below
+#   make test_nix_lint      parse every .nix file (no evaluation)
+#   make test_tf            tofu validate (no credentials)
+#   make test_nix_check     every flake output to a .drv, nothing built
+#   make test_vm            boot the hosts of NIX_HOSTS_<arch> in VMs (checks.*.boot-*)
+#   make test_templates     init, build, run and test NIX_TEMPLATES_<arch>
+#   make run_vm TARGET=x    interactive test driver for one system
+#
+# the authenticated tofu plan against the real state is plan_oci_live
+# (Makefile.littledevil), not a test
+
+# what `make test` boots and builds on a host of each arch; a hosted ci runner
+# has ~14 GB of disk, so only the small closures until the rest are trimmed
+NIX_HOSTS_AMD64=base
+NIX_HOSTS_AARCH64=littledevil
+NIX_TEMPLATES_AMD64=py-hello rust-hello lean4-hello
+NIX_TEMPLATES_AARCH64=
+
+FLAKE?=.
+# the same flake as an absolute ref, for recipes that cd elsewhere
+FLAKE_ABS=$(if $(filter .,$(FLAKE)),git+file://$(CURDIR),$(FLAKE))
+# the ci and public stubs lack the hosts' unfree allowances; only read under --impure
+export NIXPKGS_ALLOW_UNFREE?=1
+
+.PHONY: test test_nix_lint test_tf test_nix_check test_vm test_templates run_vm
+
+test: test_nix_lint test_tf test_nix_check test_vm test_templates
+
+NIX_FILES=$(shell git ls-files '*.nix')
+
+test_nix_lint:
+	@for f in $(NIX_FILES); do nix-instantiate --parse "$$f" > /dev/null || exit 1; done
+	@echo "test_nix_lint: $(words $(NIX_FILES)) files parse"
+
+# tofu validate: no registry (the flake's tofu carries the providers), no
+# credentials, no state
+TOFU=nix shell $(NIX_FLAGS) $(FLAKE)\#tofu --command tofu
+
+test_tf:
+	$(TOFU) -chdir=tf init -backend=false -input=false > /dev/null
+	$(TOFU) -chdir=tf validate
+
+# nixosConfigurations, checks (all systems), packages, devShells and
+# templates, evaluated and instantiated into the local store; nothing built,
+# so nothing lands in a binary cache. the littledevil.* outputs are not
+# standard flake outputs and are not covered yet.
+test_nix_check:
+	nix flake check --no-build --all-systems $(NIX_FLAGS) $(FLAKE)
+
+# the VM boot tests (checks.<system>.boot-*) of the hosts in NIX_HOSTS_<arch>
+# for this host's arch, or VM_TARGETS="base hell". they need kvm. `nix flake
+# check` without --no-build would build every check of this system at once,
+# the desktop closures included; this one picks.
+NIX_SYSTEM=$(shell nix eval --impure --raw --expr builtins.currentSystem)
+ARCH=$(patsubst x86_64,AMD64,$(patsubst aarch64,AARCH64,$(NIX_SYSTEM:-linux=)))
+VM_TARGETS?=$(NIX_HOSTS_$(ARCH))
+test_vm:
+	for t in $(VM_TARGETS); do \
+	  echo "== boot-$$t"; nix build -L --no-link $(NIX_FLAGS) "$(FLAKE)#checks.$(NIX_SYSTEM).boot-$$t" || exit 1; \
+	done
+
+# the same VM, interactively: start_all(), machine.shell_interact(), ...
+run_vm: $(BUILD_DIR)/vm-$(TARGET)
+	$</bin/nixos-test-driver
+
+$(BUILD_DIR)/vm-%: FORCE | $(BUILD_DIR)
+	nix build $(NIX_FLAGS) -o "$@" "$(FLAKE)#checks.$(NIX_SYSTEM).boot-$*.driverInteractive"
+
+# the templates, each copied under build/template-<name> as a git repo of its
+# own (nix would otherwise see an ignored subdirectory of this checkout) and
+# built, run and tested against this tree's nornpkgs: NIX_TEMPLATES_<arch>, or
+# TEMPLATES=llm-hello
+TEMPLATES?=$(NIX_TEMPLATES_$(ARCH))
+
+test_templates: $(foreach t,$(TEMPLATES),test_template_$(t))
+
+# MAKEOVERRIDES= keeps the ci_% wrapper's FLAKE=/NIX_FLAGS= out of the template's make
+test_template_%: MAKEOVERRIDES=
+test_template_%: FORCE | $(BUILD_DIR)
+	rm -rf $(BUILD_DIR)/template-$* && mkdir -p $(BUILD_DIR)/template-$*
+	cp -r template/$*/. $(BUILD_DIR)/template-$*
+	cd $(BUILD_DIR)/template-$* && git init -q && git add -A
+	$(MAKE) -C $(BUILD_DIR)/template-$* build run test NORNPKGS=$(FLAKE_ABS)
+
 # remote building
 .PHONY: remote_build_sys_closure remote_build_reset remote_build_log remote_build_status remote_build_check remote_pull_sys_closure
 
@@ -329,23 +422,9 @@ cleanup_system_generations:
 
 #
 
-.PHONY: run_vm_closure
-run_vm_closure: \
-	build_vm_closure
-	QEMU_NET_OPTS="hostfwd=tcp::2221-:22,hostfwd=tcp::8080-:80" ../build/vm-closure-$(TARGET)/bin/run-nixos-vm
-
 .PHONY: query_config
 query_config:
-	nix-instantiate --eval sys/$(TARGET).nix -A $(OPTION)
-
-#
-
-.PHONY: why_depends_sys
-why_depends_sys:
-	nix why-depends -I nixos-config=sys/$(TARGET).nix $(NIX_FLAGS) --attr system sys/$(TARGET).nix
-
-#
-
+	nix eval $(NIX_FLAGS) "$(FLAKE)#nixosConfigurations.$(TARGET).config.$(OPTION)"
 
 #
 

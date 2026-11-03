@@ -9,4 +9,8 @@
 
   hardware.enableRedistributableFirmware = lib.mkDefault true;
   hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
+
+  # 2-in-1: accelerometer for rotation; the fingerprint reader is not worth it
+  hardware.sensor.iio.enable = true;
+  services.fprintd.enable = lib.mkForce false;
 }

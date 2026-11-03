@@ -63,10 +63,9 @@
     nix-minecraft,
 
     gensokyo-private,
-      ... }@inputs: let
+      ... }: let
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         lib = nixpkgs.lib;
-        system = "x86_64-linux";
         # pkgs with overlays.default applied; the packages.* outputs for our
         # own packages come from here so they match what the hosts install.
         nornpkgs = pkgs.extend self.overlays.default;
@@ -210,59 +209,30 @@
       ];
     };
 
-    # systems
-
-    # The smallest system this flake expresses: lib/base.nix on a placeholder
-    # disk, nothing else. Never deployed. CI builds it on every push (cheap,
-    # nearly all cache hits), and it is a quick local check of lib/base.nix:
-    #   make build_sys_closure TARGET=base
-    nixosConfigurations.base = lib.nixosSystem {
-      system = "x86_64-linux";
-      modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "base";
-          fileSystems."/" = { device = "/dev/disk/by-label/base-root"; fsType = "ext4"; };
-          boot.loader.systemd-boot.enable = true;
-          boot.loader.efi.canTouchEfiVariables = true;
-          system.stateVersion = "26.11";
-        }
-        self.nixosModules.base
-      ];
-    };
-
-    nixosConfigurations.abandonedfactory = lib.nixosSystem {
-      system = "x86_64-linux";
-      modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "abandonedfactory";
-        }
-        self.nixosModules.base
-        (gensokyo-private.nixosModules.abandonedfactory or {})
-        lanzaboote.nixosModules.lanzaboote
-        ./hw/lattepanda_v1.nix
-        ./sys/abandonedfactory/hardware-configuration.nix
-        ./sys/abandonedfactory.nix
-      ];
-    };
- 
-
-    nixosConfigurations.cheese = lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
+    # generic systems: sys/<host> plus its roles and users, no hardware, disks,
+    # bootloader or hostname. what the boot tests (checks.*.boot-<host>) run.
+    nixosModules.gensokyo.systems = {
+      base = {
+        imports = [
           { nixpkgs.overlays = [ self.overlays.default ]; }
-          {
-            networking.hostName = "cheese";
-            networking.hostId = lib.mkDefault "00000000";
-          }
           self.nixosModules.base
-          (gensokyo-private.nixosModules.cheese or {})
+        ];
+      };
+
+      abandonedfactory = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          ./sys/abandonedfactory
+        ];
+      };
+
+      cheese = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
           self.nixosModules.desktop
-          nixos-hardware.nixosModules.gpd-pocket-3
-          ./hw/gpd_pocket_3.nix
-          ./sys/cheese/configuration.nix
-          ./sys/cheese/hardware-configuration.nix
+          ./sys/cheese
           home-manager.nixosModules.home-manager {
             home-manager.useUserPackages = true;
             home-manager.useGlobalPkgs = true;
@@ -271,207 +241,281 @@
         ];
       };
 
+      chireiden = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          self.nixosModules.desktop
+          ./sys/chireiden
+          home-manager.nixosModules.home-manager {
+            home-manager.useUserPackages = true;
+            home-manager.useGlobalPkgs = true;
+            home-manager.users."satori" = self.homeManagerModules.magician;
+          }
+        ];
+      };
+
+      dusk = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          self.nixosModules.desktop
+          ./sys/dusk
+          home-manager.nixosModules.home-manager {
+            home-manager.useUserPackages = true;
+            home-manager.useGlobalPkgs = true;
+            home-manager.users."rumia" = self.homeManagerModules.magician;
+          }
+        ];
+      };
+
+      eientei = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          ./sys/eientei
+        ];
+      };
+
+      furnace = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          ./sys/furnace
+        ];
+      };
+
+      hell = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          self.nixosModules.agent
+          self.nixosModules.desktop
+          ./sys/hell
+          home-manager.nixosModules.home-manager {
+            home-manager.useUserPackages = true;
+            home-manager.useGlobalPkgs = true;
+
+            home-manager.users.clownpiece = self.homeManagerModules.magician;
+            home-manager.users.seiran = self.homeManagerModules.common;
+          }
+        ];
+        gensokyo-agent = {
+          enable = true;
+          user = "clownpiece";
+        };
+        # no cudaCapabilities: narrowing them changes the hash of every CUDA
+        # derivation and misses cache.nixos-cuda.org, which builds the
+        # default set (see nixConfig at the top)
+        nixpkgs.config = {
+          # the CUDA builds are host-only; the runner builds the structure
+          cudaSupport = !ci;
+        };
+      };
+
+      library = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          self.nixosModules.agent
+          self.nixosModules.server
+          ./sys/library
+        ];
+        gensokyo-agent = {
+          enable = true;
+          user = "patchouli";
+        };
+        nixpkgs.config = {
+          cudaSupport = !ci; # see hell
+          # no cudaCapabilities, see hell
+        };
+      };
+
+      magic = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          ./sys/magic
+        ];
+      };
+
+      mausoleum = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          ./sys/mausoleum
+        ];
+      };
+
+      sea = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          self.nixosModules.base
+          self.nixosModules.desktop
+          ./sys/sea
+          home-manager.nixosModules.home-manager {
+            home-manager.useUserPackages = true;
+            home-manager.useGlobalPkgs = true;
+            home-manager.users."seija" = self.homeManagerModules.magician;
+          }
+        ];
+      };
+
+      littledevil = {
+        imports = [
+          { nixpkgs.overlays = [ self.overlays.default ]; }
+          ldModules.bootstrap
+          ldModules.live
+          self.nixosModules.server
+        ];
+        boot.isContainer = false;
+      };
+    };
+
+    # instances: a generic system plus hw/, the private module and inst/<fqdn>.
+    # what `make build_sys_closure TARGET=<host>` builds and deploys.
+
+    # base on a placeholder disk, never deployed; CI builds it on every push
+    nixosConfigurations.base = lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        self.nixosModules.gensokyo.systems.base
+        {
+          networking.hostName = "base";
+          fileSystems."/" = { device = "/dev/disk/by-label/base-root"; fsType = "ext4"; };
+          boot.loader.systemd-boot.enable = true;
+          boot.loader.efi.canTouchEfiVariables = true;
+          system.stateVersion = "26.11";
+        }
+      ];
+    };
+
+    nixosConfigurations.abandonedfactory = lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        self.nixosModules.gensokyo.systems.abandonedfactory
+        (gensokyo-private.nixosModules.abandonedfactory or {})
+        lanzaboote.nixosModules.lanzaboote
+        ./hw/lattepanda_v1.nix
+        ./inst/abandonedfactory.gensokyo.internal
+      ];
+    };
+ 
+
+    nixosConfigurations.cheese = lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        self.nixosModules.gensokyo.systems.cheese
+        (gensokyo-private.nixosModules.cheese or {})
+        nixos-hardware.nixosModules.gpd-pocket-3
+        ./hw/gpd_pocket_3.nix
+        ./inst/cheese.gensokyo.internal
+      ];
+    };
+
     nixosConfigurations.chireiden = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "chireiden";
-          networking.hostId = lib.mkDefault "00000000";
-        }
-        self.nixosModules.base
+        self.nixosModules.gensokyo.systems.chireiden
         (gensokyo-private.nixosModules.chireiden or {})
-        self.nixosModules.desktop
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.lenovo-thinkpad-x13-amd
         ./hw/lenovo_thinkpad_x13_gen2.nix
-        ./sys/chireiden/configuration.nix
-        ./sys/chireiden/hardware-configuration.nix
-        home-manager.nixosModules.home-manager {
-          home-manager.useUserPackages = true;
-          home-manager.useGlobalPkgs = true;
-          home-manager.users."satori" = self.homeManagerModules.magician;
-        }
+        ./inst/chireiden.gensokyo.internal
       ];
     };
 
     nixosConfigurations.dusk = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "dusk";
-          networking.hostId = lib.mkDefault "00000000";
-        }
-        self.nixosModules.base
+        self.nixosModules.gensokyo.systems.dusk
         (gensokyo-private.nixosModules.dusk or {})
-        self.nixosModules.desktop
         lanzaboote.nixosModules.lanzaboote
         ./hw/gpd_pocket_2.nix
-        ./sys/dusk/configuration.nix
-        ./sys/dusk/hardware-configuration.nix
-        home-manager.nixosModules.home-manager {
-          home-manager.useUserPackages = true;
-          home-manager.useGlobalPkgs = true;
-          home-manager.users."rumia" = self.homeManagerModules.magician;
-        }
+        ./inst/dusk.gensokyo.internal
       ];
     };
 
     nixosConfigurations.eientei = lib.nixosSystem {
-      system = "i686-linux";
+      # i686: nixpkgs.hostPlatform in sys/eientei
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "eientei";
-          networking.hostId = lib.mkDefault "00000000";
-        }
-        self.nixosModules.base
+        self.nixosModules.gensokyo.systems.eientei
         (gensokyo-private.nixosModules.eientei or {})
         ./hw/eeepc.nix
-        ./sys/eientei.nix
+        ./inst/eientei.gensokyo.internal
       ];
     };
 
     nixosConfigurations.furnace = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "furnace";
-          networking.hostId = lib.mkDefault "00000000";
-        }
-        self.nixosModules.base
-        lanzaboote.nixosModules.lanzaboote
+        self.nixosModules.gensokyo.systems.furnace
         (gensokyo-private.nixosModules.furnace or {})
+        lanzaboote.nixosModules.lanzaboote
         ./hw/ugreen_dxp2800.nix
-        ./sys/furnace/configuration.nix
-        ./sys/furnace/hardware-configuration.nix
+        ./inst/furnace.gensokyo.internal
       ];
     };
 
     nixosConfigurations.hell = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "hell";
-          networking.hostId = lib.mkDefault "00000000";
-          gensokyo-agent = {
-            enable = true;
-            user = "clownpiece";
-          };
-          # no cudaCapabilities: narrowing them changes the hash of every CUDA
-          # derivation and misses cache.nixos-cuda.org, which builds the
-          # default set (see nixConfig at the top)
-          nixpkgs.config = {
-            # the CUDA builds are host-only; the runner builds the structure
-            cudaSupport = !ci;
-          };
-        }
-        self.nixosModules.base
-        self.nixosModules.agent
-        self.nixosModules.desktop
-        self.nixosModules.nvidia
+        self.nixosModules.gensokyo.systems.hell
         (gensokyo-private.nixosModules.hell or {})
         lanzaboote.nixosModules.lanzaboote
+        # prime offload onto the dgpu: hardware, so not part of the generic system
+        self.nixosModules.nvidia
         nixos-hardware.nixosModules.common-cpu-amd
         nixos-hardware.nixosModules.common-cpu-amd-pstate
         nixos-hardware.nixosModules.common-gpu-amd
         nixos-hardware.nixosModules.common-pc-laptop
         nixos-hardware.nixosModules.common-pc-laptop-ssd
         ./hw/asus_x13_flow.nix
-        ./sys/hell/configuration.nix
-        ./sys/hell/hardware-configuration.nix
-        home-manager.nixosModules.home-manager {
-          home-manager.useUserPackages = true;
-          home-manager.useGlobalPkgs = true;
-
-          home-manager.users.clownpiece = self.homeManagerModules.magician;
-          home-manager.users.seiran = self.homeManagerModules.common;
-        }
+        ./inst/hell.gensokyo.internal
       ];
     };
 
     nixosConfigurations.library = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "library";
-          networking.hostId = lib.mkDefault "00000000";
-          gensokyo-agent = {
-            enable = true;
-            user = "patchouli";
-          };
-          nixpkgs.config = {
-            cudaSupport = !ci; # see hell
-            # no cudaCapabilities, see hell
-          };
-        }
-        self.nixosModules.base
-        self.nixosModules.agent
-        self.nixosModules.server
+        self.nixosModules.gensokyo.systems.library
         (gensokyo-private.nixosModules.library or {})
         lanzaboote.nixosModules.lanzaboote
         ./hw/library.nix
-        ./sys/library.nix
+        ./inst/library.gensokyo.internal
       ];
     };
 
     nixosConfigurations.magic = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "magic";
-          networking.hostId = lib.mkDefault "00000000";
-        }
-        self.nixosModules.base
+        self.nixosModules.gensokyo.systems.magic
         (gensokyo-private.nixosModules.magic or {})
         lanzaboote.nixosModules.lanzaboote
         ./hw/magic.nix
-        ./sys/magic.nix
+        ./inst/magic.gensokyo.internal
       ];
     };
 
     nixosConfigurations.mausoleum = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "mausoleum";
-          networking.hostId = lib.mkDefault "00000000";
-        }
-        self.nixosModules.base
+        self.nixosModules.gensokyo.systems.mausoleum
         (gensokyo-private.nixosModules.mausoleum or {})
         ./hw/mausoleum.nix
-        ./sys/mausoleum/configuration.nix
-        ./sys/mausoleum/hardware-configuration.nix
+        ./inst/mausoleum.gensokyo.internal
       ];
     };
 
     nixosConfigurations.sea = lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        { nixpkgs.overlays = [ self.overlays.default ]; }
-        {
-          networking.hostName = "sea";
-          networking.hostId = lib.mkDefault "00000000";
-        }
-        self.nixosModules.base
+        self.nixosModules.gensokyo.systems.sea
         (gensokyo-private.nixosModules.sea or {})
-        self.nixosModules.desktop
         lanzaboote.nixosModules.lanzaboote
         nixos-hardware.nixosModules.dell-xps-13-9310
         ./hw/dell_xps_13_9310.nix
-        ./sys/sea/configuration.nix
-        ./sys/sea/hardware-configuration.nix
-        home-manager.nixosModules.home-manager {
-          home-manager.useUserPackages = true;
-          home-manager.useGlobalPkgs = true;
-          home-manager.users."seija" = self.homeManagerModules.magician;
-        }
+        ./inst/sea.gensokyo.internal
       ];
     };
 
@@ -604,6 +648,15 @@
     nixosConfigurations.littledevil-prod-bootstrap = self.littledevil.aarch64.nixosConfigurations.oci-bootstrap;
     nixosConfigurations.littledevil-prod = self.littledevil.aarch64.nixosConfigurations.oci-live;
 
+    # opentofu with tf/'s providers; the devShell below and `make test_tf` share it
+    packages.x86_64-linux.tofu = pkgs.opentofu.withPlugins (p: [
+      p.hashicorp_null
+      p.hashicorp_tls
+      p.dmacvicar_libvirt
+      p.oracle_oci
+      p.cloudflare_cloudflare
+    ]);
+
     devShells.x86_64-linux.littledevil = pkgs.mkShell {
       packages = with pkgs; [
         bruno
@@ -613,16 +666,11 @@
         wireshark
         wrangler
         zap
-        (opentofu.withPlugins (p: [
-          p.hashicorp_null
-          p.hashicorp_tls
-          p.dmacvicar_libvirt
-          p.oracle_oci
-          p.cloudflare_cloudflare
-        ]))
+        self.packages.x86_64-linux.tofu
       ];
 
-      shellHook = ". secret/credentials.sh";
+      # the credentials are the owner's; the shell is still useful without them
+      shellHook = "[ -r secret/credentials.sh ] && . secret/credentials.sh";
     };
 
     # iso derivations
@@ -723,19 +771,51 @@
     #   nix run .#gc-model-sources -- --dry-run /nix/store/...-f16.gguf
     packages.x86_64-linux.gc-model-sources = (modelLib pkgs).gc-model-sources;
 
-    # Regression guard for the transformers pin in lib/models.nix. llama.cpp
-    # rejects any BPE tokenizer whose digest is missing from its table, and
-    # transformers 5.x shifts that digest for every LlamaTokenizerFast model --
-    # a class that includes deepseek-llm, deepseek-coder and their descendants,
-    # while leaving GPT2/Qwen2 tokenizers alone. So pick a llama-tokenizer
-    # model, and convert vocab-only: no weights are fetched or read, which puts
-    # the whole check at a few MB and a couple of seconds.
-    checks.x86_64-linux.llama-tokenizer =
-      ((modelLib pkgs).fetchHuggingFace {
-        src = "hf:deepseek-ai/deepseek-coder-1.3b-instruct@e063262dac8366fc1f28a4da0ff3c50ea66259ca";
-        files = [ "*.json" ];
-        hash = "sha256-Zu8WFs3xBEEpMuccy3A27iCGAxE4XFwOM3lD282DSaA=";
-      }).gguf.convert { vocabOnly = true; };
+    # boot tests: checks.<system>.boot-<host> boots the generic system as a
+    # NixOS test VM on a host of that system and waits for its default target.
+    # eientei is i686 and has none.
+    checks = let
+      bootTestHosts = {
+        x86_64-linux = builtins.attrNames (removeAttrs self.nixosModules.gensokyo.systems [ "eientei" "littledevil" ]);
+        aarch64-linux = [ "littledevil" ];
+      };
+      bootTest = hostPkgs: name: hostPkgs.testers.runNixOSTest {
+        name = "boot-${name}";
+        # the systems set nixpkgs.overlays and nixpkgs.config themselves
+        node.pkgsReadOnly = false;
+        nodes.machine = { config, lib, ... }: {
+          imports = [ self.nixosModules.gensokyo.systems.${name} ];
+          virtualisation.memorySize = 2048;
+          virtualisation.cores = 2;
+          # the instance side of the VM
+          system.stateVersion = lib.mkDefault config.system.nixos.release;
+        };
+        testScript = ''
+          machine.start()
+          machine.wait_for_unit("multi-user.target")
+          target = machine.succeed("systemctl get-default").strip()
+          machine.wait_for_unit(target)
+          failed = machine.execute("systemctl list-units --state=failed --no-legend --plain")[1].strip()
+          print(f"${name}: reached {target}" + (f", failed units:\n{failed}" if failed else ", no failed units"))
+        '';
+      };
+    in lib.mapAttrs (hostSystem: names:
+      lib.genAttrs' names (name: lib.nameValuePair "boot-${name}" (bootTest nixpkgs.legacyPackages.${hostSystem} name))
+      // lib.optionalAttrs (hostSystem == "x86_64-linux") {
+        # Regression guard for the transformers pin in lib/models.nix. llama.cpp
+        # rejects any BPE tokenizer whose digest is missing from its table, and
+        # transformers 5.x shifts that digest for every LlamaTokenizerFast model --
+        # a class that includes deepseek-llm, deepseek-coder and their descendants,
+        # while leaving GPT2/Qwen2 tokenizers alone. So pick a llama-tokenizer
+        # model, and convert vocab-only: no weights are fetched or read, which puts
+        # the whole check at a few MB and a couple of seconds.
+        llama-tokenizer =
+          ((modelLib pkgs).fetchHuggingFace {
+            src = "hf:deepseek-ai/deepseek-coder-1.3b-instruct@e063262dac8366fc1f28a4da0ff3c50ea66259ca";
+            files = [ "*.json" ];
+            hash = "sha256-Zu8WFs3xBEEpMuccy3A27iCGAxE4XFwOM3lD282DSaA=";
+          }).gguf.convert { vocabOnly = true; };
+      }) bootTestHosts;
 
     # Gearmulator: classic VA synths & sound modules (Access Virus, Waldorf
     # microQ/XT, Nord Lead 2x, JP-8000, MT-32/Sound Canvas) as audio plugins.

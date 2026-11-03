@@ -6,12 +6,7 @@
 # tailscale
 
 { config, lib, pkgs, ... }:
-
 rec {
-  imports = [ ./hardware-configuration.nix ];
-
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
 
   networking.useDHCP = lib.mkDefault true;
 
@@ -55,11 +50,6 @@ rec {
   
   virtualisation.docker = {
     enable = true;
-
-    storageDriver = "zfs";
-    daemon.settings = {
-      storage-opts = [ "zfs.fsname=fern/docker" ];
-    };
   };
   virtualisation.podman = {
     enable = true;
@@ -133,8 +123,4 @@ rec {
   ];
 
   networking.firewall.allowedTCPPorts = [ 443 9081 ];
-
-  system.stateVersion = "25.11";
-
 }
-

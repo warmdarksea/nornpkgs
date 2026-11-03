@@ -1,20 +1,6 @@
 { config, lib, pkgs, ... }: {
-  nixpkgs.config.allowUnfreePredicate = pkg: (builtins.elem (lib.getName pkg) [
-    "corefonts"
-    "nvidia-x11"
-    "nvidia-persistenced"
-    "nvidia-settings"
-    "cudnn"
-    "vcv-rack"
-  ]) || (builtins.all (license:
-    license.free || builtins.elem license.shortName [
-      "CUDA EULA"
-      "NVidia OptiX EULA"
-    ]
-  ) (if builtins.isList pkg.meta.license then pkg.meta.license else [ pkg.meta.license ]));
-
-  nix.settings.keep-failed = true;
-  nixpkgs.config.allowUnfree = true;
+  networking.hostName = "library";
+  networking.hostId = lib.mkDefault "00000000";
 
   boot.loader.systemd-boot.enable = lib.mkForce false;
 
@@ -36,7 +22,7 @@
       pin = pkgs.writeShellApplication {
         name = "boot-order-assert";
         runtimeInputs = with pkgs; [ efibootmgr gawk gnused gnugrep coreutils ];
-        text = builtins.readFile ../lib/boot-order-assert.sh;
+        text = builtins.readFile ../../lib/boot-order-assert.sh;
       };
     in {
       description = "Pin UEFI BootOrder with the NanoKVM entry first";
@@ -50,8 +36,6 @@
         ExecStop = "${pin}/bin/boot-order-assert";
       };
     };
-
-  # machine specs live in hw/library.nix
 
   boot.zfs.requestEncryptionCredentials = false;
 
@@ -92,42 +76,12 @@
   networking.useDHCP = lib.mkDefault true;
 
   virtualisation.docker = {
-    enable = true;
-    enableNvidia = true;
-
     # overlayfs backed by zfs is broken, you need to use zfs proper for it to work
     storageDriver = "zfs";
     daemon.settings = {
       storage-opts = [ "zfs.fsname=story/docker" ];
     };
   };
-
-  users.users.patchouli = {
-    isNormalUser = true;
-    extraGroups = [ "wheel" "docker" ];
-  };
-  security.auditd.enable = true;
-  security.audit.enable = true;
-  security.auditd.plugins = {
-    syslog = {
-      path = lib.getExe' config.security.auditd.package "audisp-syslog";
-      args = [ "LOG_INFO" ];
-    };
-  };
-  security.audit.rules = [
-    "-a always,exit -F arch=b64 -S execve -F uid=${builtins.toString config.users.users.claude.uid} -k claude-exec"
-  ];
-
-  programs.nix-required-mounts = {
-    enable = true;
-    presets.nvidia-gpu.enable = true;
-  };
-
-  environment.systemPackages = with pkgs; [
-    dtach
-    efibootmgr
-    sbctl
-  ];
 
   system.stateVersion = "26.11";
 }

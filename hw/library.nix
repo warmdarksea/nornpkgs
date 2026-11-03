@@ -33,4 +33,7 @@
 
     nvidiaPersistenced = true;
   };
+
+  # the gpu for containers
+  virtualisation.docker.enableNvidia = true;
 }

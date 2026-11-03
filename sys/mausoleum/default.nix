@@ -1,11 +1,8 @@
-{ config, lib, pkgs, modulesPath, ... }: {
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
-
+{ config, lib, pkgs, ... }: {
   networking.networkmanager.enable = true;
   networking.firewall.enable = true;
 
-    services.thermald.enable = true;
+  services.thermald.enable = true;
 
   security.rtkit.enable = true;
   services.pipewire = {
@@ -50,6 +47,4 @@
     gtk4
     hydrus
   ];
-
-  system.stateVersion = "23.05";
 }

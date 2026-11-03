@@ -138,8 +138,8 @@ resource "cloudflare_dns_record" "akkoma" {
 resource "cloudflare_workers_script" "akkoma_proxy" {
   account_id     = var.cf_account_id
   script_name    = "akkoma-api-proxy"
-  content_file   = "${path.module}/cf/workers/akkoma-proxy.js"
-  content_sha256 = filesha256("${path.module}/cf/workers/akkoma-proxy.js")
+  content_file   = "${path.module}/../cf/workers/akkoma-proxy.js"
+  content_sha256 = filesha256("${path.module}/../cf/workers/akkoma-proxy.js")
   main_module    = "akkoma-proxy.js"
 
   bindings = [{

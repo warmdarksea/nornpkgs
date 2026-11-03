@@ -19,7 +19,7 @@
 # credit would work with the federation inputs instead.
 #
 # Nix is installed so Claude can evaluate and build; CLAUDE.md tells it how.
-# The GitHub Actions cache step is the same opt-in as build.yml's
+# The GitHub Actions cache step is the same opt-in as the test workflow's
 # (NIX_GHA_CACHE repository variable): over the account's cache egress
 # allowance it hangs instead of degrading (run 41124231785), so it is
 # bounded by a timeout and never fails the job.
@@ -65,9 +65,9 @@ jobs:
       pull-requests: write
       issues: write
       id-token: write   # the action's GitHub App authentication
-      actions: read     # lets Claude read the build workflow's results on a PR
+      actions: read     # lets Claude read the test workflow's results on a PR
     env:
-      # same as build.yml: the hosts' private modules allow their unfree
+      # as in the Makefile: the hosts' private modules allow their unfree
       # packages, the ci stub does not
       NIXPKGS_ALLOW_UNFREE: "1"
       # scrub CLAUDE_CODE_OAUTH_TOKEN and the GitHub token from the environment
@@ -125,6 +125,11 @@ jobs:
           # scrubbed, and only the owner's text reaches Claude, so a command
           # allowlist bought nothing and cost the 2026-10-31 runs on #16 dozens
           # of denials (21 in run 41239936199) in the middle of verifying.
+          # WebSearch and WebFetch let Claude look things up (nixpkgs changes,
+          # option renames, upstream issues). Note that this is the one way
+          # text nobody here wrote reaches Claude's context: a fetched page can
+          # carry instructions, so a run that fetched something deserves a
+          # second look before its branch is merged.
           # Pinned: without --model the action ran Sonnet 5.5 (runs 41139710070,
           # 41140266129), not the plan's Opus 5.5 default. Opus is twice Sonnet
           # per token (API-rate equivalent, drawn from the Max plan's usage
@@ -134,4 +139,4 @@ jobs:
             --model claude-opus-5-5
             --effort high
             --max-turns 300
-            --allowedTools "Edit,MultiEdit,Write,Bash"
+            --allowedTools "Edit,MultiEdit,Write,Bash,WebSearch,WebFetch"

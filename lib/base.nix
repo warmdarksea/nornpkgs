@@ -80,7 +80,7 @@
   ];
 
   console = let 
-    inherit (pkgs) lib stdenv writeText kbd;
+    inherit (pkgs) lib writeText kbd;
     mykeymap = writeText "keymap" ''
       include "${kbd}/share/keymaps/i386/qwerty/us.map.gz"
 
@@ -168,6 +168,6 @@
     enable = true;
     earlySetup = true;
     keyMap = "${mykeymap}";
-    font = "default8x16";
+    font = lib.mkDefault "default8x16"; # hw/ modules override it for hidpi panels
   };
 }

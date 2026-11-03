@@ -1,11 +1,18 @@
 # nornpkgs, for Claude
 
 NixOS configuration for a handful of hosts plus some terraform, driven by
-GNU make. README.md has the layout: `sys/<host>` per-host config, `hw/`
-hardware modules, `lib/` role modules (`base`, `desktop`, `server`) and
+GNU make. README.md has the layout. Each host is three layers:
+`hw/<machine>.nix` (the box: kernel modules, firmware, gpu),
+`sys/<host>/default.nix` (the generic system: roles, services, users; no
+disks, bootloader or hostname) and `inst/<host>.gensokyo.internal/default.nix`
+(the instance: hostname, hostId, filesystems, LUKS, bootloader, pool-specific
+paths). `lib/` holds the role modules (`base`, `desktop`, `server`) and
 helpers, `home/` home-manager modules, `pkgs/` local packages, `template/`
-flake templates. `flake.nix` wires it together; the `nixosConfigurations`
-and `nixosModules` attribute sets near the bottom are the map.
+flake templates. `flake.nix` wires it together: `nixosModules.gensokyo.systems.<host>`
+is the generic system, `nixosConfigurations.<host>` the instance built on it,
+`checks.<system>.boot-<host>` the generic system booted as a test VM on a host
+of that system (a system's own arch, when not x86_64, is
+`nixpkgs.hostPlatform` in its `sys/`).
 
 ## verifying a change
 
@@ -20,6 +27,9 @@ repository" no matter what. The targets build from a git-free copy instead.
 ```sh
 make ci_check TARGET=base      # build the toplevel
 make ci_eval  TARGET=<host>    # evaluate only
+make ci_test_nix_check         # evaluate every flake output (nix flake check --no-build)
+make ci_test_vm VM_TARGETS=<host>   # boot the generic system in a VM
+make test_nix_lint             # parse every .nix file, no nix evaluation
 ```
 
 * `base` is small and almost entirely cache hits: `ci_check` it for any
@@ -30,17 +40,25 @@ make ci_eval  TARGET=<host>    # evaluate only
   after `make ci_tree`, if it is exported; otherwise evaluate the module
   that uses it.
 * `nix flake show "path:$PWD/build/ci-tree"` before guessing attribute names.
+* `make ci_<target>` runs any Makefile target against that copy; the test
+  targets are listed at the top of the Makefile's testing section. The VM
+  tests need kvm (`/dev/kvm` is available in this sandbox).
 
-`.github/workflows/build.yml` runs the `base` build on every push, so a
-pushed branch gets a real CI result; read it with the CI tools before
-claiming a fix works.
+`.github/workflows/test.yml` runs `make test`'s targets, a step each, on a runner of each arch on
+every push (syntax, terraform, evaluation, then the VMs and templates of the
+Makefile's NIX_HOSTS_<arch> and NIX_TEMPLATES_<arch>), so a pushed branch
+gets real CI results; read them with the CI tools before claiming a fix
+works. Any Makefile target runs against the ci copy on dispatch:
+`gh workflow run test.yml -f make='check TARGET=hell'` (`-f arch=aarch64` for
+the arm64 runner).
 
 ## rules
 
 * Commit messages: lowercase, `area: what changed`, as in `git log`.
   One change per commit.
 * Do not edit `flake.lock` unless the task is to bump an input. Do not touch
-  `secret/`, `Makefile.private`, or anything under `sys/*/hardware-configuration.nix`.
+  `secret/`, `Makefile.private`, or the filesystem, LUKS and bootloader
+  settings under `inst/*/default.nix` (they describe real disks).
 * Do not add binary caches, trusted keys, or CI secrets. Do not loosen
   `permissions:` in any workflow.
 * Hosts are deployed by the owner with `make deploy_*`; nothing in CI deploys.
@@ -83,6 +101,3 @@ Author and commit as `Claude <claude@anthropic.com>`, please. Thank you.
   and writes the GitHub Actions cache, so a rebuild of something an earlier
   run built is cheap. The variable is off when the cache step is missing
   from the job log.
-* `cheese` and `dusk` fail to evaluate on `master` as of 2026-10-31
-  (conflicting `console.font` definitions). Do not spend turns on them
-  unless the task is to fix that.
