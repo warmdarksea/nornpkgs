@@ -17,6 +17,8 @@
 # kvm is opened to the nix build users before nix is installed, and nix is
 # told to offer it to builds; without it qemu emulates.
 name: test
+# a dispatched run is named after what it runs; a push run keeps the commit message
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('make ci_{0} on {1} ({2})', inputs.make, inputs.arch, github.ref_name) || '' }}
 
 on:
   push:
