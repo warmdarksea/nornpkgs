@@ -119,8 +119,10 @@ jobs:
         if: github.event_name == 'push'
         run: make ci_test_templates
 
+      # not MAKE: make takes that variable from the environment, and the ci_%
+      # rule's $(MAKE) would then run the target name instead of make
       - name: make ci_${{ inputs.make }}
         if: github.event_name == 'workflow_dispatch'
         env:
-          MAKE: ${{ inputs.make }}
-        run: eval make "ci_$MAKE"
+          CI_MAKE: ${{ inputs.make }}
+        run: eval make "ci_$CI_MAKE"
