@@ -1,10 +1,10 @@
-# `make ci_test` on a runner of each arch: the Makefile's test targets against
+# `make test`'s targets, one step each, on a runner of each arch, against
 # the public inputs plus gensokyo-private's `ci` branch (gensokyo.ci = true:
 # no CUDA group, no large packages, no dev docs -- see lib/ci.nix and
 # home/common.nix). which hosts boot and which templates build on each arch
 # is the Makefile's NIX_HOSTS_<arch> and NIX_TEMPLATES_<arch>.
 #
-#   on push:  test-amd64, test-aarch64     make ci_test
+#   on push:  test-amd64, test-aarch64     make test, a step per target
 #   by hand:  any target against the ci copy, on one arch:
 #               gh workflow run test.yml -f make='test_vm VM_TARGETS=hell'
 #               gh workflow run test.yml -f make='check TARGET=library'
@@ -30,7 +30,7 @@ on:
       make:
         description: Makefile target and variables, run as `make ci_<make>`
         type: string
-        default: test
+        default: test_vm
 
 permissions:
   contents: read
@@ -94,7 +94,31 @@ jobs:
           use-flakehub: false
           diagnostic-endpoint: ""
 
-      - name: make ci_${{ inputs.make || 'test' }}
+      # make test, one step per target so the job page says which one failed.
+      # the cheap ones run even after an earlier failure; the VMs and the
+      # templates only when everything before them passed
+      - name: make test_nix_lint
+        if: github.event_name == 'push'
+        run: make test_nix_lint
+
+      - name: make ci_test_tf
+        if: github.event_name == 'push' && !cancelled()
+        run: make ci_test_tf
+
+      - name: make ci_test_nix_check
+        if: github.event_name == 'push' && !cancelled()
+        run: make ci_test_nix_check
+
+      - name: make ci_test_vm
+        if: github.event_name == 'push'
+        run: make ci_test_vm
+
+      - name: make ci_test_templates
+        if: github.event_name == 'push'
+        run: make ci_test_templates
+
+      - name: make ci_${{ inputs.make }}
+        if: github.event_name == 'workflow_dispatch'
         env:
-          MAKE: ${{ inputs.make || 'test' }}
+          MAKE: ${{ inputs.make }}
         run: eval make "ci_$MAKE"

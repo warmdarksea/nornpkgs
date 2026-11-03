@@ -114,7 +114,7 @@ The VM tests are `checks.<system>.boot-<host>`: the generic system
 plus the NixOS test framework's qemu machinery, waited for until its
 default target, failed units logged. A check under `checks.<system>` runs
 on a host of that system, littledevil (aarch64) on an arm64 runner. They
-need kvm. `.github/workflows/test.yml` runs `make ci_test` on an amd64 and an
-arm64 runner on every push, and any Makefile target on dispatch:
+need kvm. `.github/workflows/test.yml` runs `make test`'s targets, a step
+each, on an amd64 and an arm64 runner on every push, and any Makefile target on dispatch:
 `gh workflow run test.yml -f make='test_vm VM_TARGETS=hell'`. eientei is i686
 and has no VM test.
