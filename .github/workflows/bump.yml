@@ -7,7 +7,8 @@
 # PR to Claude Code with the failed run: Claude fixes the configuration and
 # pushes to the branch, every push runs the tests again, every failure comes
 # back here, at most BUMP_FIX_ATTEMPTS times per PR. Nothing merges; a green
-# bump PR is the owner's to merge.
+# bump PR is the owner's to merge. Every run that changes the lock gets a new
+# branch (bump-<date>-<nonce>) and PR; earlier bump PRs are left as they are.
 #
 #   schedule, dispatch      -> bump: make bump, branch, PR, dispatch test.yml
 #   workflow_run of test    -> fix:  a failed run of a bump-* branch goes to Claude
@@ -79,26 +80,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           AFTER: ${{ steps.bump.outputs.after }}
         run: |
-          branch=bump-$(date -u +%F)
+          # a fresh branch every run, bump-<date>-<6 hex>: nothing is looked up
+          # or reused, earlier bump PRs are left as they are
+          branch=bump-$(date -u +%F)-$(openssl rand -hex 3)
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git checkout -b "$branch"
           git commit -q -m "flake: bump nixpkgs to ${AFTER:0:11}" -m "$(cat bump.log)" flake.lock
-          # a second run on the same day replaces the branch
-          git push -f -u origin "$branch"
-          if ! gh pr view "$branch" --json number >/dev/null 2>&1; then
-            {
-              echo "\`make bump\` with NIX_BUMP_DAYS=$NIX_BUMP_DAYS, nixpkgs $AFTER."
-              echo
-              echo '```'
-              cat bump.log
-              echo '```'
-              echo
-              echo "The test workflow is dispatched on this branch for both arches; a failed run hands the branch to Claude (bump.yml)."
-            } > pr-body.md
-            gh pr create --base master --head "$branch" \
-              --title "flake: bump nixpkgs to ${AFTER:0:11}" --body-file pr-body.md
-          fi
+          git push -u origin "$branch"
+          {
+            echo "\`make bump\` with NIX_BUMP_DAYS=$NIX_BUMP_DAYS, nixpkgs $AFTER."
+            echo
+            echo '```'
+            cat bump.log
+            echo '```'
+            echo
+            echo "The test workflow is dispatched on this branch for both arches; a failed run hands the branch to Claude (bump.yml)."
+          } > pr-body.md
+          gh pr create --base master --head "$branch" \
+            --title "flake: bump nixpkgs to ${AFTER:0:11}" --body-file pr-body.md
           # `make ci_test` on each arch: lint, tofu, evaluation, the VMs, the templates
           gh workflow run test.yml --ref "$branch" -f make=test -f arch=amd64
           gh workflow run test.yml --ref "$branch" -f make=test -f arch=aarch64
