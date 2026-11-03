@@ -125,12 +125,19 @@ ci_%: ci_tree
 #   make test_nix_lint      parse every .nix file (no evaluation)
 #   make test_tf            tofu validate (no credentials)
 #   make test_nix_check     every flake output to a .drv, nothing built
-#   make test_vm            boot every generic system in a VM (checks.*.boot-*)
-#   make test_templates     init, build, run and test the templates
+#   make test_vm            boot the hosts of NIX_HOSTS_<arch> in VMs (checks.*.boot-*)
+#   make test_templates     init, build, run and test NIX_TEMPLATES_<arch>
 #   make run_vm TARGET=x    interactive test driver for one system
 #
 # the authenticated tofu plan against the real state is plan_oci_live
 # (Makefile.littledevil), not a test
+
+# what `make test` boots and builds on a host of each arch; a hosted ci runner
+# has ~14 GB of disk, so only the small closures until the rest are trimmed
+NIX_HOSTS_AMD64=base
+NIX_HOSTS_AARCH64=littledevil
+NIX_TEMPLATES_AMD64=py-hello rust-hello lean4-hello
+NIX_TEMPLATES_AARCH64=
 
 FLAKE?=.
 # the same flake as an absolute ref, for recipes that cd elsewhere
@@ -163,16 +170,15 @@ test_tf:
 test_nix_check:
 	nix flake check --no-build --all-systems $(NIX_FLAGS) $(FLAKE)
 
-# the VM boot tests of this host's system (checks.<system>.boot-*), all of
-# them or VM_TARGETS="base hell". they need kvm. `nix flake check` without
-# --no-build would build every check of this system at once, the desktop
-# closures included; this one picks.
+# the VM boot tests (checks.<system>.boot-*) of the hosts in NIX_HOSTS_<arch>
+# for this host's arch, or VM_TARGETS="base hell". they need kvm. `nix flake
+# check` without --no-build would build every check of this system at once,
+# the desktop closures included; this one picks.
 NIX_SYSTEM=$(shell nix eval --impure --raw --expr builtins.currentSystem)
-VM_TARGETS?=
+ARCH=$(patsubst x86_64,AMD64,$(patsubst aarch64,AARCH64,$(NIX_SYSTEM:-linux=)))
+VM_TARGETS?=$(NIX_HOSTS_$(ARCH))
 test_vm:
-	targets="$(VM_TARGETS)"; [ -n "$$targets" ] || targets=$$(nix eval --json $(NIX_FLAGS) "$(FLAKE)#checks.$(NIX_SYSTEM)" --apply builtins.attrNames \
-	  | jq -r '.[] | select(startswith("boot-")) | ltrimstr("boot-")'); \
-	for t in $$targets; do \
+	for t in $(VM_TARGETS); do \
 	  echo "== boot-$$t"; nix build -L --no-link $(NIX_FLAGS) "$(FLAKE)#checks.$(NIX_SYSTEM).boot-$$t" || exit 1; \
 	done
 
@@ -185,8 +191,9 @@ $(BUILD_DIR)/vm-%: FORCE | $(BUILD_DIR)
 
 # the templates, each copied under build/template-<name> as a git repo of its
 # own (nix would otherwise see an ignored subdirectory of this checkout) and
-# built, run and tested against this tree's nornpkgs
-TEMPLATES?=py-hello rust-hello lean4-hello llm-hello
+# built, run and tested against this tree's nornpkgs: NIX_TEMPLATES_<arch>, or
+# TEMPLATES=llm-hello
+TEMPLATES?=$(NIX_TEMPLATES_$(ARCH))
 
 test_templates: $(foreach t,$(TEMPLATES),test_template_$(t))
 

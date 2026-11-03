@@ -1,44 +1,53 @@
-# the Makefile's test targets against the public inputs plus gensokyo-private's
-# `ci` branch (the ci_* targets), on push; on dispatch, one system's VM.
-# the VM tests run on a host of the check's system, hence the arm64 job.
-# kvm is opened to the nix build users before nix is installed, and nix is
-# told to offer it to builds; without it qemu emulates.
+# `make ci_test` on a runner of each arch: the Makefile's test targets against
+# the public inputs plus gensokyo-private's `ci` branch (gensokyo.ci = true:
+# no CUDA group, no large packages, no dev docs -- see lib/ci.nix and
+# home/common.nix). which hosts boot and which templates build on each arch
+# is the Makefile's NIX_HOSTS_<arch> and NIX_TEMPLATES_<arch>.
+#
+#   on push:  test-amd64, test-aarch64     make ci_test
+#   by hand:  any target against the ci copy, on one arch:
+#               gh workflow run test.yml -f make='test_vm VM_TARGETS=hell'
+#               gh workflow run test.yml -f make='check TARGET=library'
+#               gh workflow run test.yml -f arch=aarch64 -f make='eval TARGET=littledevil-prod'
+#
+# the runner has ~14 GB free; a desktop closure needs the disk-space step
+# and hell does not fit even then. kvm is opened to the nix build users before
+# nix is installed, and nix is told to offer it to builds; without it qemu
+# emulates.
 name: test
 
 on:
   push:
   workflow_dispatch:
     inputs:
-      vm:
-        description: generic system to boot in a VM (checks.<system>.boot-<host>)
+      arch:
+        description: runner arch
         type: choice
-        default: base
+        default: amd64
         options:
-          - base
-          - abandonedfactory
-          - cheese
-          - chireiden
-          - dusk
-          - furnace
-          - hell
-          - library
-          - magic
-          - mausoleum
-          - sea
-          - littledevil
+          - amd64
+          - aarch64
+      make:
+        description: Makefile target and variables, run as `make ci_<make>`
+        type: string
+        default: test
 
 permissions:
   contents: read
 
 concurrency:
-  group: test-${{ github.ref }}-${{ inputs.vm || 'push' }}
+  group: test-${{ github.ref }}-${{ github.event_name == 'push' && 'push' || github.run_id }}
   cancel-in-progress: false
 
 jobs:
   test:
-    if: github.event_name == 'push' || inputs.vm != 'littledevil'
-    runs-on: ubuntu-latest
-    timeout-minutes: 180
+    name: test-${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJSON(github.event_name == 'push' && '["amd64", "aarch64"]' || format('["{0}"]', inputs.arch)) }}
+    runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-latest' || 'ubuntu-24.04-arm' }}
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
 
@@ -48,53 +57,6 @@ jobs:
             /opt/hostedtoolcache/CodeQL /usr/local/.ghcup /usr/share/swift
           sudo docker image prune --all --force || true
           df -h /
-
-      - name: open /dev/kvm to the nix build users
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
-            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-          ls -l /dev/kvm
-
-      - uses: cachix/install-nix-action@v31
-        with:
-          extra_nix_config: |
-            accept-flake-config = true
-            system-features = nixos-test benchmark big-parallel kvm
-
-      # the same opt-in GitHub Actions cache as build.yml
-      - uses: DeterminateSystems/magic-nix-cache-action@v15
-        if: vars.NIX_GHA_CACHE == 'true'
-        timeout-minutes: 5
-        continue-on-error: true
-        with:
-          use-gha-cache: true
-          use-flakehub: false
-          diagnostic-endpoint: ""
-
-      - name: nix syntax, terraform
-        if: github.event_name == 'push'
-        run: make test_nix_lint ci_test_tf
-
-      - name: evaluate every flake output
-        if: github.event_name == 'push'
-        run: make ci_test_nix_check
-
-      # the small systems; a desktop closure is several GB, one per dispatch
-      - name: boot in VMs
-        run: make ci_test_vm VM_TARGETS="${{ inputs.vm || 'base abandonedfactory' }}"
-
-      - name: templates
-        if: github.event_name == 'push'
-        run: make ci_test_templates TEMPLATES="py-hello rust-hello lean4-hello"
-
-  test-aarch64:
-    if: github.event_name == 'push' || inputs.vm == 'littledevil'
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v4
 
       - name: open /dev/kvm to the nix build users
         run: |
@@ -110,10 +72,19 @@ jobs:
 
       - uses: cachix/install-nix-action@v31
         with:
+          # trust the flake's nixConfig (cache.nixos-cuda.org)
           extra_nix_config: |
             accept-flake-config = true
             system-features = nixos-test benchmark big-parallel kvm
 
+      # GitHub Actions cache for what this job builds (runner-only; the hosts
+      # pull from cache1). Opt-in through the NIX_GHA_CACHE repository variable
+      # (Settings -> Secrets and variables -> Actions -> Variables, value true),
+      # because over the account's cache egress allowance the action hangs
+      # instead of degrading: at start-up, or in its post step after the build
+      # succeeded. The timeout bounds a hang and continue-on-error keeps it from
+      # failing the job; whether the timeout also covers the post step is
+      # unverified, so if that hangs, unset the variable.
       - uses: DeterminateSystems/magic-nix-cache-action@v15
         if: vars.NIX_GHA_CACHE == 'true'
         timeout-minutes: 5
@@ -123,5 +94,7 @@ jobs:
           use-flakehub: false
           diagnostic-endpoint: ""
 
-      - name: boot littledevil in a VM
-        run: make ci_test_vm VM_TARGETS=littledevil
+      - name: make ci_${{ inputs.make || 'test' }}
+        env:
+          MAKE: ${{ inputs.make || 'test' }}
+        run: eval make "ci_$MAKE"

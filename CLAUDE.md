@@ -44,11 +44,13 @@ make test_nix_lint             # parse every .nix file, no nix evaluation
   targets are listed at the top of the Makefile's testing section. The VM
   tests need kvm (`/dev/kvm` is available in this sandbox).
 
-`.github/workflows/build.yml` builds `base` and `test.yml` runs the syntax,
-lint, terraform, evaluation, small-system VM and light template tests on
-every push, so a pushed branch gets real CI results; read them with the CI
-tools before
-claiming a fix works.
+`.github/workflows/test.yml` runs `make ci_test` on a runner of each arch on
+every push (syntax, terraform, evaluation, then the VMs and templates of the
+Makefile's NIX_HOSTS_<arch> and NIX_TEMPLATES_<arch>), so a pushed branch
+gets real CI results; read them with the CI tools before claiming a fix
+works. Any Makefile target runs against the ci copy on dispatch:
+`gh workflow run test.yml -f make='check TARGET=hell'` (`-f arch=aarch64` for
+the arm64 runner).
 
 ## rules
 

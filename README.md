@@ -103,8 +103,8 @@ make test               # all of the below
 make test_nix_lint      # parse every .nix file
 make test_tf            # tofu validate, no credentials
 make test_nix_check     # every flake output to a .drv (nix flake check --no-build)
-make test_vm            # boot every generic system in a VM; VM_TARGETS="base hell" for some
-make test_templates     # copy, build, run and test the templates; TEMPLATES= for the heavy ones
+make test_vm            # boot NIX_HOSTS_<arch> in VMs; VM_TARGETS="base hell" for others
+make test_templates     # copy, build, run and test NIX_TEMPLATES_<arch>; TEMPLATES=llm-hello for the heavy one
 make run_vm TARGET=hell # the same VM, interactively
 make plan_oci_live      # tofu plan against the real state (authenticated, not a test)
 make ci_<target>        # any of them against the public inputs + gensokyo-private's ci branch
@@ -114,6 +114,7 @@ The VM tests are `checks.<system>.boot-<host>`: the generic system
 plus the NixOS test framework's qemu machinery, waited for until its
 default target, failed units logged. A check under `checks.<system>` runs
 on a host of that system, littledevil (aarch64) on an arm64 runner. They
-need kvm. `.github/workflows/test.yml`
-runs the cheap subset on every push (x86_64 and an arm64 runner) and boots
-any one system on dispatch. eientei is i686 and has no VM test.
+need kvm. `.github/workflows/test.yml` runs `make ci_test` on an amd64 and an
+arm64 runner on every push, and any Makefile target on dispatch:
+`gh workflow run test.yml -f make='test_vm VM_TARGETS=hell'`. eientei is i686
+and has no VM test.

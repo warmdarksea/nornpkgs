@@ -19,7 +19,7 @@
 # credit would work with the federation inputs instead.
 #
 # Nix is installed so Claude can evaluate and build; CLAUDE.md tells it how.
-# The GitHub Actions cache step is the same opt-in as build.yml's
+# The GitHub Actions cache step is the same opt-in as the test workflow's
 # (NIX_GHA_CACHE repository variable): over the account's cache egress
 # allowance it hangs instead of degrading (run 41124231785), so it is
 # bounded by a timeout and never fails the job.
@@ -65,9 +65,9 @@ jobs:
       pull-requests: write
       issues: write
       id-token: write   # the action's GitHub App authentication
-      actions: read     # lets Claude read the build workflow's results on a PR
+      actions: read     # lets Claude read the test workflow's results on a PR
     env:
-      # same as build.yml: the hosts' private modules allow their unfree
+      # as in the Makefile: the hosts' private modules allow their unfree
       # packages, the ci stub does not
       NIXPKGS_ALLOW_UNFREE: "1"
       # scrub CLAUDE_CODE_OAUTH_TOKEN and the GitHub token from the environment
