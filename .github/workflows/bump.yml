@@ -1,22 +1,25 @@
 # A nixpkgs bump a week, as a pull request CI has to pass. `make bump` picks
 # the newest nixos-unstable revision whose expensive packages the binary caches
 # have (bin/nixpkgs_maximize_cache.sh, lib/bigpkgs.nix), the new lock lands on
-# a bump-<date> branch with a PR against master, and the test workflow is
-# dispatched on that branch for both arches (a push with the job's own token
-# would not start it). When one of those runs fails, the second job hands the
+# a bump-<date>-<nonce> branch with a PR against master, and the push runs the
+# test workflow as any push does. When that run fails, the second job hands the
 # PR to Claude Code with the failed run: Claude fixes the configuration and
 # pushes to the branch, every push runs the tests again, every failure comes
 # back here, at most BUMP_FIX_ATTEMPTS times per PR. Nothing merges; a green
 # bump PR is the owner's to merge. Every run that changes the lock gets a new
-# branch (bump-<date>-<nonce>) and PR; earlier bump PRs are left as they are.
+# branch and PR; earlier bump PRs are left as they are.
 #
-#   schedule, dispatch      -> bump: make bump, branch, PR, dispatch test.yml
+#   schedule, dispatch      -> bump: make bump, branch, push, PR
 #   workflow_run of test    -> fix:  a failed run of a bump-* branch goes to Claude
 #
-# The PR is created with the job's token, which needs "Allow GitHub Actions to
-# create and approve pull requests" in the repository's Actions settings. The
-# Claude step runs on the same secret, environment and arguments as claude.yml,
-# with a prompt instead of an @claude mention.
+# The branch is pushed and the PR opened with BUMP_TOKEN, a fine-grained
+# personal access token of the owner for this repository (Contents and Pull
+# requests, read and write), not the job's own token: a push or a PR made with
+# the job's token starts no workflow and counts as a stranger's, so its test
+# runs had to be dispatched by hand, never showed on the PR, and every
+# pull_request workflow on it waited for approval. The Claude step runs on the
+# same secret, environment and arguments as claude.yml, with a prompt instead
+# of an @claude mention.
 name: bump
 
 on:
@@ -43,14 +46,15 @@ jobs:
     if: github.event_name != 'workflow_run'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # the push and the PR go through BUMP_TOKEN, the job's own token does nothing
     permissions:
-      contents: write
-      pull-requests: write
-      actions: write    # dispatches the test workflow on the branch
+      contents: read
     env:
       NIX_BUMP_DAYS: ${{ inputs.days || '7' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.BUMP_TOKEN }}
 
       - uses: cachix/install-nix-action@v31
         with:
@@ -77,7 +81,7 @@ jobs:
       - name: branch, commit, pull request, tests
         if: steps.bump.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.BUMP_TOKEN }}
           AFTER: ${{ steps.bump.outputs.after }}
         run: |
           # a fresh branch every run, bump-<date>-<6 hex>: nothing is looked up
@@ -95,13 +99,10 @@ jobs:
             cat bump.log
             echo '```'
             echo
-            echo "The test workflow is dispatched on this branch for both arches; a failed run hands the branch to Claude (bump.yml)."
+            echo "A failed test run of this branch hands it to Claude (bump.yml)."
           } > pr-body.md
           gh pr create --base master --head "$branch" \
             --title "flake: bump nixpkgs to ${AFTER:0:11}" --body-file pr-body.md
-          # `make ci_test` on each arch: lint, tofu, evaluation, the VMs, the templates
-          gh workflow run test.yml --ref "$branch" -f make=test -f arch=amd64
-          gh workflow run test.yml --ref "$branch" -f make=test -f arch=aarch64
 
   fix:
     if: >-
