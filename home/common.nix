@@ -22,12 +22,12 @@ in {
 
   programs.home-manager.enable = true;
 
-  # Two tiers plus CUDA. small_pkgs is what the CI build keeps: cli tools,
-  # light desktop utilities, and the toolchains programs.emacs drags in
-  # regardless (ghc + haskell-language-server, which its lsp wants on $PATH).
-  # large_pkgs are the big leaves -- desktop apps, anything carrying an
-  # electron/qt/webkit runtime, the heavy dev tools -- and only go in on the
-  # hosts (!ci). cuda_pkgs are the CUDA builds, see the let at the top.
+  # Two tiers plus CUDA. small_pkgs is what the CI build keeps: cli tools
+  # and light desktop utilities. large_pkgs are the big leaves -- desktop
+  # apps, anything carrying an electron/qt/webkit runtime, the heavy
+  # toolchains (ghc + haskell-language-server alone are 7 GB) -- and only go
+  # in on the hosts (!ci); programs.emacs below gates the same toolchains.
+  # cuda_pkgs are the CUDA builds, see the let at the top.
   home.packages = let
     small_pkgs = with pkgs; [
       # cli
@@ -77,7 +77,6 @@ in {
       gnumake
       flarectl
       ossutil
-      syncplay
       nanokvmctl # NanoKVM power/reset/boot control (warmdarksea/nanokvmctl, via overlays.default)
       # light desktop
       exif
@@ -99,9 +98,6 @@ in {
       yt-dlp
       flatpak
       flatpak-builder
-      # in the closure through programs.emacs anyway
-      ghc
-      haskell-language-server
     ];
     large_pkgs = with pkgs; [
       # browsers and electron/qt/webkit apps
@@ -114,6 +110,7 @@ in {
       qbittorrent
       vlc
       wireshark-qt
+      syncplay # pyside6 + qtwebengine
       # big desktop apps
       libreoffice
       gimp
@@ -124,6 +121,8 @@ in {
       virt-manager
       # heavy dev tools
       awscli2
+      ghc
+      haskell-language-server
       cabal-install
       (pkgs.opentofu.withPlugins (p: [
         p.hashicorp_null
@@ -182,12 +181,16 @@ in {
         propagatedUserEnvPkgs = [ lean4 dash lsp-mode magit-section ];
         buildInputs = propagatedUserEnvPkgs;
       };
-    in epkgs: [
-      pkgs.chez
+    in epkgs: lib.optionals (!ci) [
+      # the toolchains behind the lsp modes: ghc + hls 7 GB, clang 1 GB,
+      # lean4-mode propagates lean4 (3 GB). large_pkgs territory.
       pkgs.haskell-language-server
       pkgs.ghc
       pkgs.llvmPackages_19.clang
       pkgs.llvmPackages_19.clang-tools
+      (epkgs.callPackage lean4-mode {})
+    ] ++ [
+      pkgs.chez
       epkgs.use-package
       epkgs.forth-mode
       epkgs.go-mode
@@ -208,7 +211,6 @@ in {
       epkgs.nix-buffer
       epkgs.gnuplot-mode
       epkgs.yaml-mode
-      (epkgs.callPackage lean4-mode {})
       epkgs.terraform-mode
       pkgs.tofu-ls
       epkgs.claude-code
