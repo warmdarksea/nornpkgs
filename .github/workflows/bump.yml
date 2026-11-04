@@ -199,6 +199,12 @@ jobs:
         if: steps.gate.outputs.go == 'true'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # the actor of a workflow_run is whoever pushed the branch the tests
+          # ran on, on a bump branch always a bot: the bump app, then claude
+          # itself; the action refuses bot actors unless told otherwise, and
+          # the job's if above already limits it to bump-* branches of this
+          # repository
+          allowed_bots: "*"
           additional_permissions: |
             actions: read
           prompt: |
