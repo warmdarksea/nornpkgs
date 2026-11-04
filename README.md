@@ -140,7 +140,8 @@ once the lock is older than `NIX_BUMP_DAYS`, or gives up until next time
 while it is younger. Add a package to the list when a bump turns out to
 build it from source. `.github/workflows/bump.yml` runs `make bump` every
 monday, opens a `bump-<date>-<nonce>` pull request against master with the
-owner's `BUMP_TOKEN` (so the push runs the tests and the checks show on the
-PR), and hands a failed run to Claude, who pushes fixes to the
+bump app, a GitHub App of the owner installed on this repository (so the
+push runs the tests, the checks show on the PR, and the commit and PR are the
+app's bot, not the owner), and hands a failed run to Claude, who pushes fixes to the
 branch until the tests pass (three attempts, then it is yours). Every run
 opens a new branch (`bump-<date>-<nonce>`) and PR.
