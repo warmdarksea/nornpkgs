@@ -66,7 +66,6 @@
     crypted = {
       device = config.gensokyo.disks.crypted or "/dev/disk/by-label/dusk-crypted";
       header = "/form.h";
-      preLVM = true;
     };
   };
 
