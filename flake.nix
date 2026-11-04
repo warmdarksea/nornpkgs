@@ -71,6 +71,14 @@
         nornpkgs = pkgs.extend self.overlays.default;
         # gensokyo-private's ci branch exports gensokyo.ci = true; nothing else does.
         ci = gensokyo-private.gensokyo.ci or false;
+        # opentofu with tf/'s providers, for the packages.<system>.tofu outputs
+        tofuWith = pkgs: pkgs.opentofu.withPlugins (p: [
+          p.hashicorp_null
+          p.hashicorp_tls
+          p.dmacvicar_libvirt
+          p.oracle_oci
+          p.cloudflare_cloudflare
+        ]);
 
         # Model fetchers (lib/models.nix). A function of the *caller's* pkgs --
         # shadowing the one above is deliberate: the lib output below has to
@@ -649,14 +657,10 @@
     nixosConfigurations.littledevil-prod-bootstrap = self.littledevil.aarch64.nixosConfigurations.oci-bootstrap;
     nixosConfigurations.littledevil-prod = self.littledevil.aarch64.nixosConfigurations.oci-live;
 
-    # opentofu with tf/'s providers; the devShell below and `make test_tf` share it
-    packages.x86_64-linux.tofu = pkgs.opentofu.withPlugins (p: [
-      p.hashicorp_null
-      p.hashicorp_tls
-      p.dmacvicar_libvirt
-      p.oracle_oci
-      p.cloudflare_cloudflare
-    ]);
+    # opentofu with tf/'s providers; the devShell below and `make test_tf` share
+    # it, and test_tf runs on a runner of each arch
+    packages.x86_64-linux.tofu = tofuWith pkgs;
+    packages.aarch64-linux.tofu = tofuWith nixpkgs.legacyPackages.aarch64-linux;
 
     devShells.x86_64-linux.littledevil = pkgs.mkShell {
       packages = with pkgs; [
