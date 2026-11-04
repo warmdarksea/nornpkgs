@@ -62,7 +62,6 @@
     crypted = {
       device = config.gensokyo.disks.crypted or "/dev/disk/by-label/cheese-crypted";
       header = "/splice.h";
-      preLVM = true;
     };
   };
 

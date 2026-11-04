@@ -42,7 +42,6 @@
     crypted = {
       device = config.gensokyo.disks.crypted or "/dev/disk/by-label/mausoleum-crypted";
       header = "/leaf.h";
-      preLVM = true;
     };
   };
 
