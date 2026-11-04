@@ -9,7 +9,7 @@ BUILD_DIR=build
 
 #
 
-include Makefile.private
+-include Makefile.private
 include Makefile.littledevil
 
 # point at a checkout of gensokyo-private's private branch to build with the
