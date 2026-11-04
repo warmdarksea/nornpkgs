@@ -213,8 +213,8 @@ jobs:
             This repository's configuration no longer fits the new nixpkgs: a
             renamed or removed option, a changed default, a package that is
             now unfree or insecure, a module of ours that needs a small
-            adjustment. Fix that: the smallest change in lib/, sys/, home/ or
-            hw/ that makes `make test` pass on both runners (CLAUDE.md says
+            adjustment. Fix that: the smallest change in lib/, sys/, home/, hw/
+            or inst/ that makes `make test` pass on both runners (CLAUDE.md says
             how to evaluate and test here: make ci_eval, make ci_test_vm and
             friends). An insecure package is permitted by its exact
             name-version, as sys/hell does for zotero. Commit each fix on its
@@ -237,7 +237,7 @@ jobs:
             (which of two options, whether a package stays), stop and ask in
             a PR comment instead of guessing. Never change flake.lock other
             than by `make bump`, never edit anything under .github/workflows,
-            never touch secret/ or the inst/ disk settings.
+            never touch secret/.
           # fewer turns than claude.yml: a bump fix is small or it is not ours to make
           claude_args: |
             --model claude-opus-5-5
