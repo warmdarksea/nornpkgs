@@ -6,7 +6,7 @@
 # as nixosModules.nvidia_3090_unlock.
 #
 #   pkgs.callPackage ./hw/nvidia_3090_unlock.nix { }
-#     -> { firmware; moduleFor = kernel: <drv>; src; version; }
+#     -> { firmware; moduleFor = kernelPackages: <drv>; src; version; }
 {
   lib,
   stdenv,
@@ -105,14 +105,13 @@ let
       };
     };
 
-  # Out-of-tree build of gpu_unlock.ko against a given kernel. Built per-kernel
-  # so it drops into boot.extraModulePackages cleanly.
+  # Out-of-tree build of gpu_unlock.ko against the kernel of a given
+  # linuxPackages set. Built per-kernel so it drops into
+  # boot.extraModulePackages cleanly.
   moduleFor =
-    kernel:
+    kernelPackages:
     let
-      # modDirVersion carries any localversion suffix; fall back to version on
-      # the (rare) kernels that don't expose it.
-      modDirVersion = kernel.modDirVersion or kernel.version;
+      inherit (kernelPackages) kernel;
     in
     stdenv.mkDerivation {
       pname = "gpu-unlock-module-${kernel.version}";
@@ -120,24 +119,19 @@ let
 
       nativeBuildInputs = kernel.moduleBuildDependencies;
 
-      # The module's own Makefile takes KDIR and drives the kernel build system.
-      buildPhase = ''
-        runHook preBuild
-
-        make -C kernel/gpu_unlock \
-          KDIR="${kernel.dev}/lib/modules/${modDirVersion}/build"
-
-        runHook postBuild
-      '';
-
-      installPhase = ''
-        runHook preInstall
-
-        install -Dm644 kernel/gpu_unlock/gpu_unlock.ko \
-          "$out/lib/modules/${modDirVersion}/misc/gpu_unlock.ko"
-
-        runHook postInstall
-      '';
+      # kbuild itself rather than the module's own Makefile, which only wraps
+      # the `modules` target: nixpkgs kernels verify module signatures, and
+      # modules_install is what signs gpu_unlock.ko and writes the
+      # gpu_unlock.ko.cer that aggregateModules collects into the system's
+      # module tree (a copied-in .ko fails that build).
+      makeFlags = kernelPackages.kernelModuleMakeFlags ++ [
+        "-C"
+        "${kernel.dev}/lib/modules/${kernel.modDirVersion}/build"
+        "M=$(PWD)/kernel/gpu_unlock"
+        "INSTALL_MOD_PATH=${placeholder "out"}"
+      ];
+      buildFlags = [ "modules" ];
+      installTargets = [ "modules_install" ];
 
       enableParallelBuilding = true;
 

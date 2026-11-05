@@ -18,7 +18,7 @@ let
   cfg = config.hardware.nvidia-3090-unlock;
 
   gpuUnlock = pkgs.callPackage ../hw/nvidia_3090_unlock.nix { };
-  kernelModule = gpuUnlock.moduleFor config.boot.kernelPackages.kernel;
+  kernelModule = gpuUnlock.moduleFor config.boot.kernelPackages;
 
   targetsParam =
     lib.optional (cfg.targets != [ ])
@@ -57,7 +57,7 @@ in
     package = lib.mkOption {
       type = lib.types.package;
       default = kernelModule;
-      defaultText = lib.literalMD "the gpu_unlock module built against `boot.kernelPackages.kernel`";
+      defaultText = lib.literalMD "the gpu_unlock module built against `boot.kernelPackages`";
       description = "The gpu_unlock kernel-module package.";
     };
 
