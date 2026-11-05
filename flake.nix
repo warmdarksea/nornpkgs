@@ -180,6 +180,7 @@
     nixosModules.desktop = import lib/desktop.nix;
     nixosModules.server = import lib/server.nix;
     nixosModules.nvidia = import lib/nvidia.nix;
+    nixosModules.nvidia_3090_unlock = import lib/nvidia_3090_unlock.nix;
     nixosModules.agent = import lib/agent.nix;
     # The project-wide overlay: our own packages plus emacs-overlay. Every
     # nixosSystem below applies it ({ nixpkgs.overlays = [ self.overlays.default ]; }),
