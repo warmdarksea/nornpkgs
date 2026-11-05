@@ -2,6 +2,8 @@
 
 # library: desktop, i7-12700KF + RTX 3090 + mellanox nic
 {
+  imports = [ ../lib/nvidia_3090_unlock.nix ];
+
   boot.initrd.availableKernelModules = [ "vmd" "xhci_pci" "ahci" "nvme" "usb_storage" "sd_mod" "mlx5_core" ];
   boot.initrd.kernelModules = [ "kvm-intel" ];
 
@@ -33,6 +35,10 @@
 
     nvidiaPersistenced = true;
   };
+
+  # full-rate fp16/bf16 on the 3090, set up in the initrd before nvidia
+  # (stage 2, boot.kernelModules above) binds the card
+  hardware.nvidia-3090-unlock.enable = true;
 
   # the gpu for containers
   virtualisation.docker.enableNvidia = true;
