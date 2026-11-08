@@ -1,21 +1,26 @@
 # imgrec -- image recognition as a service: a fleet of vision models (vllm
 # servers plus the pixai tagger) behind one HTTP API, scheduled onto one GPU.
-# The program and its design live in the imgrec repository; this is only the
-# service around it.
+# The program and its design live in the slopbooru repository (imgrec/);
+# this is only the service around it. The package is pkgs.imgrec, from the
+# overlay (flake.nix pins the repository).
 #
 # Per-host:
 #   services.imgrec = {
 #     enable = true;
-#     package = pkgs.callPackage "${imgrecSrc}/default.nix" { };
+#     host = "0.0.0.0";        # TLS turns on by itself off loopback
+#     openFirewall = true;
 #   };
 #
-# The package's bin/imgrec has to carry everything a model needs (engine,
-# specs, weights manifest) -- the module passes only where things live and
-# where to listen. Clients are managed as the service user:
+# The package's bin/imgrec carries everything a model needs (engine, specs,
+# weights manifest) -- the module passes only where things live and where to
+# listen. Clients are managed as the service user:
 #   sudo -u imgrec imgrec-client add alice     # prints alice's token, once
 #   sudo -u imgrec imgrec-client list
 # and use it with
-#   imgrec submit --server http://HOST:8100 --token T pictures/*
+#   imgrec submit --server https://HOST:8100 --cacert imgrec.crt --token T pictures/*
+# where imgrec.crt is the service's self-signed certificate (tls.certFile
+# unset), made on its first start:
+#   sudo cat /var/lib/imgrec/tls/imgrec.crt > imgrec.crt
 #
 # The models want the whole card while they run: stop anything else using
 # the GPU (a long-lived llm server) first. Once the queue is empty, the
@@ -25,6 +30,11 @@
 let
   cfg = config.services.imgrec;
   db = "${cfg.dataDir}/imgrec.db";
+  loopback = builtins.elem cfg.host [ "127.0.0.1" "::1" "localhost" ];
+  selfSigned = cfg.tls.enable && cfg.tls.certFile == null;
+  tlsDir = "${cfg.dataDir}/tls";
+  certFile = if selfSigned then "${tlsDir}/imgrec.crt" else cfg.tls.certFile;
+  keyFile = if selfSigned then "${tlsDir}/imgrec.key" else cfg.tls.keyFile;
 
   # the client admin command: the same binary, pointed at the service's db
   clientCmd = pkgs.writeShellScriptBin "imgrec-client" ''
@@ -37,9 +47,11 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
+      default = pkgs.imgrec;
+      defaultText = lib.literalExpression "pkgs.imgrec";
       description = ''
-        imgrec, bundled with its engine: the default.nix at the root of the
-        imgrec repository, e.g. `pkgs.callPackage "''${imgrecSrc}/default.nix" { }`.
+        imgrec, bundled with its engine and models: the slopbooru
+        repository's `imgrec` attribute (nornpkgs' overlay has it).
       '';
     };
 
@@ -59,6 +71,42 @@ in
       type = lib.types.bool;
       default = false;
       description = "Open the port (set `host` to something other than loopback too).";
+    };
+
+    tls = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = !loopback;
+        defaultText = lib.literalMD "on unless `host` is loopback";
+        description = ''
+          Serve https. A client's token is a password: off this machine it
+          should not travel as plain http.
+        '';
+      };
+      certFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.path;
+        default = null;
+        description = ''
+          The certificate (PEM), re-read whenever it changes -- a renewal
+          needs no restart. The imgrec user must be able to read it and
+          the key. null: a self-signed certificate for `tls.hosts`, made on
+          the first start in dataDir/tls/imgrec.crt; clients trust it with
+          `imgrec submit --cacert`. Delete both files there to remake it.
+        '';
+      };
+      keyFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.path;
+        default = null;
+        description = "The certificate's private key (PEM), with `tls.certFile`.";
+      };
+      hosts = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = lib.unique ([ config.networking.hostName config.networking.fqdnOrHostName
+          "localhost" "127.0.0.1" ] ++ lib.optional (!loopback && cfg.host != "0.0.0.0" && cfg.host != "::") cfg.host);
+        defaultText = lib.literalMD "the host name, its fqdn, localhost, 127.0.0.1 and `host`";
+        example = [ "library" "library.gensokyo.internal" "10.0.0.2" ];
+        description = "Names and addresses the self-signed certificate is valid for.";
+      };
     };
 
     dataDir = lib.mkOption {
@@ -114,6 +162,13 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [{
+      assertion = (cfg.tls.certFile == null) == (cfg.tls.keyFile == null);
+      message = "services.imgrec.tls: certFile and keyFile go together";
+    }];
+    warnings = lib.optional (!loopback && !cfg.tls.enable)
+      "services.imgrec listens on ${cfg.host} without TLS: tokens and pictures cross the network in the clear";
+
     users.users.imgrec = {
       isSystemUser = true;
       group = "imgrec";
@@ -125,9 +180,12 @@ in
 
     systemd.tmpfiles.settings.imgrec = {
       ${cfg.dataDir}.d = { user = "imgrec"; group = "imgrec"; mode = "0750"; };
+    } // lib.optionalAttrs selfSigned {
+      ${tlsDir}.d = { user = "imgrec"; group = "imgrec"; mode = "0750"; };
     };
 
-    environment.systemPackages = [ clientCmd ];
+    # imgrec itself too, for `imgrec submit` from this machine
+    environment.systemPackages = [ clientCmd cfg.package ];
 
     networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [ cfg.port ];
 
@@ -143,6 +201,13 @@ in
         XDG_CACHE_HOME = "/var/cache/imgrec";
       } // cfg.environment;
 
+      # the self-signed certificate, once; the key never leaves dataDir
+      preStart = lib.optionalString selfSigned ''
+        ${lib.getExe' cfg.package "imgrec"} cert --if-missing \
+          --hosts ${lib.escapeShellArg (lib.concatStringsSep "," cfg.tls.hosts)} \
+          --cert ${lib.escapeShellArg certFile} --key ${lib.escapeShellArg keyFile}
+      '';
+
       serviceConfig = {
         ExecStart = lib.escapeShellArgs ([
           (lib.getExe' cfg.package "imgrec") "serve"
@@ -152,6 +217,7 @@ in
           "--idle" cfg.idle
           "--max-upload" (toString cfg.maxUpload)
         ] ++ lib.optionals (cfg.models != [ ]) [ "--models" (lib.concatStringsSep "," cfg.models) ]
+          ++ lib.optionals cfg.tls.enable [ "--tls-cert" certFile "--tls-key" keyFile ]
           ++ cfg.extraArgs);
         User = "imgrec";
         Group = "imgrec";
