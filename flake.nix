@@ -137,13 +137,13 @@
         rev = "4a464340116d730eb91092dfb4cbc254ec2d513f";
         ref = "main";
       };
-      # slopbooru (the booru) and imgrec (the recognition backend that fills
-      # its db), one repository. Its default.nix pins its own nixpkgs -- the
-      # engine's cuda wheels were built and run on the card against exactly
-      # that -- and takes the model fetcher from here.
+      # slopbooru: the booru, its classify command, and the fleet of models it
+      # asks (fleet/, for gpu-timeshare). Its default.nix pins its own nixpkgs
+      # -- the engine's cuda wheels were built and run on the card against
+      # exactly that -- and takes the model fetcher from here.
       slopbooruSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/slopbooru.git";
-        rev = "ea43a1e8f9559cc1896edcb13abdd534d3ff5878";
+        rev = "81cf6c58b4f85705313893763b796cbef4c04938";
         ref = "main";
       };
       slopbooruFor = pkgs: import slopbooruSrc {
@@ -206,8 +206,12 @@
     # is the overlay's gpu-timeshare. Each model runs in its own sandboxed
     # unit, started and stopped by the service through polkit.
     nixosModules.gpu-timeshare = import "${gpuTimeshareSrc}/nix/module.nix";
-    # the imgrec service (lib/imgrec.nix); its package is the overlay's imgrec
-    nixosModules.imgrec = import lib/imgrec.nix;
+    # slopbooru's fleet on it, per host:
+    #   services.gpu-timeshare = { enable = true; models = pkgs.slopbooru-fleet.models; };
+    # and on any machine: slopbooru classify --images DIR (classify.toml's
+    # backend is http://127.0.0.1:8100/v1; SLOPBOORU_TOKEN from
+    # `sudo -u gpu-timeshare timeshare-admin token add NAME`)
+
     # The project-wide overlay: our own packages plus emacs-overlay. Every
     # nixosSystem below applies it ({ nixpkgs.overlays = [ self.overlays.default ]; }),
     # and packages.x86_64-linux.* are taken from pkgs with it applied.
@@ -224,10 +228,11 @@
         openutau-bridge = final.callPackage ./pkgs/openutau-bridge { };
         # many models taking turns on one GPU (nixosModules.gpu-timeshare runs it)
         gpu-timeshare = import gpuTimeshareSrc { pkgs = final; };
-        # the booru (a static binary) and imgrec (bundled with its engine
-        # and ~75 GB of models; nixosModules.imgrec runs it)
+        # the booru (a static binary, with `slopbooru classify`), and the
+        # models it asks as gpu-timeshare models: slopbooru-fleet.models for
+        # services.gpu-timeshare.models (~75 GB of weights)
         slopbooru = (slopbooruFor final).slopbooru;
-        imgrec = (slopbooruFor final).imgrec;
+        slopbooru-fleet = (slopbooruFor final).fleet;
       })
       emacs-overlay.overlays.default
       emacs-overlay.overlays.package
@@ -879,11 +884,12 @@
 
     packages.x86_64-linux.gpu-timeshare = nornpkgs.gpu-timeshare;
 
-    # slopbooru: the booru (also as release binaries for linux and windows)
-    # and imgrec, the recognition backend that fills its db
+    # slopbooru: the booru (also as release binaries for linux and windows),
+    # and its fleet as a timeshare.toml (every model a child process of
+    # timeshare, for a machine without the module)
     packages.x86_64-linux.slopbooru = nornpkgs.slopbooru;
     packages.x86_64-linux.slopbooru-release = (slopbooruFor pkgs).release;
-    packages.x86_64-linux.imgrec = nornpkgs.imgrec;
+    packages.x86_64-linux.slopbooru-fleet = nornpkgs.slopbooru-fleet.timeshare-toml;
 
     images.gensokyo-recovery =
       self.nixosConfigurations.gensokyo-recovery.config.system.build.image;
