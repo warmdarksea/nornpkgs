@@ -129,6 +129,19 @@
         rev = "e941498c4d0bd51661b5c689a6e1de24eb85fec9";
         ref = "master";
       };
+      # slopbooru (the booru) and imgrec (the recognition backend that fills
+      # its db), one repository. Its default.nix pins its own nixpkgs -- the
+      # engine's cuda wheels were built and run on the card against exactly
+      # that -- and takes the model fetcher from here.
+      slopbooruSrc = builtins.fetchGit {
+        url = "https://github.com/warmdarksea/slopbooru.git";
+        rev = "ea43a1e8f9559cc1896edcb13abdd534d3ff5878";
+        ref = "main";
+      };
+      slopbooruFor = pkgs: import slopbooruSrc {
+        inherit (pkgs.stdenv.hostPlatform) system;
+        inherit ((modelLib pkgs)) fetchHuggingFace;
+      };
       uefiTrampolineSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/uefi_trampoline.git";
         rev = "b1d84a5752aecdbb62488753060afa9977f7ee11";
@@ -181,7 +194,7 @@
     nixosModules.server = import lib/server.nix;
     nixosModules.nvidia = import lib/nvidia.nix;
     nixosModules.agent = import lib/agent.nix;
-    # the imgrec service (lib/imgrec.nix); the package comes from the imgrec repo
+    # the imgrec service (lib/imgrec.nix); its package is the overlay's imgrec
     nixosModules.imgrec = import lib/imgrec.nix;
     # The project-wide overlay: our own packages plus emacs-overlay. Every
     # nixosSystem below applies it ({ nixpkgs.overlays = [ self.overlays.default ]; }),
@@ -197,6 +210,10 @@
         # older glibc pin, not whatever pkgs this overlay lands on.
         gearmulator = final.callPackage ./pkgs/gearmulator { };
         openutau-bridge = final.callPackage ./pkgs/openutau-bridge { };
+        # the booru (a static binary) and imgrec (bundled with its engine
+        # and ~75 GB of models; nixosModules.imgrec runs it)
+        slopbooru = (slopbooruFor final).slopbooru;
+        imgrec = (slopbooruFor final).imgrec;
       })
       emacs-overlay.overlays.default
       emacs-overlay.overlays.package
@@ -845,6 +862,12 @@
       pkgs.callPackage "${uefiTrampolineSrc}/default.nix" { }; # .override { bootId = N; }
     packages.x86_64-linux.nanokvm = nornpkgs.nanokvm;
     packages.x86_64-linux.nanokvmctl = nornpkgs.nanokvmctl;
+
+    # slopbooru: the booru (also as release binaries for linux and windows)
+    # and imgrec, the recognition backend that fills its db
+    packages.x86_64-linux.slopbooru = nornpkgs.slopbooru;
+    packages.x86_64-linux.slopbooru-release = (slopbooruFor pkgs).release;
+    packages.x86_64-linux.imgrec = nornpkgs.imgrec;
 
     images.gensokyo-recovery =
       self.nixosConfigurations.gensokyo-recovery.config.system.build.image;
