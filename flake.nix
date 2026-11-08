@@ -129,6 +129,14 @@
         rev = "e941498c4d0bd51661b5c689a6e1de24eb85fec9";
         ref = "master";
       };
+      # gpu-timeshare: many models taking turns on one GPU behind the
+      # OpenAI API (batches, a queue, a cache). Its default.nix is not a
+      # flake; built against whatever pkgs the overlay lands on.
+      gpuTimeshareSrc = builtins.fetchGit {
+        url = "https://github.com/warmdarksea/gpu-timeshare.git";
+        rev = "4a464340116d730eb91092dfb4cbc254ec2d513f";
+        ref = "main";
+      };
       # slopbooru (the booru) and imgrec (the recognition backend that fills
       # its db), one repository. Its default.nix pins its own nixpkgs -- the
       # engine's cuda wheels were built and run on the card against exactly
@@ -194,6 +202,10 @@
     nixosModules.server = import lib/server.nix;
     nixosModules.nvidia = import lib/nvidia.nix;
     nixosModules.agent = import lib/agent.nix;
+    # services.gpu-timeshare (the module ships with gpu-timeshare); its package
+    # is the overlay's gpu-timeshare. Each model runs in its own sandboxed
+    # unit, started and stopped by the service through polkit.
+    nixosModules.gpu-timeshare = import "${gpuTimeshareSrc}/nix/module.nix";
     # the imgrec service (lib/imgrec.nix); its package is the overlay's imgrec
     nixosModules.imgrec = import lib/imgrec.nix;
     # The project-wide overlay: our own packages plus emacs-overlay. Every
@@ -210,6 +222,8 @@
         # older glibc pin, not whatever pkgs this overlay lands on.
         gearmulator = final.callPackage ./pkgs/gearmulator { };
         openutau-bridge = final.callPackage ./pkgs/openutau-bridge { };
+        # many models taking turns on one GPU (nixosModules.gpu-timeshare runs it)
+        gpu-timeshare = import gpuTimeshareSrc { pkgs = final; };
         # the booru (a static binary) and imgrec (bundled with its engine
         # and ~75 GB of models; nixosModules.imgrec runs it)
         slopbooru = (slopbooruFor final).slopbooru;
@@ -862,6 +876,8 @@
       pkgs.callPackage "${uefiTrampolineSrc}/default.nix" { }; # .override { bootId = N; }
     packages.x86_64-linux.nanokvm = nornpkgs.nanokvm;
     packages.x86_64-linux.nanokvmctl = nornpkgs.nanokvmctl;
+
+    packages.x86_64-linux.gpu-timeshare = nornpkgs.gpu-timeshare;
 
     # slopbooru: the booru (also as release binaries for linux and windows)
     # and imgrec, the recognition backend that fills its db
