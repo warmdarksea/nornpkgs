@@ -18,10 +18,9 @@
 #   imgrec submit --server http://HOST:8100 --token T pictures/*
 #
 # The models want the whole card while they run: stop anything else using
-# the GPU (a long-lived llm server) first. imgrec unloads a model only to
-# make room for another, so once the queue is empty the last model stays
-# loaded (qwen: ~23 GB) until more work arrives or the service stops --
-# `systemctl stop imgrec` gives the card back.
+# the GPU (a long-lived llm server) first. Once the queue is empty, the
+# last model unloads after `idle` and the card is back to its idle power
+# state, with nothing of imgrec's on it.
 { config, lib, pkgs, ... }:
 let
   cfg = config.services.imgrec;
@@ -84,6 +83,16 @@ in
       description = "A busy model gives the card up after this when other models have work waiting.";
     };
 
+    idle = lib.mkOption {
+      type = lib.types.str;
+      default = "10m";
+      description = ''
+        A loaded model with no work for this long is stopped, so an empty
+        queue leaves the card free to power down; the next job pays the
+        model's start (1-2 minutes). "0" keeps models loaded.
+      '';
+    };
+
     maxUpload = lib.mkOption {
       type = lib.types.ints.positive;
       default = 256 * 1024 * 1024;
@@ -140,6 +149,7 @@ in
           "--db" db
           "--listen" "${cfg.host}:${toString cfg.port}"
           "--rotation" cfg.rotation
+          "--idle" cfg.idle
           "--max-upload" (toString cfg.maxUpload)
         ] ++ lib.optionals (cfg.models != [ ]) [ "--models" (lib.concatStringsSep "," cfg.models) ]
           ++ cfg.extraArgs);
