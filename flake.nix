@@ -181,6 +181,8 @@
     nixosModules.server = import lib/server.nix;
     nixosModules.nvidia = import lib/nvidia.nix;
     nixosModules.agent = import lib/agent.nix;
+    # the imgrec service (lib/imgrec.nix); the package comes from the imgrec repo
+    nixosModules.imgrec = import lib/imgrec.nix;
     # The project-wide overlay: our own packages plus emacs-overlay. Every
     # nixosSystem below applies it ({ nixpkgs.overlays = [ self.overlays.default ]; }),
     # and packages.x86_64-linux.* are taken from pkgs with it applied.
