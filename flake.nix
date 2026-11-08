@@ -135,7 +135,7 @@
       gpuTimeshareSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/gpu-timeshare.git";
         rev = "837c4cd938ef27b33f629b6d3115e5bbeb103862";
-        ref = "main";
+        ref = "master";
       };
       # slopbooru: the booru, its classify command, and the fleet of models it
       # asks (fleet/, for gpu-timeshare). Its default.nix pins its own nixpkgs
@@ -144,7 +144,7 @@
       slopbooruSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/slopbooru.git";
         rev = "ab9243e04814e44b4ab6b72237ec622118d95ba8";
-        ref = "main";
+        ref = "master";
       };
       slopbooruFor = pkgs: import slopbooruSrc {
         inherit (pkgs.stdenv.hostPlatform) system;
