@@ -138,9 +138,12 @@
         ref = "master";
       };
       # slopbooru: the booru, its classify command, and the fleet of models it
-      # asks (fleet/, for gpu-timeshare). Its default.nix pins its own nixpkgs
-      # -- the engine's cuda wheels were built and run on the card against
-      # exactly that -- and takes the model fetcher from here.
+      # asks (fleet/, for gpu-timeshare). Built against this flake's nixpkgs
+      # (not slopbooru's own pin, a second nixpkgs to fetch and to drift
+      # apart from this one), imported plain:
+      # no overlays, no host config, so a host's cudaSupport doesn't rebuild
+      # the engine. The engine's cuda wheels are fixed up at build time, so a
+      # nixpkgs bump wants a run on the card (slopbooru's fleet/engine.nix).
       slopbooruSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/slopbooru.git";
         rev = "cc6b331a1716dc6ce1d9bb27a07761d6e370c1bb";
@@ -148,6 +151,7 @@
       };
       slopbooruFor = pkgs: import slopbooruSrc {
         inherit (pkgs.stdenv.hostPlatform) system;
+        pkgs = import nixpkgs { inherit (pkgs.stdenv.hostPlatform) system; config = { }; overlays = [ ]; };
         inherit ((modelLib pkgs)) fetchHuggingFace;
       };
       uefiTrampolineSrc = builtins.fetchGit {
