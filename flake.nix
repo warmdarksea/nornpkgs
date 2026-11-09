@@ -134,7 +134,7 @@
       # flake; built against whatever pkgs the overlay lands on.
       gpuTimeshareSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/gpu-timeshare.git";
-        rev = "6374bd68c04d3eda551d78eb758a53a07c159b95";
+        rev = "2072caa679fc06251022354a5ffb68aae95e7160";
         ref = "master";
       };
       # slopbooru: the booru, its classify command, and the fleet of models it
@@ -214,7 +214,7 @@
     #   services.gpu-timeshare = { enable = true; inherit (pkgs.slopbooru-fleet) models settings; };
     # and on any machine: slopbooru classify --images DIR (classify.toml's
     # backend is http://127.0.0.1:8100/v1; SLOPBOORU_TOKEN from
-    # `sudo -u gpu-timeshare gpu-timeshare-admin token add NAME`)
+    # `sudo -u gpu-timeshare gpu-timeshare token add NAME`)
 
     # The project-wide overlay: our own packages plus emacs-overlay. Every
     # nixosSystem below applies it ({ nixpkgs.overlays = [ self.overlays.default ]; }),

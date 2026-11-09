@@ -43,7 +43,7 @@
   };
 
   # slopbooru's fleet, one model at a time on the 3090, behind the OpenAI
-  # API on 127.0.0.1:8100. A token: sudo -u gpu-timeshare gpu-timeshare-admin
+  # API on 127.0.0.1:8100. A token: sudo -u gpu-timeshare gpu-timeshare
   # token add NAME. The weights (~75 GB) are in the system closure.
   services.gpu-timeshare = {
     enable = true;
