@@ -134,7 +134,7 @@
       # flake; built against whatever pkgs the overlay lands on.
       gpuTimeshareSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/gpu-timeshare.git";
-        rev = "250d431293557df591393ffe382d674fe981e653";
+        rev = "a691a816cd708cd294690bcce7b7432572658145";
         ref = "master";
       };
       # slopbooru: the booru, its classify command, and the fleet of models it
@@ -146,7 +146,7 @@
       # nixpkgs bump wants a run on the card (slopbooru's fleet/engine.nix).
       slopbooruSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/slopbooru.git";
-        rev = "cc6b331a1716dc6ce1d9bb27a07761d6e370c1bb";
+        rev = "49aa5feae35895d4ff10e9245444e56c012f4fc7";
         ref = "master";
       };
       slopbooruFor = pkgs: import slopbooruSrc {
