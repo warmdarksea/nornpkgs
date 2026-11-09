@@ -42,6 +42,14 @@
     presets.nvidia-gpu.enable = true;
   };
 
+  # slopbooru's fleet, one model at a time on the 3090, behind the OpenAI
+  # API on 127.0.0.1:8100. A token: sudo -u gpu-timeshare gpu-timeshare-admin
+  # token add NAME. The weights (~75 GB) are in the system closure.
+  services.gpu-timeshare = {
+    enable = true;
+    inherit (pkgs.slopbooru-fleet) models settings;
+  };
+
   environment.systemPackages = with pkgs; [
     dtach
     efibootmgr

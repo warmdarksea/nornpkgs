@@ -134,7 +134,7 @@
       # flake; built against whatever pkgs the overlay lands on.
       gpuTimeshareSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/gpu-timeshare.git";
-        rev = "837c4cd938ef27b33f629b6d3115e5bbeb103862";
+        rev = "250d431293557df591393ffe382d674fe981e653";
         ref = "master";
       };
       # slopbooru: the booru, its classify command, and the fleet of models it
@@ -143,7 +143,7 @@
       # exactly that -- and takes the model fetcher from here.
       slopbooruSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/slopbooru.git";
-        rev = "ab9243e04814e44b4ab6b72237ec622118d95ba8";
+        rev = "cc6b331a1716dc6ce1d9bb27a07761d6e370c1bb";
         ref = "master";
       };
       slopbooruFor = pkgs: import slopbooruSrc {
@@ -208,10 +208,10 @@
     # unit, started and stopped by the service through polkit.
     nixosModules.gpu-timeshare = import "${gpuTimeshareSrc}/nix/module.nix";
     # slopbooru's fleet on it, per host:
-    #   services.gpu-timeshare = { enable = true; models = pkgs.slopbooru-fleet.models; };
+    #   services.gpu-timeshare = { enable = true; inherit (pkgs.slopbooru-fleet) models settings; };
     # and on any machine: slopbooru classify --images DIR (classify.toml's
     # backend is http://127.0.0.1:8100/v1; SLOPBOORU_TOKEN from
-    # `sudo -u gpu-timeshare timeshare-admin token add NAME`)
+    # `sudo -u gpu-timeshare gpu-timeshare-admin token add NAME`)
 
     # The project-wide overlay: our own packages plus emacs-overlay. Every
     # nixosSystem below applies it ({ nixpkgs.overlays = [ self.overlays.default ]; }),
@@ -367,6 +367,7 @@
           self.nixosModules.base
           self.nixosModules.agent
           self.nixosModules.server
+          self.nixosModules.gpu-timeshare
           ./sys/library
         ];
         gensokyo-agent = {
