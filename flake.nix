@@ -129,6 +129,27 @@
         rev = "e941498c4d0bd51661b5c689a6e1de24eb85fec9";
         ref = "master";
       };
+      # gpu-timeshare: many models taking turns on one GPU behind the
+      # OpenAI API (batches, a queue, a cache). Its default.nix is not a
+      # flake; built against whatever pkgs the overlay lands on.
+      gpuTimeshareSrc = builtins.fetchGit {
+        url = "https://github.com/warmdarksea/gpu-timeshare.git";
+        rev = "837c4cd938ef27b33f629b6d3115e5bbeb103862";
+        ref = "master";
+      };
+      # slopbooru: the booru, its classify command, and the fleet of models it
+      # asks (fleet/, for gpu-timeshare). Its default.nix pins its own nixpkgs
+      # -- the engine's cuda wheels were built and run on the card against
+      # exactly that -- and takes the model fetcher from here.
+      slopbooruSrc = builtins.fetchGit {
+        url = "https://github.com/warmdarksea/slopbooru.git";
+        rev = "ab9243e04814e44b4ab6b72237ec622118d95ba8";
+        ref = "master";
+      };
+      slopbooruFor = pkgs: import slopbooruSrc {
+        inherit (pkgs.stdenv.hostPlatform) system;
+        inherit ((modelLib pkgs)) fetchHuggingFace;
+      };
       uefiTrampolineSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/uefi_trampoline.git";
         rev = "b1d84a5752aecdbb62488753060afa9977f7ee11";
@@ -182,6 +203,16 @@
     nixosModules.nvidia = import lib/nvidia.nix;
     nixosModules.nvidia_3090_unlock = import lib/nvidia_3090_unlock.nix;
     nixosModules.agent = import lib/agent.nix;
+    # services.gpu-timeshare (the module ships with gpu-timeshare); its package
+    # is the overlay's gpu-timeshare. Each model runs in its own sandboxed
+    # unit, started and stopped by the service through polkit.
+    nixosModules.gpu-timeshare = import "${gpuTimeshareSrc}/nix/module.nix";
+    # slopbooru's fleet on it, per host:
+    #   services.gpu-timeshare = { enable = true; models = pkgs.slopbooru-fleet.models; };
+    # and on any machine: slopbooru classify --images DIR (classify.toml's
+    # backend is http://127.0.0.1:8100/v1; SLOPBOORU_TOKEN from
+    # `sudo -u gpu-timeshare timeshare-admin token add NAME`)
+
     # The project-wide overlay: our own packages plus emacs-overlay. Every
     # nixosSystem below applies it ({ nixpkgs.overlays = [ self.overlays.default ]; }),
     # and packages.x86_64-linux.* are taken from pkgs with it applied.
@@ -196,6 +227,13 @@
         # older glibc pin, not whatever pkgs this overlay lands on.
         gearmulator = final.callPackage ./pkgs/gearmulator { };
         openutau-bridge = final.callPackage ./pkgs/openutau-bridge { };
+        # many models taking turns on one GPU (nixosModules.gpu-timeshare runs it)
+        gpu-timeshare = import gpuTimeshareSrc { pkgs = final; };
+        # the booru (a static binary, with `slopbooru classify`), and the
+        # models it asks as gpu-timeshare models: slopbooru-fleet.models for
+        # services.gpu-timeshare.models (~75 GB of weights)
+        slopbooru = (slopbooruFor final).slopbooru;
+        slopbooru-fleet = (slopbooruFor final).fleet;
       })
       emacs-overlay.overlays.default
       emacs-overlay.overlays.package
@@ -844,6 +882,15 @@
       pkgs.callPackage "${uefiTrampolineSrc}/default.nix" { }; # .override { bootId = N; }
     packages.x86_64-linux.nanokvm = nornpkgs.nanokvm;
     packages.x86_64-linux.nanokvmctl = nornpkgs.nanokvmctl;
+
+    packages.x86_64-linux.gpu-timeshare = nornpkgs.gpu-timeshare;
+
+    # slopbooru: the booru (also as release binaries for linux and windows),
+    # and its fleet as a timeshare.toml (every model a child process of
+    # timeshare, for a machine without the module)
+    packages.x86_64-linux.slopbooru = nornpkgs.slopbooru;
+    packages.x86_64-linux.slopbooru-release = (slopbooruFor pkgs).release;
+    packages.x86_64-linux.slopbooru-fleet = nornpkgs.slopbooru-fleet.timeshare-toml;
 
     images.gensokyo-recovery =
       self.nixosConfigurations.gensokyo-recovery.config.system.build.image;
