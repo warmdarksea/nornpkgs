@@ -366,6 +366,7 @@
           self.nixosModules.base
           self.nixosModules.agent
           self.nixosModules.server
+          self.nixosModules.gpu-timeshare
           ./sys/library
         ];
         gensokyo-agent = {
