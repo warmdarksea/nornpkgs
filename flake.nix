@@ -134,7 +134,7 @@
       # flake; built against whatever pkgs the overlay lands on.
       gpuTimeshareSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/gpu-timeshare.git";
-        rev = "2072caa679fc06251022354a5ffb68aae95e7160";
+        rev = "4373e4a46a1f8f4a9ef82d457d2c6de37a24b072";
         ref = "master";
       };
       # slopbooru: the booru, its classify command, and the fleet of models it
