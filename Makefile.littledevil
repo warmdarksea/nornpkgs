@@ -154,6 +154,21 @@ deploy_oci_live: $(BUILD_DIR)/prod-deployment.tfplan | $(STATE_DIR)
 	  -var-file=$(BUILD_DIR)/prod-deployment.tfvars \
 	  $<
 
+# the cloudflare resources (null_resource.littledevil_cloudflare) on their
+# own; tofu shows the plan and asks first. the cloudflare secrets come from
+# the environment; ssh_public_key is only there because it has no default
+CF_TF_ENV     :=TF_VAR_cf_api_token TF_VAR_cf_account_id TF_VAR_cf_tunnel_secret \
+                 TF_VAR_cf_zone_id_littledevil_club TF_VAR_cf_zone_id_littledevil_org
+missing_env    = $(strip $(foreach v,$(1),$(if $($(v)),,$(v))))
+
+.PHONY: deploy_littledevil_cloudflare
+deploy_littledevil_cloudflare: | $(STATE_DIR)
+	@$(if $(call missing_env,$(CF_TF_ENV)),echo "not set: $(call missing_env,$(CF_TF_ENV))"; exit 1,true)
+	$(TERRAFORM) -chdir=tf init -input=false > /dev/null
+	$(TERRAFORM) -chdir=tf apply -state=$(CURDIR)/$(STATE_DIR)/terraform.tfstate \
+	  -var="ssh_public_key=$$(cat $(LD_SSH_KEY_PATH).pub)" \
+	  -target=null_resource.littledevil_cloudflare
+
 gc_oci:
 	$(LD_SSH) $(LD_SSH_FLAGS) root@littledevil-prod.tail3b43e6.ts.net nix-collect-garbage -d
 

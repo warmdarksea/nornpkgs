@@ -808,6 +808,33 @@ output "oci_public_ip" {
 # terraform modules are stupid and don't really encapsulate anything, so we just
 # use these null resources to refer to everything in a set and build those
 
+resource "null_resource" "littledevil_cloudflare" {
+  depends_on = [
+    cloudflare_pages_project.www_club,
+    cloudflare_pages_domain.www_club,
+    cloudflare_dns_record.www_club,
+    cloudflare_pages_project.www_org,
+    cloudflare_pages_domain.www_org,
+    cloudflare_dns_record.www_org,
+    cloudflare_pages_project.akkoma,
+    cloudflare_pages_domain.akkoma,
+    cloudflare_dns_record.akkoma,
+    cloudflare_pages_project.gehenna_prod,
+    cloudflare_pages_domain.gehenna_prod,
+    cloudflare_dns_record.gehenna_prod,
+    cloudflare_pages_project.gehenna_test,
+    cloudflare_workers_script.akkoma_proxy,
+    cloudflare_workers_route.akkoma_api,
+    cloudflare_workers_route.akkoma_oauth,
+    cloudflare_workers_route.akkoma_nodeinfo,
+    cloudflare_dns_record.backend,
+    cloudflare_zero_trust_tunnel_cloudflared.prod,
+    cloudflare_zero_trust_tunnel_cloudflared_config.prod,
+    cloudflare_r2_bucket.prod_upload,
+    cloudflare_r2_custom_domain.prod_upload,
+  ]
+}
+
 resource "null_resource" "oci_prod_bootstrap" {
   depends_on = [
     oci_core_instance.prod
@@ -824,26 +851,7 @@ resource "null_resource" "oci_prod_live" {
   depends_on = [
     oci_core_instance.prod,
     oci_core_volume_attachment.prod_data_conn,
-    cloudflare_pages_project.www_club,
-    cloudflare_pages_domain.www_club,
-    cloudflare_dns_record.www_club,
-    cloudflare_pages_project.www_org,
-    cloudflare_pages_domain.www_org,
-    cloudflare_dns_record.www_org,
-    cloudflare_zero_trust_tunnel_cloudflared.prod,
-    cloudflare_zero_trust_tunnel_cloudflared_config.prod,
-    cloudflare_dns_record.backend,
-    cloudflare_pages_project.akkoma,
-    cloudflare_pages_domain.akkoma,
-    cloudflare_dns_record.akkoma,
-    cloudflare_workers_script.akkoma_proxy,
-    cloudflare_workers_route.akkoma_api,
-    cloudflare_workers_route.akkoma_oauth,
-    cloudflare_workers_route.akkoma_nodeinfo,
-    cloudflare_pages_project.gehenna_prod,
-    cloudflare_pages_domain.gehenna_prod,
-    cloudflare_dns_record.gehenna_prod,
-    cloudflare_pages_project.gehenna_test,
+    null_resource.littledevil_cloudflare,
   ]
   triggers = {
     deps = join(",", [
