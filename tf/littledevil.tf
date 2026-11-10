@@ -133,6 +133,38 @@ resource "cloudflare_dns_record" "akkoma" {
   ttl     = 1
 }
 
+# gehenna
+resource "cloudflare_pages_project" "gehenna_prod" {
+  account_id        = var.cf_account_id
+  name              = "gehenna-prod"
+  production_branch = "master"
+}
+
+resource "cloudflare_pages_domain" "gehenna_prod" {
+  account_id   = var.cf_account_id
+  project_name = cloudflare_pages_project.gehenna_prod.name
+  name         = "gehenna.littledevil.org"
+}
+
+resource "cloudflare_dns_record" "gehenna_prod" {
+  zone_id = var.cf_zone_id_littledevil_org
+  name    = "gehenna"
+  content = cloudflare_pages_project.gehenna_prod.subdomain
+  type    = "CNAME"
+  proxied = true
+  ttl     = 1
+}
+
+resource "cloudflare_pages_project" "gehenna_test" {
+  account_id        = var.cf_account_id
+  name              = "gehenna-test"
+  production_branch = "master"
+}
+
+output "gehenna_test_url" {
+  value = "https://${cloudflare_pages_project.gehenna_test.subdomain}"
+}
+
 # worker that proxies /api, /oauth, /nodeinfo to the akkoma backend
 # while letting pages handle everything else (the frontend)
 resource "cloudflare_workers_script" "akkoma_proxy" {
@@ -808,6 +840,10 @@ resource "null_resource" "oci_prod_live" {
     cloudflare_workers_route.akkoma_api,
     cloudflare_workers_route.akkoma_oauth,
     cloudflare_workers_route.akkoma_nodeinfo,
+    cloudflare_pages_project.gehenna_prod,
+    cloudflare_pages_domain.gehenna_prod,
+    cloudflare_dns_record.gehenna_prod,
+    cloudflare_pages_project.gehenna_test,
   ]
   triggers = {
     deps = join(",", [
