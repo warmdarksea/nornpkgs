@@ -134,7 +134,7 @@
       # flake; built against its own nixpkgs pin (below).
       gpuTimeshareSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/gpu-timeshare.git";
-        rev = "3549dce355ac4302cea98e9061e2ec7f9483e66e";
+        rev = "94fac8d9d36f3527c005f964039289e42b1d696e";
         ref = "master";
       };
       # slopbooru: the booru, its classify command, and the fleet of models it
