@@ -131,10 +131,10 @@
       };
       # gpu-timeshare: many models taking turns on one GPU behind the
       # OpenAI API (batches, a queue, a cache). Its default.nix is not a
-      # flake; built against its own nixpkgs pin (below).
+      # flake; built against whatever pkgs the overlay lands on.
       gpuTimeshareSrc = builtins.fetchGit {
         url = "https://github.com/warmdarksea/gpu-timeshare.git";
-        rev = "94fac8d9d36f3527c005f964039289e42b1d696e";
+        rev = "511175fdbb3c439627451ec2c42865c3f05423c3";
         ref = "master";
       };
       # slopbooru: the booru, its classify command, and the fleet of models it
@@ -231,9 +231,10 @@
         gearmulator = final.callPackage ./pkgs/gearmulator { };
         openutau-bridge = final.callPackage ./pkgs/openutau-bridge { };
         # many models taking turns on one GPU (nixosModules.gpu-timeshare runs it)
-        # (its own nixpkgs pin, not `final`: its scheduler is a Lean model,
-        # compiled and linked in, and proved and tested with that pin's Lean)
-        gpu-timeshare = import gpuTimeshareSrc { inherit (final.stdenv.hostPlatform) system; };
+        # (built with this flake's pkgs: its scheduler is a Lean model, compiled
+        # and linked in, so a nixpkgs bump changes the Lean it is compiled with.
+        # Its tests run in the build and compare that scheduler with the Go one.)
+        gpu-timeshare = import gpuTimeshareSrc { pkgs = final; };
         # the booru (a static binary, with `slopbooru classify`), and the
         # models it asks as gpu-timeshare models: slopbooru-fleet.models for
         # services.gpu-timeshare.models (~75 GB of weights)
