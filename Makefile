@@ -427,6 +427,25 @@ update_hell:
 
 #
 
+# gehenna lives in its own repo; point GEHENNA_DIR at its built site, e.g.
+#   make deploy_gehenna_test GEHENNA_DIR=~/src/gehenna/dist
+# --branch=master makes it a production deploy whatever branch either repo
+# is on (wrangler would otherwise take this checkout's branch)
+
+GEHENNA_DIR ?=
+GEHENNA_SRC := $(if $(GEHENNA_DIR),$(shell find $(GEHENNA_DIR) -type f))
+
+$(BUILD_DIR)/.gehenna-%-deployed: $(GEHENNA_SRC) | $(BUILD_DIR)
+	@test -n "$(GEHENNA_DIR)" || { echo "set GEHENNA_DIR to gehenna's built site"; exit 1; }
+	wrangler pages deploy $(GEHENNA_DIR) --project-name=gehenna-$* --branch=master
+	touch $@
+
+.PHONY: deploy_gehenna deploy_gehenna_test
+deploy_gehenna: $(BUILD_DIR)/.gehenna-prod-deployed
+deploy_gehenna_test: $(BUILD_DIR)/.gehenna-test-deployed
+
+#
+
 .PHONY: clean
 clean:
 	rm -rf $(BUILD_DIR)
