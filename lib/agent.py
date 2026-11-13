@@ -18,7 +18,9 @@ gensokyo-agent --new-ws [FLAG...] [-- CMD...]
                                          local files, built into an image and
                                          run as a container that stays
   --name NAME                 container and image name (default: generated)
-  --flavor nix                what the sandbox is made of
+  --flavor nix|alpine         nix (default): this host's store and nix daemon,
+                              on hosts with the gensokyo-agent module.
+                              alpine: a stock image, root, any podman host
   -c, --connection NAME       podman connection to build and run on
   -s, --secret SPEC           as podman run --secret
   --gpu                       the nvidia devices and CUDA

@@ -141,6 +141,21 @@ let
       runArgs = nixArgs;
       gpuArgs = glArgs ++ cudaArgs;   # --gpu asks; whether the host has one is its business
     };
+    # root in a stock image: nothing of the host but its podman, so any connection will do
+    flavors.alpine = {
+      containerfile = ''
+        FROM docker.io/library/alpine:3
+        RUN apk add --no-cache bash ca-certificates coreutils curl file findutils gawk git grep jq less libgcc libstdc++ nodejs npm openssh-client procps ripgrep sed tree \
+         && npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
+         && git config --system user.name Claude && git config --system user.email claude@anthropic.com
+        ENV IS_SANDBOX=1 USE_BUILTIN_RIPGREP=0
+      '';
+      root = null;
+      user = "0:0";
+      home = "/root";
+      runArgs = [ "--init" ];
+      gpuArgs = null;
+    };
   });
 
   wrapper = pkgs.writers.writePython3Bin "gensokyo-agent" { flakeIgnore = [ "E501" ]; }
