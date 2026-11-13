@@ -48,6 +48,7 @@ let
       coreutils findutils gnused gnugrep gawk diffutils which file tree less
       curl wget netcat nmap
       procps util-linux jq ripgrep fd
+      bubblewrap socat   # what claude runs its commands in, see CLAUDE_CODE_SUBPROCESS_ENV_SCRUB
     ] ++ lib.optionals (!config.gensokyo.ci) [
       claude-code codex opencode
     ] ++ lib.optionals cudaSupport [
@@ -104,11 +105,17 @@ let
     "--gidmap" "0:0:1" "--gidmap" "${gid}:@${gid}:1" "--gidmap" "${kvm}:@${kvm}:1"
     "--user" "${uid}:${gid}"
     "--mount" "type=tmpfs,destination=/tmp,tmpfs-mode=1777,tmpfs-size=8g"
+    # a sandbox inside this one (claude's, for the commands it runs) mounts its
+    # own /proc, which the kernel refuses while parts of ours are masked
+    "--security-opt" "unmask=ALL"
     "-v" "/nix:/nix:ro"
     "-v" "/nix/var/nix/daemon-socket/socket:/nix/var/nix/daemon-socket/socket"
     "-v" "${hostPath}:${hostPath}:ro"
     "-e" "HOME=${home}"
     "-e" "IS_SANDBOX=1"
+    # no credential in the environment of what claude runs, which it then
+    # runs in a sandbox of its own (bubblewrap, socat) and no longer unasked
+    "-e" "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1"
     "-e" "PATH=${hostPath}/env/bin"
     "-e" "NIX_PATH=nixpkgs=${hostPath}/nixpkgs"
     "-e" "SSL_CERT_FILE=${hostPath}/ca-bundle.crt"
@@ -128,7 +135,8 @@ let
   # everything host-specific the wrapper needs; lib/agent.py is the same on every host
   conf = pkgs.writeText "gensokyo-agent.json" (builtins.toJSON {
     podman = "${pkgs.podman}/bin/podman";
-    defaultCmd = "claude --dangerously-skip-permissions";
+    # the env scrub puts claude back in its default permission mode; the tools are allowed by name
+    defaultCmd = "claude --dangerously-skip-permissions --allowedTools Edit,MultiEdit,Write,NotebookEdit,Bash,WebSearch,WebFetch";
     inherit token;
     git = "${pkgs.gitMinimal}/bin/git";
     ssh = "${pkgs.openssh}/bin/ssh";
@@ -151,15 +159,15 @@ let
     flavors.alpine = {
       containerfile = ''
         FROM docker.io/library/alpine:3
-        RUN apk add --no-cache bash ca-certificates coreutils curl file findutils gawk git grep jq less libgcc libstdc++ nodejs npm openssh-client procps ripgrep sed tree \
+        RUN apk add --no-cache bash bubblewrap ca-certificates coreutils curl file findutils gawk git grep jq less libgcc libstdc++ nodejs npm openssh-client procps ripgrep sed socat tree \
          && npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
          && git config --system user.name Claude && git config --system user.email claude@anthropic.com
-        ENV IS_SANDBOX=1 USE_BUILTIN_RIPGREP=0
+        ENV IS_SANDBOX=1 USE_BUILTIN_RIPGREP=0 CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1
       '';
       root = null;
       user = "0:0";
       home = "/root";
-      runArgs = [ "--init" ];
+      runArgs = [ "--init" "--security-opt" "unmask=ALL" ];   # as in nixArgs
       gpuArgs = null;
       vm = false;
       # root in the container is the user outside, who is in the kvm group there
