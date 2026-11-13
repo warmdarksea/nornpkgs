@@ -862,6 +862,53 @@
           HOME=$PWD python3 -W error -m unittest -v agent_test
           touch $out
         '';
+        # the nix flavor for real, in a VM: rootless podman, the uid map, a
+        # workspace built and run, and a sandbox inside the sandbox
+        agent-sandbox = hostPkgs.testers.runNixOSTest {
+          name = "agent-sandbox";
+          node.pkgsReadOnly = false;
+          nodes.machine = { config, lib, ... }: {
+            imports = [ ./lib/ci.nix self.nixosModules.agent ];
+            gensokyo.ci = true;
+            gensokyo-agent = { enable = true; user = "alice"; };
+            users.users.alice = { isNormalUser = true; uid = 1000; };
+            hardware.graphics.enable = true;   # /run/opengl-driver, which --legacy binds
+            virtualisation.memorySize = 2048;
+            virtualisation.diskSize = 4096;
+            system.stateVersion = lib.mkDefault config.system.nixos.release;
+          };
+          testScript = ''
+            machine.wait_for_unit("multi-user.target")
+            machine.wait_for_unit("user@1000.service")
+            machine.succeed("test -e /dev/kvm || mknod -m 666 /dev/kvm c 10 232")
+            machine.succeed("install -d -o alice /home/alice/w")
+
+            def agent(args):
+                return ("sudo -u alice env HOME=/home/alice XDG_RUNTIME_DIR=/run/user/1000"
+                        " DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus"
+                        f" sh -c 'cd /home/alice/w && gensokyo-agent {args}' 2>&1")
+
+            # what claude's own sandbox asks of the kernel: namespaces and a fresh /proc
+            nested = "bwrap --ro-bind / / --dev /dev --unshare-all --proc /proc sh -c \"echo nested \\$\\$\""
+
+            with subtest("the sandbox on the current directory"):
+                out = machine.succeed(agent("--legacy sh -c \"id -u; touch \\$HOME/mine; pwd\""))
+                assert "4738" in out and "/home/alice/w" in out, out
+                assert "nested 2" in machine.succeed(agent("--legacy " + nested))
+
+            with subtest("a workspace is the agent's own"):
+                out = machine.succeed(agent(
+                    "--name ws1 --cp /etc/hostname:notes/host -- sh -c"
+                    " \"id -u; cat notes/host; touch notes/mine \\$HOME/mine; git config user.name; pwd\""))
+                assert "4738\nmachine\nClaude\n/var/tmp/gensokyo-agent/ws1" in out.replace("\r", ""), out
+                assert "nested 2" in machine.succeed(agent("--name ws2 -- " + nested))
+
+            with subtest("and it comes back after it stopped"):
+                podman = "sudo -u alice env XDG_RUNTIME_DIR=/run/user/1000 podman"
+                machine.succeed(f"{podman} start -a ws1")
+                machine.succeed(f"{podman} rm ws1 ws2")
+          '';
+        };
       })
       // lib.optionalAttrs (hostSystem == "x86_64-linux") {
         # Regression guard for the transformers pin in lib/models.nix. llama.cpp

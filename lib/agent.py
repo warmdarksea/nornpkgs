@@ -9,15 +9,16 @@ import signal
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 
 USAGE = """\
-gensokyo-agent [CMD...]                  CMD (default: claude) in a throwaway
-                                         sandbox on the current directory
-gensokyo-agent --new-ws [FLAG...] [-- CMD...]
-                                         a workspace: a directory assembled from
-                                         local files, built into an image and
-                                         run as a container that stays
-  --name NAME                 container and image name (default: generated)
+gensokyo-agent [FLAG...] [-- CMD...]     CMD (default: claude) in a workspace: a
+                                         directory assembled from local files,
+                                         built into an image and run as a
+                                         container that stays
+gensokyo-agent --legacy [CMD...]         CMD in a throwaway sandbox on the
+                                         current directory
+  --name NAME                container and image name (default: generated)
   --flavor nix|alpine         nix (default): this host's store and nix daemon,
                               on hosts with the gensokyo-agent module.
                               alpine: a stock image, root, any podman host
@@ -37,8 +38,39 @@ gensokyo-agent --new-ws [FLAG...] [-- CMD...]
                               and one that exists is used as it is
   --bind SRC:DST[:DESC]       SRC itself at DST; local only
   --prompt TEXT               what the agent starts on
+  --model MODEL               claude --model: fable, opus, sonnet, haiku,
+                              opusplan, or a full model name; [1m] after
+                              it for the long context. default: claude's
+  --effort LEVEL              claude --effort: low, medium, high, xhigh, max
+  -p, --publish SPEC          as podman run -p
+  -L SPEC                     as ssh -L, to the host of -c; the tunnel stays
+                              up after this command returns
+  -sp PORT                    both for one port: localhost:PORT here is
+                              PORT in the workspace, wherever it runs
   anything else               goes to podman run
 DST is relative to the workspace; DESC ends up in its CLAUDE.md.
+
+examples:
+  gensokyo-agent --git .::
+      claude in a workspace, on this checkout cloned to a new branch. the
+      checkout gets a remote of the workspace's name: git fetch NAME
+  gensokyo-agent --git ~/src/nornpkgs:master:fix-build --prompt "make ci_check pass"
+      the branch to start from and the one to make, and what to do there
+  gensokyo-agent -c library --gpu --git @.:: --ro ~/datasets/foo:data/foo:"the training set"
+      on the host of the podman connection library, with its GPU, the whole
+      history, and a directory of this machine as a read-only volume there
+  gensokyo-agent -c library -sp 8800 --git .::
+      what the agent serves on 0.0.0.0:8800 answers on localhost:8800 here
+  gensokyo-agent --flavor alpine -s openai-api-key,type=env,target=OPENAI_API_KEY -- codex
+      another agent, a secret of its own, on a host without the module
+  gensokyo-agent --legacy
+      claude on the current directory, gone when it exits
+
+afterwards, with podman (and -c where the workspace is elsewhere):
+  podman attach NAME            back in; leave with ctrl-p ctrl-q
+  podman start -ai NAME         once it has stopped: the same session again
+  podman exec -it NAME bash     a shell next to the agent
+  podman rm NAME && podman rmi gensokyo-agent/NAME
 """
 
 ADJECTIVES = """amber brisk calm cosy dapper eager fuzzy gentle hazy idle
@@ -152,10 +184,9 @@ def parse_args(argv):
     if flags[:1] in (["-h"], ["--help"]):
         print(USAGE, end="")
         sys.exit(0)
-    if "--new-ws" not in flags:
-        return None, argv, []
+    if argv[:1] == ["--legacy"]:
+        return None, argv[1:], []
     p = argparse.ArgumentParser(prog="gensokyo-agent", usage=USAGE, add_help=False, allow_abbrev=False)
-    p.add_argument("--new-ws", action="store_true")
     p.add_argument("--name")
     p.add_argument("--flavor", default="nix")
     p.add_argument("-c", "--connection")
@@ -163,11 +194,18 @@ def parse_args(argv):
     p.add_argument("--gpu", action="store_true")
     p.add_argument("--vm", action=argparse.BooleanOptionalAction)
     p.add_argument("--prompt")
+    p.add_argument("--model")
+    p.add_argument("--effort")
+    p.add_argument("-p", "--publish", action="append", default=[])
+    p.add_argument("-L", dest="tunnel", action="append", default=[])
+    p.add_argument("-sp", dest="port", action="append", default=[])
     for flag in ("--git", "--cp", "--ro", "--rw", "--bind"):
         p.add_argument(flag, action="append", default=[])
     opts, passthrough = p.parse_known_args(flags)
     if sep and not cmd:
         die("nothing after --")
+    if passthrough and not passthrough[0].startswith("-"):
+        die(f"{passthrough[0]}: a command goes after --, or after --legacy for the sandbox on the current directory")
     return opts, cmd, passthrough
 
 
@@ -298,6 +336,23 @@ def add_remote(conf, g, name, podman, workdir):
             die(f"--git: could not add the remote {name} to {g['top']}")
 
 
+def ssh_target(conf, connection):
+    """What ssh needs to reach the host of a podman connection."""
+    out = subprocess.run([conf["podman"], "system", "connection", "ls", "--format", "json"],
+                         stdout=subprocess.PIPE, text=True).stdout
+    for c in json.loads(out or "[]"):
+        if c["Name"] == connection:
+            uri = urllib.parse.urlsplit(c["URI"])
+            if uri.scheme != "ssh":
+                die(f"-L: the connection {connection} is not over ssh")
+            return [
+                *(["-p", str(uri.port)] if uri.port else []),
+                *(["-i", c["Identity"]] if c.get("Identity") else []),
+                (f"{uri.username}@" if uri.username else "") + uri.hostname,
+            ]
+    die(f"-L: no podman connection {connection}")
+
+
 def new_workspace(conf, opts, cmd, passthrough):
     podman = [conf["podman"]] + (["-c", opts.connection] if opts.connection else [])
     debug = os.environ.get("DEBUG", "0") == "1"
@@ -317,6 +372,15 @@ def new_workspace(conf, opts, cmd, passthrough):
         opts.vm = flavor["vm"]
     if opts.bind and opts.connection:
         die("--bind: a path of this machine cannot be bound on another")
+    for port in opts.port:
+        if not port.isdigit():
+            die(f"-sp {port}: a port number")
+        opts.publish.append(f"127.0.0.1:{port}:{port}")
+        if opts.connection:
+            opts.tunnel.append(f"{port}:127.0.0.1:{port}")
+    if opts.tunnel and not opts.connection:
+        die("-L: without -c the workspace is on this machine, -p is all it takes")
+    target = ssh_target(conf, opts.connection) if opts.tunnel else None
 
     name = opts.name
     if name is None:
@@ -330,6 +394,11 @@ def new_workspace(conf, opts, cmd, passthrough):
              for flag in ("--cp", "--ro", "--rw", "--bind") for spec in getattr(opts, flag[2:])]
     repos = [parse_git(conf, spec, name) for spec in opts.git]
     cmd = cmd or os.environ.get("AGENT_CMD", conf["defaultCmd"]).split()
+    for flag in ("model", "effort"):
+        if getattr(opts, flag):
+            if os.path.basename(cmd[0]) != "claude":
+                die(f"--{flag}: a flag of claude; {cmd[0]} takes its own after --")
+            cmd += [f"--{flag}", getattr(opts, flag)]
 
     # the workspace has one path, here while it is assembled and in the
     # container afterwards. not under /tmp, that is a tmpfs in the sandbox
@@ -412,6 +481,8 @@ def new_workspace(conf, opts, cmd, passthrough):
     for spec in opts.secret:
         args += ["--secret", spec]
     args += mounts
+    for spec in opts.publish:
+        args += ["-p", spec]
     if sys.stdin.isatty():
         args.append("-it")
     argv = [*podman, "run", *args, *passthrough, image, "/.gensokyo-agent/entrypoint"]
@@ -423,6 +494,15 @@ def new_workspace(conf, opts, cmd, passthrough):
     for g in repos:
         say(f"  its work, while it runs: git -C {g['top']} fetch {name}")
     say(f"  remove: {pm} rm {name} && {pm} rmi {image}")
+    if opts.tunnel:
+        runtime = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "gensokyo-agent")
+        os.makedirs(runtime, exist_ok=True)
+        sock = os.path.join(runtime, f"{name}.ssh")
+        forwards = [arg for spec in opts.tunnel for arg in ("-L", spec)]
+        if call([conf["ssh"], "-f", "-N", "-M", "-S", sock, "-o", "ExitOnForwardFailure=yes", *forwards, *target]) != 0:
+            say(f"  no tunnel, ssh failed; by hand: ssh -N {shlex.join(forwards + target)}")
+        else:
+            say(f"  tunnel {' '.join(opts.tunnel)}, until: ssh -S {sock} -O exit {target[-1]}")
     if debug:
         print("+ " + shlex.join(argv), file=sys.stderr)
     sys.stdout.flush()

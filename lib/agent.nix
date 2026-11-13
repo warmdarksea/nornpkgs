@@ -17,16 +17,17 @@
 #   printf %s "$token" | podman secret create claude-oauth-token -
 # The sandbox keeps no home between runs, so that secret is the login.
 #
-# Usage (gensokyo-agent --help has the flags):
-#   gensokyo-agent                        claude on the current directory, permissions skipped
-#   gensokyo-agent codex                  any command in the sandbox
-#   AGENT_CMD="opencode" gensokyo-agent   change the default
-#   gensokyo-agent --new-ws --git .:master: --prompt "fix the build"
+# Usage (gensokyo-agent --help has the flags and examples):
+#   gensokyo-agent --git .:master: --prompt "fix the build"
 #                                         a workspace: a clone on a new branch (and whatever --cp,
-#                                         --ro, --rw add), built into an image, in a
-#                                         container that stays until podman rm. the checkout gets a
-#                                         remote to fetch its commits from. -c NAME puts it all on
-#                                         another host (podman system connection add)
+#                                         --ro, --rw add), built into an image, in a container that
+#                                         stays until podman rm. the checkout gets a remote to fetch
+#                                         its commits from. -c NAME puts it all on another host
+#                                         (podman system connection add)
+#   gensokyo-agent -- codex               another agent in it
+#   gensokyo-agent --legacy               claude in a throwaway sandbox on the current directory
+#   gensokyo-agent --legacy codex         any command there
+#   AGENT_CMD="opencode" gensokyo-agent   change the default
 { config, pkgs, lib, ... }:
 let
   cfg = config.gensokyo-agent;
@@ -47,6 +48,7 @@ let
       coreutils findutils gnused gnugrep gawk diffutils which file tree less
       curl wget netcat nmap
       procps util-linux jq ripgrep fd
+      bubblewrap socat   # what claude runs its commands in, see CLAUDE_CODE_SUBPROCESS_ENV_SCRUB
     ] ++ lib.optionals (!config.gensokyo.ci) [
       claude-code codex opencode
     ] ++ lib.optionals cudaSupport [
@@ -103,11 +105,21 @@ let
     "--gidmap" "0:0:1" "--gidmap" "${gid}:@${gid}:1" "--gidmap" "${kvm}:@${kvm}:1"
     "--user" "${uid}:${gid}"
     "--mount" "type=tmpfs,destination=/tmp,tmpfs-mode=1777,tmpfs-size=8g"
+    # a sandbox inside this one (claude's, for the commands it runs) mounts its
+    # own /proc, which the kernel refuses while parts of ours are masked
+    "--security-opt" "unmask=ALL"
     "-v" "/nix:/nix:ro"
     "-v" "/nix/var/nix/daemon-socket/socket:/nix/var/nix/daemon-socket/socket"
     "-v" "${hostPath}:${hostPath}:ro"
     "-e" "HOME=${home}"
     "-e" "IS_SANDBOX=1"
+    # no credential in the environment of what claude runs, which it then
+    # runs in a sandbox of its own (bubblewrap, socat) and no longer unasked
+    "-e" "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1"
+    # claude kills a command after 2 minutes unless it asked for longer, and
+    # may ask for 10 at most; a host evaluation or a build takes more
+    "-e" "BASH_DEFAULT_TIMEOUT_MS=600000"
+    "-e" "BASH_MAX_TIMEOUT_MS=3600000"
     "-e" "PATH=${hostPath}/env/bin"
     "-e" "NIX_PATH=nixpkgs=${hostPath}/nixpkgs"
     "-e" "SSL_CERT_FILE=${hostPath}/ca-bundle.crt"
@@ -127,9 +139,11 @@ let
   # everything host-specific the wrapper needs; lib/agent.py is the same on every host
   conf = pkgs.writeText "gensokyo-agent.json" (builtins.toJSON {
     podman = "${pkgs.podman}/bin/podman";
-    defaultCmd = "claude --dangerously-skip-permissions";
+    # the env scrub puts claude back in its default permission mode; the tools are allowed by name
+    defaultCmd = "claude --dangerously-skip-permissions --allowedTools Edit,MultiEdit,Write,NotebookEdit,Bash,WebSearch,WebFetch";
     inherit token;
     git = "${pkgs.gitMinimal}/bin/git";
+    ssh = "${pkgs.openssh}/bin/ssh";
     # plain gensokyo-agent: the nix flavor on the current directory
     hereArgs = [ "--rm" "--log-driver" "none" ] ++ nixArgs ++ vmArgs ++ glArgs ++ lib.optionals cudaSupport cudaArgs;
     # a flavor is the head of a Containerfile, files for /, and podman run arguments
@@ -149,15 +163,15 @@ let
     flavors.alpine = {
       containerfile = ''
         FROM docker.io/library/alpine:3
-        RUN apk add --no-cache bash ca-certificates coreutils curl file findutils gawk git grep jq less libgcc libstdc++ nodejs npm openssh-client procps ripgrep sed tree \
+        RUN apk add --no-cache bash bubblewrap ca-certificates coreutils curl file findutils gawk git grep jq less libgcc libstdc++ nodejs npm openssh-client procps ripgrep sed socat tree \
          && npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
          && git config --system user.name Claude && git config --system user.email claude@anthropic.com
-        ENV IS_SANDBOX=1 USE_BUILTIN_RIPGREP=0
+        ENV IS_SANDBOX=1 USE_BUILTIN_RIPGREP=0 CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 BASH_DEFAULT_TIMEOUT_MS=600000 BASH_MAX_TIMEOUT_MS=3600000
       '';
       root = null;
       user = "0:0";
       home = "/root";
-      runArgs = [ "--init" ];
+      runArgs = [ "--init" "--security-opt" "unmask=ALL" ];   # as in nixArgs
       gpuArgs = null;
       vm = false;
       # root in the container is the user outside, who is in the kvm group there
@@ -165,8 +179,13 @@ let
     };
   });
 
-  wrapper = pkgs.writers.writePython3Bin "gensokyo-agent" { flakeIgnore = [ "E501" ]; }
+  cli = pkgs.writers.writePython3Bin "gensokyo-agent" { flakeIgnore = [ "E501" ]; }
     (builtins.replaceStrings [ "@conf@" ] [ "${conf}" ] (builtins.readFile ./agent.py));
+  wrapper = pkgs.runCommand "gensokyo-agent" { } ''
+    mkdir -p $out/bin $out/share/bash-completion/completions
+    ln -s ${cli}/bin/gensokyo-agent $out/bin/
+    ln -s ${./agent-completion.bash} $out/share/bash-completion/completions/gensokyo-agent
+  '';
 in
 {
   options.gensokyo-agent = {

@@ -209,9 +209,11 @@ test_vm:
 	  echo "== boot-$$t"; nix build -L --no-link $(NIX_FLAGS) "$(FLAKE)#checks.$(NIX_SYSTEM).boot-$$t" || exit 1; \
 	done
 
-# lib/agent.py against a podman that only records what it is asked
+# lib/agent.py against a podman that only records what it is asked, then the
+# nix flavor itself in a VM (kvm)
 test_agent:
 	nix build -L --no-link $(NIX_FLAGS) "$(FLAKE)#checks.$(NIX_SYSTEM).agent-cli"
+	nix build -L --no-link $(NIX_FLAGS) "$(FLAKE)#checks.$(NIX_SYSTEM).agent-sandbox"
 
 # the same VM, interactively: start_all(), machine.shell_interact(), ...
 run_vm: $(BUILD_DIR)/vm-$(TARGET)
