@@ -12,11 +12,10 @@
 # sandbox. The agents themselves are large leaves CI never runs, so
 # gensokyo.ci leaves them out as well.
 #
-# One-time, as the user (rootless secrets are per-user):
+# One-time, as the user (rootless secrets are per-user, and per podman host):
 #   gensokyo-agent claude setup-token            # browser flow, prints a 1-year token
 #   printf %s "$token" | podman secret create claude-oauth-token -
-#   printf %s "$key"   | podman secret create openai-api-key -      # optional, for codex
-# ...or skip secrets entirely and /login once; credentials persist in the home volume.
+# The sandbox keeps no home between runs, so that secret is the login.
 #
 # Usage:
 #   gensokyo-agent                        claude, permissions skipped
@@ -33,7 +32,7 @@ let
   uid = toString u.uid;
   gid = toString g.gid;
   kvm = toString config.ids.gids.kvm;
-  home = "/home/agent";             # container-only; lives in a named volume
+  home = "/home/agent";             # container-only, and gone with the container
 
   env = pkgs.buildEnv {
     name = "gensokyo-agent-env";
@@ -78,13 +77,12 @@ let
     ln -s ${hostPath}/nix.conf ${hostPath}/registry.json $out/etc/nix/
     ln -s ${hostPath}/env/bin/sh $out/bin/sh
     ln -s ${hostPath}/env/bin/env $out/usr/bin/env
+    printf "[user]\n\tname = Claude\n\temail = claude@anthropic.com\n" > $out/etc/gitconfig
   '';
 
-  # podman secret name -> env var inside the sandbox; skipped if not created
-  secrets = {
-    claude-oauth-token = "CLAUDE_CODE_OAUTH_TOKEN";   # from `claude setup-token`; never ANTHROPIC_API_KEY, that bills API credits
-    openai-api-key = "OPENAI_API_KEY";
-  };
+  # the one secret every sandbox gets; from `claude setup-token`, never
+  # ANTHROPIC_API_KEY, that bills API credits
+  token = { secret = "claude-oauth-token"; target = "CLAUDE_CODE_OAUTH_TOKEN"; };
 
   runArgs = [
     "--rm" "--log-driver" "none"
@@ -100,13 +98,13 @@ let
     "--gidmap" "0:0:1" "--gidmap" "${gid}:@${gid}:1" "--gidmap" "${kvm}:@${kvm}:1"
     "--user" "${uid}:${gid}" "--group-add" kvm
     "--device" "/dev/kvm"
-    "-v" "gensokyo-agent-home:${home}:U"
     "--mount" "type=tmpfs,destination=/tmp,tmpfs-mode=1777,tmpfs-size=8g"
     "-v" "/nix:/nix:ro"
     "-v" "/nix/var/nix/daemon-socket/socket:/nix/var/nix/daemon-socket/socket"
     "-v" "${hostPath}:${hostPath}:ro"
     "-v" "/run/opengl-driver:/run/opengl-driver:ro"
     "-e" "HOME=${home}"
+    "-e" "IS_SANDBOX=1"
     "-e" "PATH=${hostPath}/env/bin"
     "-e" "NIX_PATH=nixpkgs=${hostPath}/nixpkgs"
     "-e" "SSL_CERT_FILE=${hostPath}/ca-bundle.crt"
@@ -122,7 +120,7 @@ let
   conf = pkgs.writeText "gensokyo-agent.json" (builtins.toJSON {
     podman = "${pkgs.podman}/bin/podman";
     defaultCmd = "claude --dangerously-skip-permissions";
-    inherit rootfs runArgs secrets;
+    inherit rootfs runArgs token home;
   });
 
   wrapper = pkgs.writers.writePython3Bin "gensokyo-agent" { flakeIgnore = [ "E501" ]; }
