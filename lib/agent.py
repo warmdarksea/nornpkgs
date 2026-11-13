@@ -435,4 +435,5 @@ def main():
     new_workspace(conf, opts, cmd, passthrough)
 
 
-main()
+if __name__ == "__main__":
+    main()

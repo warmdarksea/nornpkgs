@@ -117,6 +117,10 @@ jobs:
         if: github.event_name == 'push'
         run: make ci_test_vm
 
+      - name: make ci_test_agent
+        if: github.event_name == 'push'
+        run: make ci_test_agent
+
       - name: make ci_test_templates
         if: github.event_name == 'push'
         run: make ci_test_templates
