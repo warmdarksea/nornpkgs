@@ -249,8 +249,9 @@ class AgentTest(unittest.TestCase):
         self.assertEqual(git(clone, "rev-list", "--count", "HEAD"), "1")
         self.assertEqual(git(clone, "remote"), "")
         self.assertEqual(git(clone, "status", "--porcelain"), "")
-        self.assertEqual(git(top, "config", "remote.ws3.url"),
-                         f"ext::podman -c library exec -i ws3 %S {work}/src/proj")
+        url = git(top, "config", "remote.ws3.url")
+        self.assertTrue(url.startswith("ext::sh -c n=$1% s=$2% d=$3;% shift% 3;% up=$("), url)
+        self.assertTrue(url.endswith(f" sh ws3 %S {work}/src/proj podman -c library"), url)
         self.assertEqual(git(top, "config", "remote.ws3.push"), "refs/heads/*:refs/remotes/owner/*")
         self.assertEqual(git(top, "config", "protocol.ext.allow"), "user")
         with open(os.path.join(self.out, "ctx", "work", "CLAUDE.md")) as f:
