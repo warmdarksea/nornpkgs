@@ -116,6 +116,10 @@ let
     # no credential in the environment of what claude runs, which it then
     # runs in a sandbox of its own (bubblewrap, socat) and no longer unasked
     "-e" "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1"
+    # claude kills a command after 2 minutes unless it asked for longer, and
+    # may ask for 10 at most; a host evaluation or a build takes more
+    "-e" "BASH_DEFAULT_TIMEOUT_MS=600000"
+    "-e" "BASH_MAX_TIMEOUT_MS=3600000"
     "-e" "PATH=${hostPath}/env/bin"
     "-e" "NIX_PATH=nixpkgs=${hostPath}/nixpkgs"
     "-e" "SSL_CERT_FILE=${hostPath}/ca-bundle.crt"
@@ -162,7 +166,7 @@ let
         RUN apk add --no-cache bash bubblewrap ca-certificates coreutils curl file findutils gawk git grep jq less libgcc libstdc++ nodejs npm openssh-client procps ripgrep sed socat tree \
          && npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
          && git config --system user.name Claude && git config --system user.email claude@anthropic.com
-        ENV IS_SANDBOX=1 USE_BUILTIN_RIPGREP=0 CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1
+        ENV IS_SANDBOX=1 USE_BUILTIN_RIPGREP=0 CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 BASH_DEFAULT_TIMEOUT_MS=600000 BASH_MAX_TIMEOUT_MS=3600000
       '';
       root = null;
       user = "0:0";
