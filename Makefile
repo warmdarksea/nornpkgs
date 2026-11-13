@@ -153,6 +153,7 @@ bump:
 #   make test_tf            tofu validate (no credentials)
 #   make test_nix_check     every flake output to a .drv, nothing built
 #   make test_vm            boot the hosts of NIX_HOSTS_<arch> in VMs (checks.*.boot-*)
+#   make test_agent         lib/agent.py against a recording podman (checks.*.agent-cli)
 #   make test_templates     init, build, run and test NIX_TEMPLATES_<arch>
 #   make run_vm TARGET=x    interactive test driver for one system
 #
@@ -171,9 +172,9 @@ FLAKE_ABS=$(if $(filter .,$(FLAKE)),git+file://$(CURDIR),$(FLAKE))
 # the ci and public stubs lack the hosts' unfree allowances; only read under --impure
 export NIXPKGS_ALLOW_UNFREE?=1
 
-.PHONY: test test_nix_lint test_tf test_nix_check test_vm test_templates run_vm
+.PHONY: test test_nix_lint test_tf test_nix_check test_vm test_agent test_templates run_vm
 
-test: test_nix_lint test_tf test_nix_check test_vm test_templates
+test: test_nix_lint test_tf test_nix_check test_vm test_agent test_templates
 
 NIX_FILES=$(shell git ls-files '*.nix')
 
@@ -207,6 +208,10 @@ test_vm:
 	for t in $(VM_TARGETS); do \
 	  echo "== boot-$$t"; nix build -L --no-link $(NIX_FLAGS) "$(FLAKE)#checks.$(NIX_SYSTEM).boot-$$t" || exit 1; \
 	done
+
+# lib/agent.py against a podman that only records what it is asked
+test_agent:
+	nix build -L --no-link $(NIX_FLAGS) "$(FLAKE)#checks.$(NIX_SYSTEM).agent-cli"
 
 # the same VM, interactively: start_all(), machine.shell_interact(), ...
 run_vm: $(BUILD_DIR)/vm-$(TARGET)

@@ -853,6 +853,16 @@
       };
     in lib.mapAttrs (hostSystem: names:
       lib.genAttrs' names (name: lib.nameValuePair "boot-${name}" (bootTest nixpkgs.legacyPackages.${hostSystem} name))
+      // (let hostPkgs = nixpkgs.legacyPackages.${hostSystem}; in {
+        # lib/agent.py up to the podman run it would exec: flags, the staged
+        # workspace, the clone and the remote, against a podman that only records
+        agent-cli = hostPkgs.runCommand "agent-cli-test" { nativeBuildInputs = [ hostPkgs.python3 hostPkgs.gitMinimal ]; } ''
+          cp ${./lib/agent.py} agent.py
+          cp ${./lib/agent_test.py} agent_test.py
+          HOME=$PWD python3 -W error -m unittest -v agent_test
+          touch $out
+        '';
+      })
       // lib.optionalAttrs (hostSystem == "x86_64-linux") {
         # Regression guard for the transformers pin in lib/models.nix. llama.cpp
         # rejects any BPE tokenizer whose digest is missing from its table, and

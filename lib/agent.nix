@@ -12,16 +12,21 @@
 # sandbox. The agents themselves are large leaves CI never runs, so
 # gensokyo.ci leaves them out as well.
 #
-# One-time, as the user (rootless secrets are per-user):
+# One-time, as the user (rootless secrets are per-user, and per podman host):
 #   gensokyo-agent claude setup-token            # browser flow, prints a 1-year token
 #   printf %s "$token" | podman secret create claude-oauth-token -
-#   printf %s "$key"   | podman secret create openai-api-key -      # optional, for codex
-# ...or skip secrets entirely and /login once; credentials persist in the home volume.
+# The sandbox keeps no home between runs, so that secret is the login.
 #
-# Usage:
-#   gensokyo-agent                        claude, permissions skipped
+# Usage (gensokyo-agent --help has the flags):
+#   gensokyo-agent                        claude on the current directory, permissions skipped
 #   gensokyo-agent codex                  any command in the sandbox
 #   AGENT_CMD="opencode" gensokyo-agent   change the default
+#   gensokyo-agent --new-ws --git .:master: --prompt "fix the build"
+#                                         a workspace: a clone on a new branch (and whatever --cp,
+#                                         --ro, --rw add), built into an image, in a
+#                                         container that stays until podman rm. the checkout gets a
+#                                         remote to fetch its commits from. -c NAME puts it all on
+#                                         another host (podman system connection add)
 { config, pkgs, lib, ... }:
 let
   cfg = config.gensokyo-agent;
@@ -33,7 +38,7 @@ let
   uid = toString u.uid;
   gid = toString g.gid;
   kvm = toString config.ids.gids.kvm;
-  home = "/home/agent";             # container-only; lives in a named volume
+  home = "/home/agent";             # container-only, and gone with the container
 
   env = pkgs.buildEnv {
     name = "gensokyo-agent-env";
@@ -50,90 +55,118 @@ let
     ];
   };
 
+  # what the sandbox takes from this host's store, under one name that is the
+  # same on every host (bound read-only at the same path): nothing the wrapper
+  # passes to podman, and nothing in the rootfs, names a store path, so a
+  # sandbox started from another machine gets this host's tools
+  hostPath = "/etc/gensokyo-agent";
+  hostDir = pkgs.linkFarm "gensokyo-agent-host" ({
+    inherit env;
+    nixpkgs = pkgs.path;
+    "ca-bundle.crt" = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+    "nix.conf" = config.environment.etc."nix/nix.conf".source;
+    "registry.json" = config.environment.etc."nix/registry.json".source;
+  } // lib.optionalAttrs cudaSupport {
+    cc = cuda.backendStdenv.cc;
+  });
+
   nss = pkgs.dockerTools.fakeNss.override {
     extraPasswdLines = [ "claude:x:${uid}:${gid}::${home}:/bin/sh" ];
     extraGroupLines = [ "agent:x:${gid}:" ];
   };
 
-  # real directories at the top level: podman populates /etc before /nix is mounted,
-  # so nothing above the leaves may be a symlink into the store. /etc/nix on the host
-  # is symlinks via /etc/static, so copy the resolved files from config instead of mounting.
+  # real directories at the top level: podman populates /etc before anything is
+  # mounted, so only the leaves may be symlinks, and they dangle until ${hostPath} is bound
   rootfs = pkgs.runCommand "gensokyo-agent-rootfs" { } ''
     mkdir -p $out/{etc/nix,bin,usr/bin,tmp} $out${home}
     cp -rL ${nss}/etc/. $out/etc/
-    cp -L ${config.environment.etc."nix/nix.conf".source} $out/etc/nix/nix.conf
-    cp -L ${config.environment.etc."nix/registry.json".source} $out/etc/nix/registry.json
-    ln -s ${pkgs.dockerTools.binSh}/bin/sh $out/bin/sh
-    ln -s ${pkgs.dockerTools.usrBinEnv}/usr/bin/env $out/usr/bin/env
+    ln -s ${hostPath}/nix.conf ${hostPath}/registry.json $out/etc/nix/
+    ln -s ${hostPath}/env/bin/sh $out/bin/sh
+    ln -s ${hostPath}/env/bin/env $out/usr/bin/env
+    printf "[user]\n\tname = Claude\n\temail = claude@anthropic.com\n" > $out/etc/gitconfig
   '';
 
-  # podman secret name -> env var inside the sandbox; skipped if not created
-  secrets = {
-    claude-oauth-token = "CLAUDE_CODE_OAUTH_TOKEN";   # from `claude setup-token`; never ANTHROPIC_API_KEY, that bills API credits
-    openai-api-key = "OPENAI_API_KEY";
-  };
+  # the one secret every sandbox gets; from `claude setup-token`, never
+  # ANTHROPIC_API_KEY, that bills API credits
+  token = { secret = "claude-oauth-token"; target = "CLAUDE_CODE_OAUTH_TOKEN"; };
 
-  wrapper = pkgs.writeShellApplication {
-    name = "gensokyo-agent";
-    runtimeInputs = [ pkgs.podman ];
-    text = ''
-      : "''${DEBUG:=0}"
-      : "''${AGENT_CMD:=claude --dangerously-skip-permissions}"
+  nixArgs = [
+    # catatonit as pid 1. without it the agent itself is pid 1, and pid 1
+    # in a pid namespace is the only process that can reap orphans -- so
+    # anything the agent daemonises (a jupyter server, a dev server, any
+    # nohup'd thing) is reparented to a process that never calls wait()
+    # and stays a zombie for the life of the sandbox. zombies still answer
+    # `kill -0`, which makes a pidfile look live long after the process
+    # has gone. nixpkgs' podman points init_path at catatonit already.
+    "--init"
+    "--uidmap" "0:0:1" "--uidmap" "${uid}:@${uid}:1"
+    "--gidmap" "0:0:1" "--gidmap" "${gid}:@${gid}:1" "--gidmap" "${kvm}:@${kvm}:1"
+    "--user" "${uid}:${gid}"
+    "--mount" "type=tmpfs,destination=/tmp,tmpfs-mode=1777,tmpfs-size=8g"
+    "-v" "/nix:/nix:ro"
+    "-v" "/nix/var/nix/daemon-socket/socket:/nix/var/nix/daemon-socket/socket"
+    "-v" "${hostPath}:${hostPath}:ro"
+    "-e" "HOME=${home}"
+    "-e" "IS_SANDBOX=1"
+    "-e" "PATH=${hostPath}/env/bin"
+    "-e" "NIX_PATH=nixpkgs=${hostPath}/nixpkgs"
+    "-e" "SSL_CERT_FILE=${hostPath}/ca-bundle.crt"
+  ];
+  vmArgs = [ "--group-add" kvm "--device" "/dev/kvm" ];
+  glArgs = [
+    "-v" "/run/opengl-driver:/run/opengl-driver:ro"
+    "-e" "LD_LIBRARY_PATH=/run/opengl-driver/lib"
+  ];
+  cudaArgs = [
+    "--device" "/dev/nvidiactl" "--device" "/dev/nvidia0"
+    "--device" "/dev/nvidia-uvm" "--device" "/dev/nvidia-uvm-tools"
+    "-e" "CUDA_PATH=${hostPath}/env"
+    "-e" "NVCC_PREPEND_FLAGS=-ccbin ${hostPath}/cc/bin/g++ -I${hostPath}/env/include ${gencode}"
+  ];
 
-      # rootless podman can't write into a root-owned store path (unmapped uid, no
-      # DAC override in the userns), so stage the skeleton somewhere we own
-      base="''${XDG_RUNTIME_DIR:-/tmp}/gensokyo-agent"
-      mkdir -p "$base"
-      root=$(mktemp -d "$base/root.XXXXXX")
-      trap 'podman unshare rm -rf "$root"' EXIT   # anything uid ${uid} left behind is only ours inside the userns
-      cp -r ${rootfs}/. "$root/" && chmod -R u+w "$root" && chmod 755 "$root"   # mktemp gives 0700; / must be traversable by uid ${uid}
+  # everything host-specific the wrapper needs; lib/agent.py is the same on every host
+  conf = pkgs.writeText "gensokyo-agent.json" (builtins.toJSON {
+    podman = "${pkgs.podman}/bin/podman";
+    defaultCmd = "claude --dangerously-skip-permissions";
+    inherit token;
+    git = "${pkgs.gitMinimal}/bin/git";
+    # plain gensokyo-agent: the nix flavor on the current directory
+    hereArgs = [ "--rm" "--log-driver" "none" ] ++ nixArgs ++ vmArgs ++ glArgs ++ lib.optionals cudaSupport cudaArgs;
+    # a flavor is the head of a Containerfile, files for /, and podman run arguments
+    flavors.nix = {
+      containerfile = "FROM scratch\n";
+      root = rootfs;
+      user = "${uid}:${gid}";
+      inherit home;
+      runArgs = nixArgs;
+      # --gpu asks; whether the host has the devices is its business
+      gpuArgs = glArgs ++ cudaArgs;
+      # --no-vm for a host without kvm
+      vm = true;
+      inherit vmArgs;
+    };
+    # root in a stock image: nothing of the host but its podman, so any connection will do
+    flavors.alpine = {
+      containerfile = ''
+        FROM docker.io/library/alpine:3
+        RUN apk add --no-cache bash ca-certificates coreutils curl file findutils gawk git grep jq less libgcc libstdc++ nodejs npm openssh-client procps ripgrep sed tree \
+         && npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
+         && git config --system user.name Claude && git config --system user.email claude@anthropic.com
+        ENV IS_SANDBOX=1 USE_BUILTIN_RIPGREP=0
+      '';
+      root = null;
+      user = "0:0";
+      home = "/root";
+      runArgs = [ "--init" ];
+      gpuArgs = null;
+      vm = false;
+      # root in the container is the user outside, who is in the kvm group there
+      vmArgs = [ "--group-add" "keep-groups" "--device" "/dev/kvm" ];
+    };
+  });
 
-      args=(
-        --rm --log-driver none
-        # catatonit as pid 1. without it the agent itself is pid 1, and pid 1
-        # in a pid namespace is the only process that can reap orphans -- so
-        # anything the agent daemonises (a jupyter server, a dev server, any
-        # nohup'd thing) is reparented to a process that never calls wait()
-        # and stays a zombie for the life of the sandbox. zombies still answer
-        # `kill -0`, which makes a pidfile look live long after the process
-        # has gone. nixpkgs' podman points init_path at catatonit already.
-        --init
-        --rootfs
-        --uidmap 0:0:1 --uidmap ${uid}:@${uid}:1
-        --gidmap 0:0:1 --gidmap ${gid}:@${gid}:1 --gidmap ${kvm}:@${kvm}:1
-        --user ${uid}:${gid} --group-add ${kvm}
-        --device /dev/kvm
-        -v gensokyo-agent-home:${home}:U
-        --mount "type=tmpfs,destination=/tmp,tmpfs-mode=1777,tmpfs-size=8g"
-        -v /nix:/nix:ro
-        -v /nix/var/nix/daemon-socket/socket:/nix/var/nix/daemon-socket/socket
-        -v /run/opengl-driver:/run/opengl-driver:ro
-        -v "$PWD:$PWD" -w "$PWD"
-        -e HOME=${home}
-        -e PATH=${env}/bin
-        -e NIX_PATH=nixpkgs=${pkgs.path}
-        -e SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
-        -e LD_LIBRARY_PATH=/run/opengl-driver/lib
-      )
-      ${lib.optionalString cudaSupport ''
-        args+=(
-          --device /dev/nvidiactl --device /dev/nvidia0
-          --device /dev/nvidia-uvm --device /dev/nvidia-uvm-tools
-          -e CUDA_PATH=${env}
-          -e NVCC_PREPEND_FLAGS="-ccbin ${cuda.backendStdenv.cc}/bin/g++ -I${env}/include ${gencode}"
-        )
-      ''}
-      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: var: ''
-        podman secret exists ${name} && args+=(--secret "${name},type=env,target=${var}")
-      '') secrets)}
-      [[ -t 0 ]] && args+=(-it)
-      [[ $DEBUG == 1 ]] && { args+=(--log-level=debug); set -x; }
-
-      if (($#)); then cmd=("$@"); else read -ra cmd <<< "$AGENT_CMD"; fi
-      echo "gensokyo-agent: $PWD :: ''${cmd[*]}" >&2
-      podman run "''${args[@]}" "$root" "''${cmd[@]}"
-    '';
-  };
+  wrapper = pkgs.writers.writePython3Bin "gensokyo-agent" { flakeIgnore = [ "E501" ]; }
+    (builtins.replaceStrings [ "@conf@" ] [ "${conf}" ] (builtins.readFile ./agent.py));
 in
 {
   options.gensokyo-agent = {
@@ -166,5 +199,6 @@ in
     boot.kernelModules = lib.optional cudaSupport "nvidia-uvm";
     virtualisation.podman.enable = true;
     environment.systemPackages = [ wrapper ];
+    environment.etc."gensokyo-agent".source = hostDir;
   };
 }

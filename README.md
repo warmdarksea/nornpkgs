@@ -104,6 +104,7 @@ make test_nix_lint      # parse every .nix file
 make test_tf            # tofu validate, no credentials
 make test_nix_check     # every flake output to a .drv (nix flake check --no-build)
 make test_vm            # boot NIX_HOSTS_<arch> in VMs; VM_TARGETS="base hell" for others
+make test_agent         # lib/agent.py (gensokyo-agent) against a recording podman
 make test_templates     # copy, build, run and test NIX_TEMPLATES_<arch>; TEMPLATES=llm-hello for the heavy one
 make run_vm TARGET=hell # the same VM, interactively
 make plan_oci_live      # tofu plan against the real state (authenticated, not a test)
