@@ -45,6 +45,28 @@ gensokyo-agent --legacy [CMD...]         CMD in a throwaway sandbox on the
                               PORT in the workspace, wherever it runs
   anything else               goes to podman run
 DST is relative to the workspace; DESC ends up in its CLAUDE.md.
+
+examples:
+  gensokyo-agent --git .::
+      claude in a workspace, on this checkout cloned to a new branch. the
+      checkout gets a remote of the workspace's name: git fetch NAME
+  gensokyo-agent --git ~/src/nornpkgs:master:fix-build --prompt "make ci_check pass"
+      the branch to start from and the one to make, and what to do there
+  gensokyo-agent -c library --gpu --git @.:: --ro ~/datasets/foo:data/foo:"the training set"
+      on the host of the podman connection library, with its GPU, the whole
+      history, and a directory of this machine as a read-only volume there
+  gensokyo-agent -c library -sp 8800 --git .::
+      what the agent serves on 0.0.0.0:8800 answers on localhost:8800 here
+  gensokyo-agent --flavor alpine -s openai-api-key,type=env,target=OPENAI_API_KEY -- codex
+      another agent, a secret of its own, on a host without the module
+  gensokyo-agent --legacy
+      claude on the current directory, gone when it exits
+
+afterwards, with podman (and -c where the workspace is elsewhere):
+  podman attach NAME            back in; leave with ctrl-p ctrl-q
+  podman start -ai NAME         once it has stopped: the same session again
+  podman exec -it NAME bash     a shell next to the agent
+  podman rm NAME && podman rmi gensokyo-agent/NAME
 """
 
 ADJECTIVES = """amber brisk calm cosy dapper eager fuzzy gentle hazy idle
