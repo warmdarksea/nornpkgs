@@ -101,8 +101,7 @@ let
     "--init"
     "--uidmap" "0:0:1" "--uidmap" "${uid}:@${uid}:1"
     "--gidmap" "0:0:1" "--gidmap" "${gid}:@${gid}:1" "--gidmap" "${kvm}:@${kvm}:1"
-    "--user" "${uid}:${gid}" "--group-add" kvm
-    "--device" "/dev/kvm"
+    "--user" "${uid}:${gid}"
     "--mount" "type=tmpfs,destination=/tmp,tmpfs-mode=1777,tmpfs-size=8g"
     "-v" "/nix:/nix:ro"
     "-v" "/nix/var/nix/daemon-socket/socket:/nix/var/nix/daemon-socket/socket"
@@ -113,6 +112,7 @@ let
     "-e" "NIX_PATH=nixpkgs=${hostPath}/nixpkgs"
     "-e" "SSL_CERT_FILE=${hostPath}/ca-bundle.crt"
   ];
+  vmArgs = [ "--group-add" kvm "--device" "/dev/kvm" ];
   glArgs = [
     "-v" "/run/opengl-driver:/run/opengl-driver:ro"
     "-e" "LD_LIBRARY_PATH=/run/opengl-driver/lib"
@@ -131,7 +131,7 @@ let
     inherit token;
     git = "${pkgs.gitMinimal}/bin/git";
     # plain gensokyo-agent: the nix flavor on the current directory
-    hereArgs = [ "--rm" "--log-driver" "none" ] ++ nixArgs ++ glArgs ++ lib.optionals cudaSupport cudaArgs;
+    hereArgs = [ "--rm" "--log-driver" "none" ] ++ nixArgs ++ vmArgs ++ glArgs ++ lib.optionals cudaSupport cudaArgs;
     # a flavor is the head of a Containerfile, files for /, and podman run arguments
     flavors.nix = {
       containerfile = "FROM scratch\n";
@@ -139,7 +139,11 @@ let
       user = "${uid}:${gid}";
       inherit home;
       runArgs = nixArgs;
-      gpuArgs = glArgs ++ cudaArgs;   # --gpu asks; whether the host has one is its business
+      # --gpu asks; whether the host has the devices is its business
+      gpuArgs = glArgs ++ cudaArgs;
+      # --no-vm for a host without kvm
+      vm = true;
+      inherit vmArgs;
     };
     # root in a stock image: nothing of the host but its podman, so any connection will do
     flavors.alpine = {
@@ -155,6 +159,9 @@ let
       home = "/root";
       runArgs = [ "--init" ];
       gpuArgs = null;
+      vm = false;
+      # root in the container is the user outside, who is in the kvm group there
+      vmArgs = [ "--group-add" "keep-groups" "--device" "/dev/kvm" ];
     };
   });
 

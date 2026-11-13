@@ -24,6 +24,7 @@ gensokyo-agent --new-ws [FLAG...] [-- CMD...]
   -c, --connection NAME       podman connection to build and run on
   -s, --secret SPEC           as podman run --secret
   --gpu                       the nvidia devices and CUDA
+  --vm, --no-vm               /dev/kvm; on in the nix flavor, off in alpine
   --git [@]PATH[:BASE[:[NEW]]]
                               clone the checkout at PATH into src/, one
                               commit deep (@: all of it), and give PATH a
@@ -160,6 +161,7 @@ def parse_args(argv):
     p.add_argument("-c", "--connection")
     p.add_argument("-s", "--secret", action="append", default=[])
     p.add_argument("--gpu", action="store_true")
+    p.add_argument("--vm", action=argparse.BooleanOptionalAction)
     p.add_argument("--prompt")
     for flag in ("--git", "--cp", "--ro", "--rw", "--bind"):
         p.add_argument(flag, action="append", default=[])
@@ -311,6 +313,8 @@ def new_workspace(conf, opts, cmd, passthrough):
     flavor = conf["flavors"].get(opts.flavor) or die(f"--flavor is one of: {' '.join(conf['flavors'])}")
     if opts.gpu and flavor["gpuArgs"] is None:
         die(f"--gpu: not in the {opts.flavor} flavor")
+    if opts.vm is None:
+        opts.vm = flavor["vm"]
     if opts.bind and opts.connection:
         die("--bind: a path of this machine cannot be bound on another")
 
@@ -401,8 +405,9 @@ def new_workspace(conf, opts, cmd, passthrough):
 
     args = ["--name", name, "--label", f"gensokyo-agent={name}", "--log-driver", "none", "-w", workdir]
     args += flavor["runArgs"]
-    if opts.gpu:
-        args += flavor["gpuArgs"]
+    for want in ("gpu", "vm"):
+        if getattr(opts, want):
+            args += flavor[f"{want}Args"]
     args += token_args(conf, podman)
     for spec in opts.secret:
         args += ["--secret", spec]

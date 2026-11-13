@@ -19,8 +19,9 @@ with open(os.path.join(out, "calls"), "a") as f:
 if "exists" in args:
     sys.exit(0 if args[-1] in ("claude-oauth-token", "old") else 1)
 if "build" in args:
+    shutil.rmtree(os.path.join(out, "ctx"), ignore_errors=True)
     shutil.copytree(args[-1], os.path.join(out, "ctx"), symlinks=True)
-    shutil.move(os.path.join(out, "ctx", "Containerfile"), out)
+    shutil.move(os.path.join(out, "ctx", "Containerfile"), os.path.join(out, "Containerfile"))
 """
 
 
@@ -53,9 +54,9 @@ class AgentTest(unittest.TestCase):
             "hereArgs": ["--rm"],
             "flavors": {
                 "nix": {"containerfile": "FROM scratch\n", "root": root, "user": "4738:384",
-                        "home": "/home/agent", "runArgs": ["--init"], "gpuArgs": ["--device", "/dev/gpu"]},
+                        "home": "/home/agent", "runArgs": ["--init"], "gpuArgs": ["--device", "/dev/gpu"], "vm": True, "vmArgs": ["--device", "/dev/kvm"]},
                 "alpine": {"containerfile": "FROM alpine\n", "root": None, "user": "0:0",
-                           "home": "/root", "runArgs": [], "gpuArgs": None},
+                           "home": "/root", "runArgs": [], "gpuArgs": None, "vm": False, "vmArgs": ["--device", "/dev/kvm-alpine"]},
             },
         }
         self.base = os.path.join(self.tmp, "ws")
@@ -150,7 +151,7 @@ class AgentTest(unittest.TestCase):
         self.assertEqual(run[1:5], ["run", "--name", "ws1", "--label"])
         self.assertEqual(run[-2:], ["localhost/gensokyo-agent/ws1", "/.gensokyo-agent/entrypoint"])
         joined = " ".join(run)
-        for part in (f"-w {work}", "--init", "--device /dev/gpu", "--secret k,type=env",
+        for part in (f"-w {work}", "--init", "--device /dev/gpu", "--device /dev/kvm", "--secret k,type=env",
                      "--secret claude-oauth-token,type=env,target=CLAUDE_CODE_OAUTH_TOKEN",
                      f"-v sets-d:{work}/sets/d:ro", f"-v old:{work}/scratch", f"-v {data}:{work}/live", "--memory 4g"):
             self.assertIn(part, joined)
@@ -176,6 +177,12 @@ class AgentTest(unittest.TestCase):
     def test_generated_name(self):
         name = self.new()[3]
         self.assertRegex(name, r"^[a-z]+_[a-z]+$")
+
+    def test_devices_are_asked_for(self):
+        self.assertNotIn("/dev/kvm", self.new("--no-vm"))
+        self.assertNotIn("/dev/kvm-alpine", self.new("--flavor", "alpine"))
+        self.assertIn("/dev/kvm-alpine", self.new("--flavor", "alpine", "--vm"))
+        self.assertNotIn("/dev/gpu", self.new())
 
     def test_git_forms(self):
         top = self.repo()
