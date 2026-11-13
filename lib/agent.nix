@@ -50,21 +50,34 @@ let
     ];
   };
 
+  # what the sandbox takes from this host's store, under one name that is the
+  # same on every host (bound read-only at the same path): nothing the wrapper
+  # passes to podman, and nothing in the rootfs, names a store path, so a
+  # sandbox started from another machine gets this host's tools
+  hostPath = "/etc/gensokyo-agent";
+  hostDir = pkgs.linkFarm "gensokyo-agent-host" ({
+    inherit env;
+    nixpkgs = pkgs.path;
+    "ca-bundle.crt" = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+    "nix.conf" = config.environment.etc."nix/nix.conf".source;
+    "registry.json" = config.environment.etc."nix/registry.json".source;
+  } // lib.optionalAttrs cudaSupport {
+    cc = cuda.backendStdenv.cc;
+  });
+
   nss = pkgs.dockerTools.fakeNss.override {
     extraPasswdLines = [ "claude:x:${uid}:${gid}::${home}:/bin/sh" ];
     extraGroupLines = [ "agent:x:${gid}:" ];
   };
 
-  # real directories at the top level: podman populates /etc before /nix is mounted,
-  # so nothing above the leaves may be a symlink into the store. /etc/nix on the host
-  # is symlinks via /etc/static, so copy the resolved files from config instead of mounting.
+  # real directories at the top level: podman populates /etc before anything is
+  # mounted, so only the leaves may be symlinks, and they dangle until ${hostPath} is bound
   rootfs = pkgs.runCommand "gensokyo-agent-rootfs" { } ''
     mkdir -p $out/{etc/nix,bin,usr/bin,tmp} $out${home}
     cp -rL ${nss}/etc/. $out/etc/
-    cp -L ${config.environment.etc."nix/nix.conf".source} $out/etc/nix/nix.conf
-    cp -L ${config.environment.etc."nix/registry.json".source} $out/etc/nix/registry.json
-    ln -s ${pkgs.dockerTools.binSh}/bin/sh $out/bin/sh
-    ln -s ${pkgs.dockerTools.usrBinEnv}/usr/bin/env $out/usr/bin/env
+    ln -s ${hostPath}/nix.conf ${hostPath}/registry.json $out/etc/nix/
+    ln -s ${hostPath}/env/bin/sh $out/bin/sh
+    ln -s ${hostPath}/env/bin/env $out/usr/bin/env
   '';
 
   # podman secret name -> env var inside the sandbox; skipped if not created
@@ -91,17 +104,18 @@ let
     "--mount" "type=tmpfs,destination=/tmp,tmpfs-mode=1777,tmpfs-size=8g"
     "-v" "/nix:/nix:ro"
     "-v" "/nix/var/nix/daemon-socket/socket:/nix/var/nix/daemon-socket/socket"
+    "-v" "${hostPath}:${hostPath}:ro"
     "-v" "/run/opengl-driver:/run/opengl-driver:ro"
     "-e" "HOME=${home}"
-    "-e" "PATH=${env}/bin"
-    "-e" "NIX_PATH=nixpkgs=${pkgs.path}"
-    "-e" "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+    "-e" "PATH=${hostPath}/env/bin"
+    "-e" "NIX_PATH=nixpkgs=${hostPath}/nixpkgs"
+    "-e" "SSL_CERT_FILE=${hostPath}/ca-bundle.crt"
     "-e" "LD_LIBRARY_PATH=/run/opengl-driver/lib"
   ] ++ lib.optionals cudaSupport [
     "--device" "/dev/nvidiactl" "--device" "/dev/nvidia0"
     "--device" "/dev/nvidia-uvm" "--device" "/dev/nvidia-uvm-tools"
-    "-e" "CUDA_PATH=${env}"
-    "-e" "NVCC_PREPEND_FLAGS=-ccbin ${cuda.backendStdenv.cc}/bin/g++ -I${env}/include ${gencode}"
+    "-e" "CUDA_PATH=${hostPath}/env"
+    "-e" "NVCC_PREPEND_FLAGS=-ccbin ${hostPath}/cc/bin/g++ -I${hostPath}/env/include ${gencode}"
   ];
 
   # everything host-specific the wrapper needs; lib/agent.py is the same on every host
@@ -145,5 +159,6 @@ in
     boot.kernelModules = lib.optional cudaSupport "nvidia-uvm";
     virtualisation.podman.enable = true;
     environment.systemPackages = [ wrapper ];
+    environment.etc."gensokyo-agent".source = hostDir;
   };
 }
