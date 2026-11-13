@@ -21,9 +21,11 @@
 #   gensokyo-agent                        claude on the current directory, permissions skipped
 #   gensokyo-agent codex                  any command in the sandbox
 #   AGENT_CMD="opencode" gensokyo-agent   change the default
-#   gensokyo-agent --new-ws --cp notes.md:notes.md --prompt "read notes.md"
-#                                         a workspace: files of its own, built into an image, in a
-#                                         container that stays until podman rm. -c NAME puts it on
+#   gensokyo-agent --new-ws --git .:master: --prompt "fix the build"
+#                                         a workspace: a clone on a new branch (and whatever --cp,
+#                                         --ro, --rw add), built into an image, in a
+#                                         container that stays until podman rm. the checkout gets a
+#                                         remote to fetch its commits from. -c NAME puts it all on
 #                                         another host (podman system connection add)
 { config, pkgs, lib, ... }:
 let
@@ -127,6 +129,7 @@ let
     podman = "${pkgs.podman}/bin/podman";
     defaultCmd = "claude --dangerously-skip-permissions";
     inherit token;
+    git = "${pkgs.gitMinimal}/bin/git";
     # plain gensokyo-agent: the nix flavor on the current directory
     hereArgs = [ "--rm" "--log-driver" "none" ] ++ nixArgs ++ glArgs ++ lib.optionals cudaSupport cudaArgs;
     # a flavor is the head of a Containerfile, files for /, and podman run arguments

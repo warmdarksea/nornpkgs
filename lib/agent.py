@@ -22,6 +22,12 @@ gensokyo-agent --new-ws [FLAG...] [-- CMD...]
   -c, --connection NAME       podman connection to build and run on
   -s, --secret SPEC           as podman run --secret
   --gpu                       the nvidia devices and CUDA
+  --git [@]PATH[:BASE[:[NEW]]]
+                              clone the checkout at PATH into src/, one
+                              commit deep (@: all of it), and give PATH a
+                              remote NAME to fetch the work from. BASE: the
+                              branch to be on, default the current one.
+                              NEW: a branch to start from it, default NAME
   --cp SRC:DST[:DESC]         copy SRC to DST in the workspace
   --ro [VOL=]SRC:DST[:DESC]   a volume seeded from SRC at DST, read-only;
   --rw [VOL=]SRC:DST[:DESC]   or writable. volumes outlive the workspace,
@@ -153,7 +159,7 @@ def parse_args(argv):
     p.add_argument("-s", "--secret", action="append", default=[])
     p.add_argument("--gpu", action="store_true")
     p.add_argument("--prompt")
-    for flag in ("--cp", "--ro", "--rw", "--bind"):
+    for flag in ("--git", "--cp", "--ro", "--rw", "--bind"):
         p.add_argument(flag, action="append", default=[])
     opts, passthrough = p.parse_known_args(flags)
     if sep and not cmd:
@@ -224,6 +230,70 @@ def claude_md(name, notes):
     return "\n".join(lines) + "\n"
 
 
+def git_out(conf, repo, *args):
+    r = subprocess.run([conf["git"], "-C", repo, *args], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def parse_git(conf, spec, name):
+    """[@]PATH[:BASE[:[NEW]]] -> the repository, what to clone and the branch to be on"""
+    full = spec.startswith("@")
+    parts = spec.removeprefix("@").split(":")
+    if len(parts) > 3 or not parts[0]:
+        die(f"--git {spec}: expected [@]PATH[:BASE[:NEW]]")
+    top = git_out(conf, os.path.expanduser(parts[0]), "rev-parse", "--show-toplevel") if os.path.isdir(os.path.expanduser(parts[0])) else None
+    if top is None:
+        die(f"--git {spec}: {parts[0]} is not a git checkout")
+    base = parts[1] if len(parts) > 1 and parts[1] else git_out(conf, top, "symbolic-ref", "-q", "--short", "HEAD")
+    if base is None:
+        die(f"--git {spec}: HEAD is detached, name the branch to start from")
+    ref = git_out(conf, top, "rev-parse", "-q", "--verify", "--symbolic-full-name", base)
+    if not ref:
+        die(f"--git {spec}: {base} is not a branch or tag of {top}")
+    if len(parts) == 3:
+        branch = parts[2] or name
+    elif ref.startswith("refs/heads/"):
+        branch = base
+    else:
+        die(f"--git {spec}: {base} is not a local branch, name a new one to work on")
+    if name in (git_out(conf, top, "remote") or "").split():
+        die(f"--git {spec}: {top} already has a remote {name}")
+    return {"top": top, "repo": os.path.basename(top), "full": full, "base": base, "ref": ref, "branch": branch}
+
+
+def clone_in(conf, g, work):
+    """The owner's branch arrives as owner/BASE and is all there is: no
+    remote to push to, and one commit of history unless asked for all."""
+    dst = os.path.join(work, "src", g["repo"])
+    if os.path.lexists(dst):
+        die(f"src/{g['repo']} is in the workspace twice")
+    os.makedirs(dst)
+    owner = f"refs/remotes/owner/{g['base']}"
+    for args in (
+        ["init", "-q"],
+        ["fetch", "-q", *([] if g["full"] else ["--depth", "1"]), "file://" + g["top"], f"+{g['ref']}:{owner}"],
+        ["checkout", "-q", "--no-track", "-B", g["branch"], owner],
+    ):
+        if subprocess.run([conf["git"], "-C", dst, *args]).returncode != 0:
+            die(f"--git: git {args[0]} failed for {g['top']}")
+
+
+def add_remote(conf, g, name, podman, workdir):
+    """The remote is podman itself, so it is wherever the container is."""
+    def esc(word):
+        return word.replace("%", "%%").replace(" ", "% ")
+    exe = os.environ.get("GENSOKYO_AGENT_PODMAN", "podman")
+    url = "ext::" + " ".join(map(esc, [exe, *podman[1:], "exec", "-i", name])) + " %S " + esc(f"{workdir}/src/{g['repo']}")
+    for args in (
+        ["remote", "add", name, url],
+        # git push NAME master: the agent sees it as owner/master
+        ["config", f"remote.{name}.push", "refs/heads/*:refs/remotes/owner/*"],
+        ["config", "protocol.ext.allow", "user"],
+    ):
+        if subprocess.run([conf["git"], "-C", g["top"], *args]).returncode != 0:
+            die(f"--git: could not add the remote {name} to {g['top']}")
+
+
 def new_workspace(conf, opts, cmd, passthrough):
     podman = [conf["podman"]] + (["-c", opts.connection] if opts.connection else [])
     debug = os.environ.get("DEBUG", "0") == "1"
@@ -252,6 +322,7 @@ def new_workspace(conf, opts, cmd, passthrough):
         die(f"--name {name}: there is a container of that name")
     items = [(flag, *parse_item(flag, spec))
              for flag in ("--cp", "--ro", "--rw", "--bind") for spec in getattr(opts, flag[2:])]
+    repos = [parse_git(conf, spec, name) for spec in opts.git]
     cmd = cmd or os.environ.get("AGENT_CMD", conf["defaultCmd"]).split()
 
     # the workspace has one path, here while it is assembled and in the
@@ -278,7 +349,13 @@ def new_workspace(conf, opts, cmd, passthrough):
         write_home(os.path.join(ctx, "home"), workdir)
 
         mounts = []
-        notes = {"files": []}
+        notes = {"repositories": [], "files": []}
+        for g in repos:
+            clone_in(conf, g, work)
+            notes["repositories"].append(
+                f"`src/{g['repo']}`, on `{g['branch']}`, started from the owner's `{g['base']}`"
+                f"{'' if g['full'] else ' with one commit of history'}. Commit here; there is nowhere"
+                f" to push, the owner fetches. What they send arrives as `owner/<branch>`")
         for flag, vol, src, dst, desc in items:
             inside = os.path.join(workdir, dst)
             desc = f": {desc}" if desc else ""
@@ -317,6 +394,9 @@ def new_workspace(conf, opts, cmd, passthrough):
     finally:
         remove_tree(ctx)
 
+    for g in repos:
+        add_remote(conf, g, name, podman, workdir)
+
     args = ["--name", name, "--label", f"gensokyo-agent={name}", "--log-driver", "none", "-w", workdir]
     args += flavor["runArgs"]
     if opts.gpu:
@@ -333,6 +413,8 @@ def new_workspace(conf, opts, cmd, passthrough):
     say(f"workspace {name} ({opts.flavor}) at {workdir}")
     say(f"  leave with ctrl-p ctrl-q, return with: {pm} attach {name}")
     say(f"  once it has stopped: {pm} start -ai {name}")
+    for g in repos:
+        say(f"  its work, while it runs: git -C {g['top']} fetch {name}")
     say(f"  remove: {pm} rm {name} && {pm} rmi {image}")
     if debug:
         print("+ " + shlex.join(argv), file=sys.stderr)
