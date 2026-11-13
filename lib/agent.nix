@@ -17,16 +17,17 @@
 #   printf %s "$token" | podman secret create claude-oauth-token -
 # The sandbox keeps no home between runs, so that secret is the login.
 #
-# Usage (gensokyo-agent --help has the flags):
-#   gensokyo-agent                        claude on the current directory, permissions skipped
-#   gensokyo-agent codex                  any command in the sandbox
-#   AGENT_CMD="opencode" gensokyo-agent   change the default
-#   gensokyo-agent --new-ws --git .:master: --prompt "fix the build"
+# Usage (gensokyo-agent --help has the flags and examples):
+#   gensokyo-agent --git .:master: --prompt "fix the build"
 #                                         a workspace: a clone on a new branch (and whatever --cp,
-#                                         --ro, --rw add), built into an image, in a
-#                                         container that stays until podman rm. the checkout gets a
-#                                         remote to fetch its commits from. -c NAME puts it all on
-#                                         another host (podman system connection add)
+#                                         --ro, --rw add), built into an image, in a container that
+#                                         stays until podman rm. the checkout gets a remote to fetch
+#                                         its commits from. -c NAME puts it all on another host
+#                                         (podman system connection add)
+#   gensokyo-agent -- codex               another agent in it
+#   gensokyo-agent --legacy               claude in a throwaway sandbox on the current directory
+#   gensokyo-agent --legacy codex         any command there
+#   AGENT_CMD="opencode" gensokyo-agent   change the default
 { config, pkgs, lib, ... }:
 let
   cfg = config.gensokyo-agent;

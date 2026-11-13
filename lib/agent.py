@@ -11,13 +11,13 @@ import sys
 import tempfile
 
 USAGE = """\
-gensokyo-agent [CMD...]                  CMD (default: claude) in a throwaway
-                                         sandbox on the current directory
-gensokyo-agent --new-ws [FLAG...] [-- CMD...]
-                                         a workspace: a directory assembled from
-                                         local files, built into an image and
-                                         run as a container that stays
-  --name NAME                 container and image name (default: generated)
+gensokyo-agent [FLAG...] [-- CMD...]     CMD (default: claude) in a workspace: a
+                                         directory assembled from local files,
+                                         built into an image and run as a
+                                         container that stays
+gensokyo-agent --legacy [CMD...]         CMD in a throwaway sandbox on the
+                                         current directory
+  --name NAME                container and image name (default: generated)
   --flavor nix|alpine         nix (default): this host's store and nix daemon,
                               on hosts with the gensokyo-agent module.
                               alpine: a stock image, root, any podman host
@@ -152,10 +152,9 @@ def parse_args(argv):
     if flags[:1] in (["-h"], ["--help"]):
         print(USAGE, end="")
         sys.exit(0)
-    if "--new-ws" not in flags:
-        return None, argv, []
+    if argv[:1] == ["--legacy"]:
+        return None, argv[1:], []
     p = argparse.ArgumentParser(prog="gensokyo-agent", usage=USAGE, add_help=False, allow_abbrev=False)
-    p.add_argument("--new-ws", action="store_true")
     p.add_argument("--name")
     p.add_argument("--flavor", default="nix")
     p.add_argument("-c", "--connection")
@@ -168,6 +167,8 @@ def parse_args(argv):
     opts, passthrough = p.parse_known_args(flags)
     if sep and not cmd:
         die("nothing after --")
+    if passthrough and not passthrough[0].startswith("-"):
+        die(f"{passthrough[0]}: a command goes after --, or after --legacy for the sandbox on the current directory")
     return opts, cmd, passthrough
 
 

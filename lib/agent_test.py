@@ -80,8 +80,8 @@ class AgentTest(unittest.TestCase):
         return top
 
     def new(self, *argv):
-        """Run --new-ws up to the podman run it would exec; returns that argv."""
-        opts, cmd, passthrough = agent.parse_args(["--new-ws", *argv])
+        """A workspace up to the podman run it would exec; returns that argv."""
+        opts, cmd, passthrough = agent.parse_args(list(argv))
         with mock.patch("os.execvp") as execvp, quiet():
             agent.new_workspace(self.conf, opts, cmd, passthrough)
         return execvp.call_args[0][1]
@@ -90,15 +90,18 @@ class AgentTest(unittest.TestCase):
         with self.assertRaises(SystemExit), quiet():
             self.new(*argv)
 
-    def test_plain_invocation_is_left_alone(self):
-        self.assertEqual(agent.parse_args(["codex", "--foo"]), (None, ["codex", "--foo"], []))
-        self.assertEqual(agent.parse_args([]), (None, [], []))
+    def test_legacy_takes_the_rest_as_the_command(self):
+        self.assertEqual(agent.parse_args(["--legacy", "codex", "--foo"]), (None, ["codex", "--foo"], []))
+        self.assertEqual(agent.parse_args(["--legacy"]), (None, [], []))
+        self.assertEqual(agent.parse_args([])[1:], ([], []))
+        with self.assertRaises(SystemExit), quiet():
+            agent.parse_args(["codex"])
 
     def test_flags_command_and_passthrough(self):
         opts, cmd, passthrough = agent.parse_args(
-            ["--new-ws", "--memory", "4g", "-c", "library", "-s", "k,type=env", "--", "codex", "--new-ws"])
+            ["--memory", "4g", "-c", "library", "-s", "k,type=env", "--", "codex", "--legacy"])
         self.assertEqual((opts.connection, opts.secret), ("library", ["k,type=env"]))
-        self.assertEqual(cmd, ["codex", "--new-ws"])
+        self.assertEqual(cmd, ["codex", "--legacy"])
         self.assertEqual(passthrough, ["--memory", "4g"])
 
     def test_item_specs(self):
