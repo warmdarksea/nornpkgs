@@ -73,67 +73,46 @@ let
     openai-api-key = "OPENAI_API_KEY";
   };
 
-  wrapper = pkgs.writeShellApplication {
-    name = "gensokyo-agent";
-    runtimeInputs = [ pkgs.podman ];
-    text = ''
-      : "''${DEBUG:=0}"
-      : "''${AGENT_CMD:=claude --dangerously-skip-permissions}"
+  runArgs = [
+    "--rm" "--log-driver" "none"
+    # catatonit as pid 1. without it the agent itself is pid 1, and pid 1
+    # in a pid namespace is the only process that can reap orphans -- so
+    # anything the agent daemonises (a jupyter server, a dev server, any
+    # nohup'd thing) is reparented to a process that never calls wait()
+    # and stays a zombie for the life of the sandbox. zombies still answer
+    # `kill -0`, which makes a pidfile look live long after the process
+    # has gone. nixpkgs' podman points init_path at catatonit already.
+    "--init"
+    "--uidmap" "0:0:1" "--uidmap" "${uid}:@${uid}:1"
+    "--gidmap" "0:0:1" "--gidmap" "${gid}:@${gid}:1" "--gidmap" "${kvm}:@${kvm}:1"
+    "--user" "${uid}:${gid}" "--group-add" kvm
+    "--device" "/dev/kvm"
+    "-v" "gensokyo-agent-home:${home}:U"
+    "--mount" "type=tmpfs,destination=/tmp,tmpfs-mode=1777,tmpfs-size=8g"
+    "-v" "/nix:/nix:ro"
+    "-v" "/nix/var/nix/daemon-socket/socket:/nix/var/nix/daemon-socket/socket"
+    "-v" "/run/opengl-driver:/run/opengl-driver:ro"
+    "-e" "HOME=${home}"
+    "-e" "PATH=${env}/bin"
+    "-e" "NIX_PATH=nixpkgs=${pkgs.path}"
+    "-e" "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+    "-e" "LD_LIBRARY_PATH=/run/opengl-driver/lib"
+  ] ++ lib.optionals cudaSupport [
+    "--device" "/dev/nvidiactl" "--device" "/dev/nvidia0"
+    "--device" "/dev/nvidia-uvm" "--device" "/dev/nvidia-uvm-tools"
+    "-e" "CUDA_PATH=${env}"
+    "-e" "NVCC_PREPEND_FLAGS=-ccbin ${cuda.backendStdenv.cc}/bin/g++ -I${env}/include ${gencode}"
+  ];
 
-      # rootless podman can't write into a root-owned store path (unmapped uid, no
-      # DAC override in the userns), so stage the skeleton somewhere we own
-      base="''${XDG_RUNTIME_DIR:-/tmp}/gensokyo-agent"
-      mkdir -p "$base"
-      root=$(mktemp -d "$base/root.XXXXXX")
-      trap 'podman unshare rm -rf "$root"' EXIT   # anything uid ${uid} left behind is only ours inside the userns
-      cp -r ${rootfs}/. "$root/" && chmod -R u+w "$root" && chmod 755 "$root"   # mktemp gives 0700; / must be traversable by uid ${uid}
+  # everything host-specific the wrapper needs; lib/agent.py is the same on every host
+  conf = pkgs.writeText "gensokyo-agent.json" (builtins.toJSON {
+    podman = "${pkgs.podman}/bin/podman";
+    defaultCmd = "claude --dangerously-skip-permissions";
+    inherit rootfs runArgs secrets;
+  });
 
-      args=(
-        --rm --log-driver none
-        # catatonit as pid 1. without it the agent itself is pid 1, and pid 1
-        # in a pid namespace is the only process that can reap orphans -- so
-        # anything the agent daemonises (a jupyter server, a dev server, any
-        # nohup'd thing) is reparented to a process that never calls wait()
-        # and stays a zombie for the life of the sandbox. zombies still answer
-        # `kill -0`, which makes a pidfile look live long after the process
-        # has gone. nixpkgs' podman points init_path at catatonit already.
-        --init
-        --rootfs
-        --uidmap 0:0:1 --uidmap ${uid}:@${uid}:1
-        --gidmap 0:0:1 --gidmap ${gid}:@${gid}:1 --gidmap ${kvm}:@${kvm}:1
-        --user ${uid}:${gid} --group-add ${kvm}
-        --device /dev/kvm
-        -v gensokyo-agent-home:${home}:U
-        --mount "type=tmpfs,destination=/tmp,tmpfs-mode=1777,tmpfs-size=8g"
-        -v /nix:/nix:ro
-        -v /nix/var/nix/daemon-socket/socket:/nix/var/nix/daemon-socket/socket
-        -v /run/opengl-driver:/run/opengl-driver:ro
-        -v "$PWD:$PWD" -w "$PWD"
-        -e HOME=${home}
-        -e PATH=${env}/bin
-        -e NIX_PATH=nixpkgs=${pkgs.path}
-        -e SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
-        -e LD_LIBRARY_PATH=/run/opengl-driver/lib
-      )
-      ${lib.optionalString cudaSupport ''
-        args+=(
-          --device /dev/nvidiactl --device /dev/nvidia0
-          --device /dev/nvidia-uvm --device /dev/nvidia-uvm-tools
-          -e CUDA_PATH=${env}
-          -e NVCC_PREPEND_FLAGS="-ccbin ${cuda.backendStdenv.cc}/bin/g++ -I${env}/include ${gencode}"
-        )
-      ''}
-      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: var: ''
-        podman secret exists ${name} && args+=(--secret "${name},type=env,target=${var}")
-      '') secrets)}
-      [[ -t 0 ]] && args+=(-it)
-      [[ $DEBUG == 1 ]] && { args+=(--log-level=debug); set -x; }
-
-      if (($#)); then cmd=("$@"); else read -ra cmd <<< "$AGENT_CMD"; fi
-      echo "gensokyo-agent: $PWD :: ''${cmd[*]}" >&2
-      podman run "''${args[@]}" "$root" "''${cmd[@]}"
-    '';
-  };
+  wrapper = pkgs.writers.writePython3Bin "gensokyo-agent" { flakeIgnore = [ "E501" ]; }
+    (builtins.replaceStrings [ "@conf@" ] [ "${conf}" ] (builtins.readFile ./agent.py));
 in
 {
   options.gensokyo-agent = {
