@@ -1,6 +1,7 @@
 import contextlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,8 +15,11 @@ STUB = """#!{python}
 import json, os, shutil, sys
 args = sys.argv[1:]
 out = os.environ["STUB_OUT"]
-with open(os.path.join(out, "calls"), "a") as f:
+with open(os.path.join(out, os.path.basename(sys.argv[0])), "a") as f:
     f.write(json.dumps(args) + "\\n")
+if "connection" in args:
+    print(json.dumps([{{"Name": "library", "URI": "ssh://alice@library.example:2222/run/user/1000/podman/podman.sock", "Identity": "/id"}},
+                      {{"Name": "pipe", "URI": "unix:///run/podman.sock"}}]))
 if "exists" in args:
     sys.exit(0 if args[-1] in ("claude-oauth-token", "old") else 1)
 if "build" in args:
@@ -44,11 +48,14 @@ class AgentTest(unittest.TestCase):
         with open(podman, "w") as f:
             f.write(STUB.format(python=sys.executable))
         os.chmod(podman, 0o755)
+        ssh = os.path.join(self.tmp, "ssh")
+        shutil.copy(podman, ssh)
         root = os.path.join(self.tmp, "rootfs")
         os.makedirs(os.path.join(root, "home", "agent"))
         self.conf = {
             "podman": podman,
             "git": "git",
+            "ssh": ssh,
             "defaultCmd": "claude --dangerously-skip-permissions",
             "token": {"secret": "claude-oauth-token", "target": "CLAUDE_CODE_OAUTH_TOKEN"},
             "hereArgs": ["--rm"],
@@ -162,10 +169,27 @@ class AgentTest(unittest.TestCase):
     def test_connection_reaches_every_podman_call(self):
         run = self.new("--name", "ws2", "-c", "library", "--flavor", "alpine")
         self.assertEqual(run[1:4], ["-c", "library", "run"])
-        with open(os.path.join(self.out, "calls")) as f:
+        with open(os.path.join(self.out, "podman")) as f:
             for call in map(json.loads, f):
                 self.assertEqual(call[:2], ["-c", "library"])
         self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "root", "home")))
+
+    def test_ports(self):
+        run = " ".join(self.new("--name", "ws5", "-p", "9000", "-sp", "8800"))
+        self.assertIn("-p 9000 -p 127.0.0.1:8800:8800", run)
+        self.assertFalse(os.path.exists(os.path.join(self.out, "ssh")))
+
+        run = " ".join(self.new("--name", "ws6", "-c", "library", "-sp", "8800", "-L", "1:h:2"))
+        self.assertIn("-p 127.0.0.1:8800:8800", run)
+        with open(os.path.join(self.out, "ssh")) as f:
+            ssh = json.loads(f.read())
+        self.assertEqual(ssh[:2], ["-f", "-N"])
+        self.assertEqual(ssh[-9:], ["-L", "1:h:2", "-L", "8800:127.0.0.1:8800", "-p", "2222", "-i", "/id", "alice@library.example"])
+
+        self.dies("-L", "1:h:2")
+        self.dies("-sp", "http")
+        self.dies("-c", "pipe", "-sp", "8800")
+        self.dies("-c", "nowhere", "-sp", "8800")
 
     def test_refusals(self):
         data = os.path.join(self.tmp, "data")

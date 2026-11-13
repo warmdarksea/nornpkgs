@@ -131,6 +131,7 @@ let
     defaultCmd = "claude --dangerously-skip-permissions";
     inherit token;
     git = "${pkgs.gitMinimal}/bin/git";
+    ssh = "${pkgs.openssh}/bin/ssh";
     # plain gensokyo-agent: the nix flavor on the current directory
     hereArgs = [ "--rm" "--log-driver" "none" ] ++ nixArgs ++ vmArgs ++ glArgs ++ lib.optionals cudaSupport cudaArgs;
     # a flavor is the head of a Containerfile, files for /, and podman run arguments

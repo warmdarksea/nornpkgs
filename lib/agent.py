@@ -9,6 +9,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 
 USAGE = """\
 gensokyo-agent [FLAG...] [-- CMD...]     CMD (default: claude) in a workspace: a
@@ -37,6 +38,11 @@ gensokyo-agent --legacy [CMD...]         CMD in a throwaway sandbox on the
                               and one that exists is used as it is
   --bind SRC:DST[:DESC]       SRC itself at DST; local only
   --prompt TEXT               what the agent starts on
+  -p, --publish SPEC          as podman run -p
+  -L SPEC                     as ssh -L, to the host of -c; the tunnel stays
+                              up after this command returns
+  -sp PORT                    both for one port: localhost:PORT here is
+                              PORT in the workspace, wherever it runs
   anything else               goes to podman run
 DST is relative to the workspace; DESC ends up in its CLAUDE.md.
 """
@@ -162,6 +168,9 @@ def parse_args(argv):
     p.add_argument("--gpu", action="store_true")
     p.add_argument("--vm", action=argparse.BooleanOptionalAction)
     p.add_argument("--prompt")
+    p.add_argument("-p", "--publish", action="append", default=[])
+    p.add_argument("-L", dest="tunnel", action="append", default=[])
+    p.add_argument("-sp", dest="port", action="append", default=[])
     for flag in ("--git", "--cp", "--ro", "--rw", "--bind"):
         p.add_argument(flag, action="append", default=[])
     opts, passthrough = p.parse_known_args(flags)
@@ -299,6 +308,23 @@ def add_remote(conf, g, name, podman, workdir):
             die(f"--git: could not add the remote {name} to {g['top']}")
 
 
+def ssh_target(conf, connection):
+    """What ssh needs to reach the host of a podman connection."""
+    out = subprocess.run([conf["podman"], "system", "connection", "ls", "--format", "json"],
+                         stdout=subprocess.PIPE, text=True).stdout
+    for c in json.loads(out or "[]"):
+        if c["Name"] == connection:
+            uri = urllib.parse.urlsplit(c["URI"])
+            if uri.scheme != "ssh":
+                die(f"-L: the connection {connection} is not over ssh")
+            return [
+                *(["-p", str(uri.port)] if uri.port else []),
+                *(["-i", c["Identity"]] if c.get("Identity") else []),
+                (f"{uri.username}@" if uri.username else "") + uri.hostname,
+            ]
+    die(f"-L: no podman connection {connection}")
+
+
 def new_workspace(conf, opts, cmd, passthrough):
     podman = [conf["podman"]] + (["-c", opts.connection] if opts.connection else [])
     debug = os.environ.get("DEBUG", "0") == "1"
@@ -318,6 +344,15 @@ def new_workspace(conf, opts, cmd, passthrough):
         opts.vm = flavor["vm"]
     if opts.bind and opts.connection:
         die("--bind: a path of this machine cannot be bound on another")
+    for port in opts.port:
+        if not port.isdigit():
+            die(f"-sp {port}: a port number")
+        opts.publish.append(f"127.0.0.1:{port}:{port}")
+        if opts.connection:
+            opts.tunnel.append(f"{port}:127.0.0.1:{port}")
+    if opts.tunnel and not opts.connection:
+        die("-L: without -c the workspace is on this machine, -p is all it takes")
+    target = ssh_target(conf, opts.connection) if opts.tunnel else None
 
     name = opts.name
     if name is None:
@@ -413,6 +448,8 @@ def new_workspace(conf, opts, cmd, passthrough):
     for spec in opts.secret:
         args += ["--secret", spec]
     args += mounts
+    for spec in opts.publish:
+        args += ["-p", spec]
     if sys.stdin.isatty():
         args.append("-it")
     argv = [*podman, "run", *args, *passthrough, image, "/.gensokyo-agent/entrypoint"]
@@ -424,6 +461,15 @@ def new_workspace(conf, opts, cmd, passthrough):
     for g in repos:
         say(f"  its work, while it runs: git -C {g['top']} fetch {name}")
     say(f"  remove: {pm} rm {name} && {pm} rmi {image}")
+    if opts.tunnel:
+        runtime = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "gensokyo-agent")
+        os.makedirs(runtime, exist_ok=True)
+        sock = os.path.join(runtime, f"{name}.ssh")
+        forwards = [arg for spec in opts.tunnel for arg in ("-L", spec)]
+        if call([conf["ssh"], "-f", "-N", "-M", "-S", sock, "-o", "ExitOnForwardFailure=yes", *forwards, *target]) != 0:
+            say(f"  no tunnel, ssh failed; by hand: ssh -N {shlex.join(forwards + target)}")
+        else:
+            say(f"  tunnel {' '.join(opts.tunnel)}, until: ssh -S {sock} -O exit {target[-1]}")
     if debug:
         print("+ " + shlex.join(argv), file=sys.stderr)
     sys.stdout.flush()
