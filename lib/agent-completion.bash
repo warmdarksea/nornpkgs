@@ -4,12 +4,18 @@ _gensokyo_agent() {
     -c|--connection)
       mapfile -t COMPREPLY < <(compgen -W "$(podman system connection ls --format '{{.Name}}' 2>/dev/null)" -- "$cur")
       return ;;
+    --model)
+      mapfile -t COMPREPLY < <(compgen -W "fable opus sonnet haiku opusplan" -- "$cur")
+      return ;;
+    --effort)
+      mapfile -t COMPREPLY < <(compgen -W "low medium high xhigh max" -- "$cur")
+      return ;;
     --flavor)
       mapfile -t COMPREPLY < <(compgen -W "nix alpine" -- "$cur")
       return ;;
   esac
   if [[ $cur == -* ]]; then
-    mapfile -t COMPREPLY < <(compgen -W "--legacy --name --flavor --connection --secret --gpu --vm --no-vm --git --cp --ro --rw --bind --prompt --publish -L -sp --help" -- "$cur")
+    mapfile -t COMPREPLY < <(compgen -W "--legacy --name --flavor --connection --secret --gpu --vm --no-vm --git --cp --ro --rw --bind --prompt --model --effort --publish -L -sp --help" -- "$cur")
   fi
 }
 # paths are the default: most of the other flags start with one

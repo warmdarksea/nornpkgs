@@ -38,6 +38,10 @@ gensokyo-agent --legacy [CMD...]         CMD in a throwaway sandbox on the
                               and one that exists is used as it is
   --bind SRC:DST[:DESC]       SRC itself at DST; local only
   --prompt TEXT               what the agent starts on
+  --model MODEL               claude --model: fable, opus, sonnet, haiku,
+                              opusplan, or a full model name; [1m] after
+                              it for the long context. default: claude's
+  --effort LEVEL              claude --effort: low, medium, high, xhigh, max
   -p, --publish SPEC          as podman run -p
   -L SPEC                     as ssh -L, to the host of -c; the tunnel stays
                               up after this command returns
@@ -190,6 +194,8 @@ def parse_args(argv):
     p.add_argument("--gpu", action="store_true")
     p.add_argument("--vm", action=argparse.BooleanOptionalAction)
     p.add_argument("--prompt")
+    p.add_argument("--model")
+    p.add_argument("--effort")
     p.add_argument("-p", "--publish", action="append", default=[])
     p.add_argument("-L", dest="tunnel", action="append", default=[])
     p.add_argument("-sp", dest="port", action="append", default=[])
@@ -388,6 +394,11 @@ def new_workspace(conf, opts, cmd, passthrough):
              for flag in ("--cp", "--ro", "--rw", "--bind") for spec in getattr(opts, flag[2:])]
     repos = [parse_git(conf, spec, name) for spec in opts.git]
     cmd = cmd or os.environ.get("AGENT_CMD", conf["defaultCmd"]).split()
+    for flag in ("model", "effort"):
+        if getattr(opts, flag):
+            if os.path.basename(cmd[0]) != "claude":
+                die(f"--{flag}: a flag of claude; {cmd[0]} takes its own after --")
+            cmd += [f"--{flag}", getattr(opts, flag)]
 
     # the workspace has one path, here while it is assembled and in the
     # container afterwards. not under /tmp, that is a tmpfs in the sandbox

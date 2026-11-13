@@ -122,6 +122,17 @@ class AgentTest(unittest.TestCase):
             with self.assertRaises(SystemExit), quiet():
                 agent.parse_item("--cp", bad)
 
+    def test_model_and_effort_reach_claude_as_given(self):
+        self.new("--name", "ws7", "--model", "some-new-model[1m]", "--effort", "xhigh", "--prompt", "go")
+        with open(os.path.join(self.out, "ctx", "root", ".gensokyo-agent", "entrypoint")) as f:
+            entry = f.read()
+        self.assertIn("--model 'some-new-model[1m]' --effort xhigh go\n", entry)
+        self.assertIn("--model 'some-new-model[1m]' --effort xhigh --continue && exit\n", entry)
+        self.new("--name", "ws8")
+        with open(os.path.join(self.out, "ctx", "root", ".gensokyo-agent", "entrypoint")) as f:
+            self.assertNotIn("--model", f.read())
+        self.dies("--model", "opus", "--", "codex")
+
     def test_entrypoint_resumes_claude_only(self):
         claude = agent.entrypoint(["claude", "--x"], "it's time")
         self.assertIn("claude --x --continue && exit", claude)
