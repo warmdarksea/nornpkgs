@@ -167,8 +167,13 @@ let
     };
   });
 
-  wrapper = pkgs.writers.writePython3Bin "gensokyo-agent" { flakeIgnore = [ "E501" ]; }
+  cli = pkgs.writers.writePython3Bin "gensokyo-agent" { flakeIgnore = [ "E501" ]; }
     (builtins.replaceStrings [ "@conf@" ] [ "${conf}" ] (builtins.readFile ./agent.py));
+  wrapper = pkgs.runCommand "gensokyo-agent" { } ''
+    mkdir -p $out/bin $out/share/bash-completion/completions
+    ln -s ${cli}/bin/gensokyo-agent $out/bin/
+    ln -s ${./agent-completion.bash} $out/share/bash-completion/completions/gensokyo-agent
+  '';
 in
 {
   options.gensokyo-agent = {
