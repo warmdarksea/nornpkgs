@@ -17,10 +17,14 @@
 #   printf %s "$token" | podman secret create claude-oauth-token -
 # The sandbox keeps no home between runs, so that secret is the login.
 #
-# Usage:
-#   gensokyo-agent                        claude, permissions skipped
+# Usage (gensokyo-agent --help has the flags):
+#   gensokyo-agent                        claude on the current directory, permissions skipped
 #   gensokyo-agent codex                  any command in the sandbox
 #   AGENT_CMD="opencode" gensokyo-agent   change the default
+#   gensokyo-agent --new-ws --cp notes.md:notes.md --prompt "read notes.md"
+#                                         a workspace: files of its own, built into an image, in a
+#                                         container that stays until podman rm. -c NAME puts it on
+#                                         another host (podman system connection add)
 { config, pkgs, lib, ... }:
 let
   cfg = config.gensokyo-agent;
@@ -84,8 +88,7 @@ let
   # ANTHROPIC_API_KEY, that bills API credits
   token = { secret = "claude-oauth-token"; target = "CLAUDE_CODE_OAUTH_TOKEN"; };
 
-  runArgs = [
-    "--rm" "--log-driver" "none"
+  nixArgs = [
     # catatonit as pid 1. without it the agent itself is pid 1, and pid 1
     # in a pid namespace is the only process that can reap orphans -- so
     # anything the agent daemonises (a jupyter server, a dev server, any
@@ -102,14 +105,17 @@ let
     "-v" "/nix:/nix:ro"
     "-v" "/nix/var/nix/daemon-socket/socket:/nix/var/nix/daemon-socket/socket"
     "-v" "${hostPath}:${hostPath}:ro"
-    "-v" "/run/opengl-driver:/run/opengl-driver:ro"
     "-e" "HOME=${home}"
     "-e" "IS_SANDBOX=1"
     "-e" "PATH=${hostPath}/env/bin"
     "-e" "NIX_PATH=nixpkgs=${hostPath}/nixpkgs"
     "-e" "SSL_CERT_FILE=${hostPath}/ca-bundle.crt"
+  ];
+  glArgs = [
+    "-v" "/run/opengl-driver:/run/opengl-driver:ro"
     "-e" "LD_LIBRARY_PATH=/run/opengl-driver/lib"
-  ] ++ lib.optionals cudaSupport [
+  ];
+  cudaArgs = [
     "--device" "/dev/nvidiactl" "--device" "/dev/nvidia0"
     "--device" "/dev/nvidia-uvm" "--device" "/dev/nvidia-uvm-tools"
     "-e" "CUDA_PATH=${hostPath}/env"
@@ -120,7 +126,18 @@ let
   conf = pkgs.writeText "gensokyo-agent.json" (builtins.toJSON {
     podman = "${pkgs.podman}/bin/podman";
     defaultCmd = "claude --dangerously-skip-permissions";
-    inherit rootfs runArgs token home;
+    inherit token;
+    # plain gensokyo-agent: the nix flavor on the current directory
+    hereArgs = [ "--rm" "--log-driver" "none" ] ++ nixArgs ++ glArgs ++ lib.optionals cudaSupport cudaArgs;
+    # a flavor is the head of a Containerfile, files for /, and podman run arguments
+    flavors.nix = {
+      containerfile = "FROM scratch\n";
+      root = rootfs;
+      user = "${uid}:${gid}";
+      inherit home;
+      runArgs = nixArgs;
+      gpuArgs = glArgs ++ cudaArgs;   # --gpu asks; whether the host has one is its business
+    };
   });
 
   wrapper = pkgs.writers.writePython3Bin "gensokyo-agent" { flakeIgnore = [ "E501" ]; }
