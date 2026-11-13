@@ -821,8 +821,9 @@
         agent-sandbox = hostPkgs.testers.runNixOSTest {
           name = "agent-sandbox";
           node.pkgsReadOnly = false;
-          nodes.machine = { config, lib, ... }: {
+          nodes.machine = { config, lib, pkgs, ... }: {
             imports = [ ./lib/ci.nix self.nixosModules.agent ];
+            environment.systemPackages = [ pkgs.gitMinimal ];
             gensokyo.ci = true;
             gensokyo-agent = { enable = true; user = "alice"; };
             users.users.alice = { isNormalUser = true; uid = 1000; };
@@ -861,6 +862,22 @@
                 podman = "sudo -u alice env XDG_RUNTIME_DIR=/run/user/1000 podman"
                 machine.succeed(f"{podman} start -a ws1")
                 machine.succeed(f"{podman} rm ws1 ws2")
+
+            with subtest("a fetch wakes a stopped workspace, and leaves it stopped"):
+                def alice(cmd):
+                    return ("sudo -u alice env HOME=/home/alice XDG_RUNTIME_DIR=/run/user/1000"
+                            f" sh -c 'cd /home/alice/w && {cmd}' 2>&1")
+                machine.succeed(alice("git init -q -b master . && git -c user.name=a -c user.email=a@b commit -q --allow-empty -m base"))
+                # the second start (the fetch's) only waits to be asked
+                machine.succeed(agent(
+                    "--name ws3 --git .:: -- sh -c"
+                    " \"test -e \\$HOME/done && exec sleep 600; touch \\$HOME/done; git -C src/w commit -q --allow-empty -m agent\""))
+                running = podman + " container inspect -f {{.State.Running}} ws3"
+                assert "false" in machine.succeed(running)
+                machine.succeed(alice("git fetch ws3"))
+                assert "agent" in machine.succeed(alice("git log -1 --format=%s ws3/ws3"))
+                assert "false" in machine.succeed(running)
+                machine.succeed(f"{podman} rm ws3")
           '';
         };
       })

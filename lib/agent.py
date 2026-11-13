@@ -53,7 +53,8 @@ DST is relative to the workspace; DESC ends up in its CLAUDE.md.
 examples:
   gensokyo-agent --git .::
       claude in a workspace, on this checkout cloned to a new branch. the
-      checkout gets a remote of the workspace's name: git fetch NAME
+      checkout gets a remote of the workspace's name: git fetch NAME, which
+      starts the workspace for as long as it takes if it had stopped
   gensokyo-agent --git ~/src/nornpkgs:master:fix-build --prompt "make ci_check pass"
       the branch to start from and the one to make, and what to do there
   gensokyo-agent -c library --gpu --git @.:: --ro ~/datasets/foo:data/foo:"the training set"
@@ -320,12 +321,23 @@ def clone_in(conf, g, work):
             die(f"--git: git {args[0]} failed for {g['top']}")
 
 
+# the remote's command: git-upload-pack or git-receive-pack ($2) in the
+# container $1, which is started for it when it had stopped, and stopped again
+SERVE = """n=$1 s=$2 d=$3; shift 3
+up=$("$@" container inspect -f {{.State.Running}} "$n") || exit
+[ "$up" = true ] || "$@" start "$n" >/dev/null || exit
+"$@" exec -i "$n" "$s" "$d"; r=$?
+[ "$up" = true ] || "$@" stop "$n" >/dev/null
+exit $r"""
+
+
 def add_remote(conf, g, name, podman, workdir):
     """The remote is podman itself, so it is wherever the container is."""
     def esc(word):
         return word.replace("%", "%%").replace(" ", "% ")
     exe = os.environ.get("GENSOKYO_AGENT_PODMAN", "podman")
-    url = "ext::" + " ".join(map(esc, [exe, *podman[1:], "exec", "-i", name])) + " %S " + esc(f"{workdir}/src/{g['repo']}")
+    script = "; ".join(SERVE.splitlines())
+    url = "ext::" + " ".join([*map(esc, ["sh", "-c", script, "sh", name]), "%S", *map(esc, [f"{workdir}/src/{g['repo']}", exe, *podman[1:]])])
     for args in (
         ["remote", "add", name, url],
         # git push NAME master: the agent sees it as owner/master
