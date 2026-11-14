@@ -110,6 +110,7 @@ def write_home(home, workdir):
     with open(os.path.join(home, ".claude.json"), "w") as f:
         json.dump({
             "hasCompletedOnboarding": True,
+            "theme": "auto",
             "projects": {workdir: {"hasTrustDialogAccepted": True}},
         }, f)
     with open(os.path.join(home, ".claude", "settings.json"), "w") as f:
