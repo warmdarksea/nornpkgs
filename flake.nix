@@ -873,7 +873,8 @@
             gensokyo.ci = true;
             gensokyo-agent = { enable = true; user = "alice"; };
             time.timeZone = "Asia/Tokyo";
-            users.users.alice = { isNormalUser = true; uid = 1000; };
+            users.users.alice = { isNormalUser = true; uid = 1000; extraGroups = [ "gadget" ]; };
+            users.groups.gadget = { };   # of a device only its group may write, for -d
             hardware.graphics.enable = true;   # /run/opengl-driver, which --legacy binds
             virtualisation.memorySize = 2048;
             virtualisation.diskSize = 4096;
@@ -912,6 +913,12 @@
                 podman = "sudo -u alice env XDG_RUNTIME_DIR=/run/user/1000 podman"
                 machine.succeed(f"{podman} start -a ws1")
                 machine.succeed(f"{podman} rm ws1 ws2")
+
+            with subtest("a device the owner may use, the agent may"):
+                machine.succeed("mknod -m 660 /dev/gadget c 1 3 && chgrp gadget /dev/gadget")
+                out = machine.succeed(agent(
+                    "--name dev1 -d /dev/gadget --rm -- sh -c \"echo x > /dev/gadget && echo wrote; test -w /dev/kvm && echo kvm\""))
+                assert "wrote\nkvm" in out.replace("\r", ""), out
 
             with subtest("a fetch wakes a stopped workspace, and leaves it stopped"):
                 def alice(cmd):

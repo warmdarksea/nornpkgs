@@ -15,7 +15,7 @@ _gensokyo_agent() {
       return ;;
   esac
   if [[ $cur == -* ]]; then
-    mapfile -t COMPREPLY < <(compgen -W "--legacy --name --flavor --connection --secret --gpu --vm --no-vm --git --cp --ro --rw --bind --prompt --model --effort --publish -L -sp --help" -- "$cur")
+    mapfile -t COMPREPLY < <(compgen -W "--legacy --name --flavor --connection --secret --gpu --vm --no-vm --device --git --cp --ro --rw --bind --prompt --model --effort --publish -L -sp --help" -- "$cur")
   fi
 }
 # paths are the default: most of the other flags start with one

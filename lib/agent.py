@@ -26,6 +26,8 @@ gensokyo-agent --legacy [CMD...]         CMD in a throwaway sandbox on the
   -s, --secret SPEC           as podman run --secret
   --gpu                       the nvidia devices and CUDA
   --vm, --no-vm               /dev/kvm; on in the nix flavor, off in alpine
+  -d, --device SPEC           as podman run --device. the agent has your
+                              groups then, to use it with: /dev/kvm too
   --git [@]PATH[:BASE[:[NEW]]]
                               clone the checkout at PATH into src/, one
                               commit deep (@: all of it), and give PATH a
@@ -209,6 +211,7 @@ def parse_args(argv):
     p.add_argument("-s", "--secret", action="append", default=[])
     p.add_argument("--gpu", action="store_true")
     p.add_argument("--vm", action=argparse.BooleanOptionalAction)
+    p.add_argument("-d", "--device", action="append", default=[])
     p.add_argument("--prompt")
     p.add_argument("--model")
     p.add_argument("--effort")
@@ -507,6 +510,20 @@ def new_workspace(conf, opts, cmd, passthrough):
     for want in ("gpu", "vm"):
         if getattr(opts, want):
             args += flavor[f"{want}Args"]
+    if opts.device:
+        # the host's device, with the host's modes, so the agent needs the
+        # groups of whoever runs this. podman keeps them only when it adds no
+        # other: not the one the flavor gives the agent for /dev/kvm
+        kept, i = [], 0
+        while i < len(args):
+            if args[i] == "--group-add":
+                i += 2
+            else:
+                kept.append(args[i])
+                i += 1
+        args = kept + ["--group-add", "keep-groups"]
+        for spec in opts.device:
+            args += ["--device", spec]
     args += token_args(conf, podman)
     for spec in opts.secret:
         args += ["--secret", spec]

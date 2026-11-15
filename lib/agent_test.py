@@ -232,6 +232,18 @@ class AgentTest(unittest.TestCase):
         self.assertIn("/dev/kvm-alpine", self.new("--flavor", "alpine", "--vm"))
         self.assertNotIn("/dev/gpu", self.new())
 
+    def test_device_with_the_owners_groups(self):
+        self.conf["flavors"]["nix"]["vmArgs"] = ["--group-add", "302", "--device", "/dev/kvm"]
+        run = self.new("--name", "ws12", "-d", "/dev/ttyUSB0", "--device", "/dev/dri/renderD128:/dev/dri/renderD128:rw", "--memory", "4g")
+        self.assertEqual(run[run.index("--group-add"):run.index("--secret")],
+                         ["--group-add", "keep-groups", "--device", "/dev/ttyUSB0", "--device", "/dev/dri/renderD128:/dev/dri/renderD128:rw"])
+        self.assertEqual(run.count("--group-add"), 1)
+        self.assertIn("/dev/kvm", run)
+        self.assertIn("--memory", run)
+        run = self.new("--name", "ws13")
+        self.assertEqual(run[run.index("--group-add"):][:4], ["--group-add", "302", "--device", "/dev/kvm"])
+        self.assertNotIn("keep-groups", run)
+
     def test_git_forms(self):
         top = self.repo()
         git(top, "checkout", "-q", "-b", "topic")
