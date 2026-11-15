@@ -24,13 +24,16 @@
 #                                         stays until podman rm. the checkout gets a remote to fetch
 #                                         its commits from. -c NAME puts it all on another host
 #                                         (podman system connection add)
+#   gensokyo-agent --closure .#NAME --git .::
+#                                         with the packages and MCP servers of this flake's
+#                                         agentClosures.<system>.NAME (lib/agent-closure.nix)
 #   gensokyo-agent -- codex               another agent in it
 #   gensokyo-agent --legacy               claude in a throwaway sandbox on the current directory
 #   gensokyo-agent --legacy codex         any command there
 #   AGENT_CMD="opencode" gensokyo-agent   change the default
 #
-# MCP servers are the agent's own: the workspace's .mcp.json, which it may edit with the owner's
-# approval. a server is the project's to package (nix run, the sandbox has the daemon), not the module's
+# MCP servers: those of the closure, declared by the project, which packages them; and the
+# workspace's .mcp.json, which the agent may edit with the owner's approval. none in the module
 { config, pkgs, lib, ... }:
 let
   cfg = config.gensokyo-agent;
@@ -65,6 +68,9 @@ let
   # passes to podman, and nothing in the rootfs, names a store path, so a
   # sandbox started from another machine gets this host's tools
   hostPath = "/etc/gensokyo-agent";
+  # where a sandbox has its closure (lib/agent-closure.nix): the default one
+  # of ${hostPath}, or one built from a flake with --closure
+  closurePath = "/.gensokyo-agent/closure";
   hostDir = pkgs.linkFarm "gensokyo-agent-host" ({
     inherit env;
     nixpkgs = pkgs.path;
@@ -74,6 +80,8 @@ let
     zoneinfo = "${pkgs.tzdata}/share/zoneinfo";
     # this host's zone; one set by hand (timedatectl, time.timeZone = null) is not followed
     localtime = "${pkgs.tzdata}/share/zoneinfo/${if config.time.timeZone == null then "UTC" else config.time.timeZone}";
+    # the closure of a sandbox without --closure
+    closure = import ./agent-closure.nix pkgs { name = "gensokyo-agent-closure"; };
   } // lib.optionalAttrs cudaSupport {
     cc = cuda.backendStdenv.cc;
   });
@@ -132,7 +140,7 @@ let
     # may ask for 10 at most; a host evaluation or a build takes more
     "-e" "BASH_DEFAULT_TIMEOUT_MS=600000"
     "-e" "BASH_MAX_TIMEOUT_MS=3600000"
-    "-e" "PATH=${hostPath}/env/bin"
+    "-e" "PATH=${closurePath}/bin:${hostPath}/env/bin"
     "-e" "NIX_PATH=nixpkgs=${hostPath}/nixpkgs"
     "-e" "SSL_CERT_FILE=${hostPath}/ca-bundle.crt"
     # where glibc looks up the zone of a TZ; nixpkgs' has no zones of its own
@@ -158,9 +166,13 @@ let
     defaultCmd = "claude --dangerously-skip-permissions --allowedTools Edit,MultiEdit,Write,NotebookEdit,Bash,WebSearch,WebFetch";
     inherit token;
     git = "${pkgs.gitMinimal}/bin/git";
+    nix = "${config.nix.package}/bin/nix";
+    system = pkgs.stdenv.hostPlatform.system;
+    closure = { at = closurePath; default = "${hostPath}/closure"; };
     ssh = "${pkgs.openssh}/bin/ssh";
     # gensokyo-agent --legacy: the same sandbox on the current directory
-    hereArgs = [ "--rm" "--log-driver" "none" ] ++ nixArgs ++ vmArgs ++ glArgs ++ lib.optionals cudaSupport cudaArgs;
+    hereArgs = [ "--rm" "--log-driver" "none" "-v" "${hostPath}/closure:${closurePath}:ro" ]
+      ++ nixArgs ++ vmArgs ++ glArgs ++ lib.optionals cudaSupport cudaArgs;
     # a workspace: an image of these files for / and the home, run with these arguments
     root = rootfs;
     user = "${uid}:${gid}";

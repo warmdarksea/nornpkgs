@@ -29,6 +29,18 @@ if "build" in args:
     shutil.move(os.path.join(out, "ctx", "Containerfile"), os.path.join(out, "Containerfile"))
 """
 
+# a nix whose build links the out-link to $STUB_CLOSURE
+NIX = """#!{python}
+import json, os, sys
+args = sys.argv[1:]
+with open(os.path.join(os.environ["STUB_OUT"], "nix"), "a") as f:
+    f.write(json.dumps(args) + "\\n")
+if not os.path.isdir(os.environ["STUB_CLOSURE"]):
+    sys.exit(1)
+os.symlink(os.environ["STUB_CLOSURE"], args[args.index("--out-link") + 1])
+"""
+MCP = "--mcp-config /.gensokyo-agent/closure/share/gensokyo-agent/mcp.json"
+
 
 @contextlib.contextmanager
 def quiet():
@@ -51,12 +63,19 @@ class AgentTest(unittest.TestCase):
         os.chmod(podman, 0o755)
         ssh = os.path.join(self.tmp, "ssh")
         shutil.copy(podman, ssh)
+        nix = os.path.join(self.tmp, "nix")
+        with open(nix, "w") as f:
+            f.write(NIX.format(python=sys.executable))
+        os.chmod(nix, 0o755)
         root = os.path.join(self.tmp, "rootfs")
         os.makedirs(os.path.join(root, "home", "agent"))
         self.conf = {
             "podman": podman,
             "git": "git",
             "ssh": ssh,
+            "nix": nix,
+            "system": "x86_64-linux",
+            "closure": {"at": "/.gensokyo-agent/closure", "default": "/etc/gensokyo-agent/closure"},
             "defaultCmd": "claude --dangerously-skip-permissions",
             "token": {"secret": "claude-oauth-token", "target": "CLAUDE_CODE_OAUTH_TOKEN"},
             "hereArgs": ["--rm"],
@@ -123,8 +142,8 @@ class AgentTest(unittest.TestCase):
         self.new("--name", "ws7", "--model", "some-new-model[1m]", "--effort", "xhigh", "--prompt", "go")
         with open(os.path.join(self.out, "ctx", "root", ".gensokyo-agent", "entrypoint")) as f:
             entry = f.read()
-        self.assertIn("--model 'some-new-model[1m]' --effort xhigh -- go\n", entry)
-        self.assertIn("--model 'some-new-model[1m]' --effort xhigh --continue && exit\n", entry)
+        self.assertIn(f"--model 'some-new-model[1m]' --effort xhigh {MCP} -- go\n", entry)
+        self.assertIn(f"--model 'some-new-model[1m]' --effort xhigh {MCP} --continue && exit\n", entry)
         self.new("--name", "ws8")
         with open(os.path.join(self.out, "ctx", "root", ".gensokyo-agent", "entrypoint")) as f:
             self.assertNotIn("--model", f.read())
@@ -171,7 +190,7 @@ class AgentTest(unittest.TestCase):
         self.assertEqual([decision(t) for t in ("Read", "Bash", "mcp__lean__goal", "mcp__claude_ai_Gmail__send")],
                          ["allow", "allow", "allow", "deny"])
         with open(os.path.join(ctx, "root", ".gensokyo-agent", "entrypoint")) as f:
-            self.assertIn('exec claude --dangerously-skip-permissions -- go\n', f.read())
+            self.assertIn(f'exec claude --dangerously-skip-permissions {MCP} -- go\n', f.read())
         with open(os.path.join(ctx, "work", "CLAUDE.md")) as f:
             md = f.read()
         for line in ("`notes/a`, a copy: a note", "`sets/d`, a read-only volume", "`scratch`, a volume", "`live`, the owner's own"):
@@ -205,6 +224,46 @@ class AgentTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "work", ".mcp.json")))
         self.assertNotIn("MCP", self.staged("work", "CLAUDE.md"))
         self.assertNotIn("mcp", self.staged("root", ".gensokyo-agent", "entrypoint"))
+
+    def test_closure_is_built_and_rooted(self):
+        state = os.path.join(self.tmp, "state")
+        closure = os.path.join(self.tmp, "closure")
+        os.makedirs(os.path.join(closure, "share", "gensokyo-agent"))
+        with open(os.path.join(closure, "share", "gensokyo-agent", "mcp.json"), "w") as f:
+            json.dump({"mcpServers": {"lean": {"command": "/nix/store/x/bin/lean-mcp"}}}, f)
+        self.enterContext(mock.patch.dict(os.environ, {"XDG_STATE_HOME": state, "STUB_CLOSURE": closure}))
+        # the root of a workspace that is gone, and of one that may be on its way
+        for old in ("gone", "new"):
+            os.makedirs(os.path.join(state, "gensokyo-agent", old))
+        os.utime(os.path.join(state, "gensokyo-agent", "gone"), (0, 0))
+        flake = os.path.join(self.tmp, "flake")
+        os.mkdir(flake)
+        self.enterContext(contextlib.chdir(flake))
+        run = self.new("--name", "ws14", "--closure", ".#lean")
+        with open(os.path.join(self.out, "nix")) as f:
+            self.assertEqual(json.loads(f.read())[-3:], [
+                "--out-link", os.path.join(state, "gensokyo-agent", "ws14", "closure"),
+                f"{flake}#agentClosures.x86_64-linux.lean"])
+        self.assertEqual(sorted(os.listdir(os.path.join(state, "gensokyo-agent"))), ["new", "ws14"])
+        self.assertIn(f"{closure}:/.gensokyo-agent/closure:ro", run)
+        self.assertNotIn("/etc/gensokyo-agent/closure:/.gensokyo-agent/closure:ro", run)
+        md = self.staged("work", "CLAUDE.md")
+        self.assertIn("`lean`: the owner's, from the closure", md)
+        self.assertIn("built by the owner from `.#lean`", md)
+
+        # a flake by registry name stays one; #default when no name is given
+        self.new("--name", "ws15", "--closure", "nixpkgs")
+        with open(os.path.join(self.out, "nix")) as f:
+            self.assertEqual(f.read().splitlines()[-1].split(", ")[-1], '"nixpkgs#agentClosures.x86_64-linux.default"]')
+
+        self.dies("--closure", ".", "-c", "library")
+        os.environ["STUB_CLOSURE"] = os.path.join(self.tmp, "missing")
+        self.dies("--name", "ws16", "--closure", ".")
+        # a store path that is not a closure of mkAgentClosure
+        os.environ["STUB_CLOSURE"] = os.path.join(self.tmp, "bare")
+        os.mkdir(os.environ["STUB_CLOSURE"])
+        self.dies("--name", "ws17", "--closure", ".")
+        self.assertFalse(os.path.exists(os.path.join(state, "gensokyo-agent", "ws17")))
 
     def test_connection_reaches_every_podman_call(self):
         run = self.new("--name", "ws2", "-c", "library")
@@ -245,6 +304,7 @@ class AgentTest(unittest.TestCase):
     def test_devices_are_asked_for(self):
         self.assertNotIn("/dev/kvm", self.new("--no-vm"))
         self.assertIn("/dev/kvm", self.new())
+        self.assertIn("/etc/gensokyo-agent/closure:/.gensokyo-agent/closure:ro", self.new())
         self.assertNotIn("/dev/gpu", self.new())
 
     def test_device_with_the_owners_groups(self):

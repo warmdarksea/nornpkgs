@@ -194,6 +194,12 @@
     lib.mkJupyter = { pkgs, ... }@args:
       (import lib/jupyter.nix pkgs).mkJupyter (removeAttrs args [ "pkgs" ]);
 
+    # What gensokyo-agent --closure FLAKE#NAME puts in a sandbox, exported by a
+    # project as agentClosures.<system>.NAME: packages and MCP servers.
+    # Example at the top of lib/agent-closure.nix.
+    lib.mkAgentClosure = { pkgs, ... }@args:
+      import lib/agent-closure.nix pkgs (removeAttrs args [ "pkgs" ]);
+
     # nix modules
 
     # lib/base.nix plus the CI flag: gensokyo-private's `ci` branch exports
@@ -853,7 +859,30 @@
       };
     in lib.mapAttrs (hostSystem: names:
       lib.genAttrs' names (name: lib.nameValuePair "boot-${name}" (bootTest nixpkgs.legacyPackages.${hostSystem} name))
-      // (let hostPkgs = nixpkgs.legacyPackages.${hostSystem}; in {
+      // (let
+        hostPkgs = nixpkgs.legacyPackages.${hostSystem};
+        # a project's flake with a closure for --closure. the VM has no network:
+        # it builds what is built here already, from the same nixpkgs
+        fakeClosure = pkgs: import ./lib/agent-closure.nix pkgs {
+          packages = [ (pkgs.writeShellScriptBin "fake-mcp" "echo fake") ];
+          mcpServers.fake.command = "fake-mcp";
+        };
+        agentFlake = hostPkgs.runCommand "agent-flake" { } ''
+          mkdir $out
+          cp ${./lib/agent-closure.nix} $out/agent-closure.nix
+          cat > $out/flake.nix <<'EOF'
+          {
+            inputs.nixpkgs.url = "path:${hostPkgs.path}";
+            outputs = { nixpkgs, ... }: let pkgs = nixpkgs.legacyPackages.${hostSystem}; in {
+              agentClosures.${hostSystem}.fake = import ./agent-closure.nix pkgs {
+                packages = [ (pkgs.writeShellScriptBin "fake-mcp" "echo fake") ];
+                mcpServers.fake.command = "fake-mcp";
+              };
+            };
+          }
+          EOF
+        '';
+      in {
         # lib/agent.py up to the podman run it would exec: flags, the staged
         # workspace, the clone and the remote, against a podman that only records
         agent-cli = hostPkgs.runCommand "agent-cli-test" { nativeBuildInputs = [ hostPkgs.python3 hostPkgs.gitMinimal ]; } ''
@@ -878,6 +907,7 @@
             hardware.graphics.enable = true;   # /run/opengl-driver, which --legacy binds
             virtualisation.memorySize = 2048;
             virtualisation.diskSize = 4096;
+            virtualisation.additionalPaths = [ hostPkgs.path (fakeClosure hostPkgs) ];
             system.stateVersion = lib.mkDefault config.system.nixos.release;
           };
           testScript = ''
@@ -919,6 +949,21 @@
                 out = machine.succeed(agent(
                     "--name dev1 -d /dev/gadget --rm -- sh -c \"echo x > /dev/gadget && echo wrote; test -w /dev/kvm && echo kvm\""))
                 assert "wrote\nkvm" in out.replace("\r", ""), out
+
+            with subtest("a closure from a flake, built before the workspace"):
+                machine.succeed("cp -r ${agentFlake} /home/alice/proj && chmod -R u+w /home/alice/proj && chown -R alice /home/alice/proj")
+                out = machine.succeed(agent(
+                    "--name cl1 --closure /home/alice/proj#fake -- sh -c"
+                    " \"fake-mcp; cat /.gensokyo-agent/closure/share/gensokyo-agent/mcp.json; grep -q built.by.the.owner CLAUDE.md && echo noted\""))
+                assert "fake\n{\"mcpServers\":{\"fake\":{\"command\":\"fake-mcp\"}}}noted" in out.replace("\r", ""), out
+                # rooted for as long as the workspace is there
+                root = "/home/alice/.local/state/gensokyo-agent/cl1/closure"
+                machine.succeed(f"test $(readlink {root}) = ${fakeClosure hostPkgs}")
+                machine.succeed(f"nix-store --gc --print-roots | grep -F {root}")
+                # without --closure, the module's own, which has no servers
+                out = machine.succeed(agent("--name cl2 -- cat /.gensokyo-agent/closure/share/gensokyo-agent/mcp.json"))
+                assert '{"mcpServers":{}}' in out, out
+                machine.succeed(f"{podman} rm cl1 cl2")
 
             with subtest("a fetch wakes a stopped workspace, and leaves it stopped"):
                 def alice(cmd):

@@ -9,6 +9,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.parse
 
 USAGE = """\
@@ -25,6 +26,9 @@ gensokyo-agent --legacy [CMD...]         CMD in a throwaway sandbox on the
   --vm, --no-vm               /dev/kvm, on by default
   -d, --device SPEC           as podman run --device. the agent has your
                               groups then, to use it with: /dev/kvm too
+  --closure FLAKE[#NAME]      build the flake's agentClosures.<system>.NAME
+                              (default: default) here, and give the agent
+                              its packages and MCP servers. local only
   --git [@]PATH[:BASE[:[NEW]]]
                               clone the checkout at PATH into src/, one
                               commit deep (@: all of it), and give PATH a
@@ -61,6 +65,9 @@ examples:
       history, and a directory of this machine as a read-only volume there
   gensokyo-agent -c library -sp 8800 --git .::
       what the agent serves on 0.0.0.0:8800 answers on localhost:8800 here
+  gensokyo-agent --closure .#lean --git .::
+      with the packages and MCP servers of this flake's closure lean, made
+      with nornpkgs.lib.mkAgentClosure
   gensokyo-agent -s openai-api-key,type=env,target=OPENAI_API_KEY -- codex
       another agent, and a secret of its own
   gensokyo-agent --legacy
@@ -216,6 +223,7 @@ def parse_args(argv):
     p.add_argument("--gpu", action="store_true")
     p.add_argument("--vm", action=argparse.BooleanOptionalAction)
     p.add_argument("-d", "--device", action="append", default=[])
+    p.add_argument("--closure")
     p.add_argument("--prompt")
     p.add_argument("--model")
     p.add_argument("--effort")
@@ -391,6 +399,40 @@ def ssh_target(conf, connection):
     die(f"-L: no podman connection {connection}")
 
 
+def state_dir():
+    return os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "gensokyo-agent")
+
+
+def build_closure(conf, spec, name, call, taken):
+    """Build what --closure names, for the workspace NAME, rooted for as long
+    as the workspace is there; its store path and its MCP servers."""
+    ref, _, attr = spec.partition("#")
+    if os.path.isdir(os.path.expanduser(ref or ".")):
+        ref = os.path.abspath(os.path.expanduser(ref or "."))
+    attr = f"agentClosures.{conf['system']}.{attr or 'default'}"
+    roots = state_dir()
+    # the roots of workspaces that are gone; an hour, as one may be assembled still
+    for old in os.listdir(roots) if os.path.isdir(roots) else []:
+        path = os.path.join(roots, old)
+        if time.time() - os.lstat(path).st_mtime > 3600 and not taken(old):
+            shutil.rmtree(path, ignore_errors=True)
+    os.makedirs(os.path.join(roots, name), exist_ok=True)
+    link = os.path.join(roots, name, "closure")
+    if call([conf["nix"], "--extra-experimental-features", "nix-command flakes",
+             "build", "--out-link", link, f"{ref}#{attr}"]) != 0:
+        die(f"--closure {spec}: nix build {ref}#{attr} failed")
+    closure = os.path.realpath(link)
+    try:
+        with open(os.path.join(closure, "share", "gensokyo-agent", "mcp.json")) as f:
+            servers = json.load(f)["mcpServers"]
+        if not isinstance(servers, dict):
+            raise TypeError
+    except (OSError, ValueError, LookupError, TypeError):
+        shutil.rmtree(os.path.join(roots, name))
+        die(f"--closure {spec}: no share/gensokyo-agent/mcp.json in {closure}, not a closure of nornpkgs.lib.mkAgentClosure")
+    return closure, list(servers)
+
+
 def new_workspace(conf, opts, cmd, passthrough):
     podman = [conf["podman"]] + (["-c", opts.connection] if opts.connection else [])
     debug = os.environ.get("DEBUG", "0") == "1"
@@ -415,6 +457,8 @@ def new_workspace(conf, opts, cmd, passthrough):
             opts.tunnel.append(f"{port}:127.0.0.1:{port}")
     if opts.tunnel and not opts.connection:
         die("-L: without -c the workspace is on this machine, -p is all it takes")
+    if opts.closure and opts.connection:
+        die("--closure: the closure is built here, for a workspace here")
     target = ssh_target(conf, opts.connection) if opts.tunnel else None
 
     name = opts.name
@@ -436,6 +480,11 @@ def new_workspace(conf, opts, cmd, passthrough):
     for flag in ("model", "effort"):
         if getattr(opts, flag):
             cmd += [f"--{flag}", getattr(opts, flag)]
+    if claude:
+        cmd += ["--mcp-config", f"{conf['closure']['at']}/share/gensokyo-agent/mcp.json"]
+    closure, servers = conf["closure"]["default"], []
+    if opts.closure:
+        closure, servers = build_closure(conf, opts.closure, name, call, taken)
 
     # the workspace has one path, here while it is assembled and in the
     # container afterwards. not under /tmp, that is a tmpfs in the sandbox
@@ -457,7 +506,7 @@ def new_workspace(conf, opts, cmd, passthrough):
         write_home(os.path.join(ctx, "home"), workdir)
 
         mounts = []
-        notes = {"repositories": [], "files": [], "MCP servers": []}
+        notes = {"repositories": [], "files": [], "closure": [], "MCP servers": []}
         for g in repos:
             clone_in(conf, g, work)
             notes["repositories"].append(
@@ -491,10 +540,16 @@ def new_workspace(conf, opts, cmd, passthrough):
             if not os.path.lexists(os.path.join(work, ".mcp.json")):
                 with open(os.path.join(work, ".mcp.json"), "w") as f:
                     f.write('{"mcpServers": {}}\n')
+            if servers:
+                notes["MCP servers"].append(f"{', '.join(f'`{n}`' for n in servers)}: the owner's, from the closure")
             notes["MCP servers"].append(
                 "`.mcp.json` here is yours to fill in; claude reads it when it starts. Your edits of it"
                 " are the owner's to approve, and count once they restart you. A server runs in this"
                 " directory: one of a checkout `cd`s there in its command")
+        if opts.closure:
+            notes["closure"].append(
+                f"`{conf['closure']['at']}`, built by the owner from `{opts.closure}`: its `bin` is first on your PATH."
+                " A change to it takes a new workspace")
         with open(os.path.join(root, ".gensokyo-agent", "entrypoint"), "w") as f:
             f.write(entrypoint(cmd, opts.prompt))
             os.fchmod(f.fileno(), 0o755)
@@ -521,6 +576,7 @@ def new_workspace(conf, opts, cmd, passthrough):
 
     args = ["--name", name, "--label", f"gensokyo-agent={name}", "--log-driver", "none", "-w", workdir]
     args += conf["runArgs"]
+    args += ["-v", f"{closure}:{conf['closure']['at']}:ro"]
     for want in ("gpu", "vm"):
         if getattr(opts, want):
             args += conf[f"{want}Args"]
@@ -555,6 +611,8 @@ def new_workspace(conf, opts, cmd, passthrough):
     for g in repos:
         say(f"  its work, while it runs: git -C {g['top']} fetch {name}")
     say(f"  remove: {pm} rm {name} && {pm} rmi {image}")
+    if opts.closure:
+        say(f"  its closure is kept until a later --closure finds it gone, or: rm -r {os.path.join(state_dir(), name)}")
     if opts.tunnel:
         runtime = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "gensokyo-agent")
         os.makedirs(runtime, exist_ok=True)
