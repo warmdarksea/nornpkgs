@@ -68,6 +68,7 @@ let
     "ca-bundle.crt" = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
     "nix.conf" = config.environment.etc."nix/nix.conf".source;
     "registry.json" = config.environment.etc."nix/registry.json".source;
+    zoneinfo = "${pkgs.tzdata}/share/zoneinfo";
   } // lib.optionalAttrs cudaSupport {
     cc = cuda.backendStdenv.cc;
   });
@@ -85,6 +86,10 @@ let
     ln -s ${hostPath}/nix.conf ${hostPath}/registry.json $out/etc/nix/
     ln -s ${hostPath}/env/bin/sh $out/bin/sh
     ln -s ${hostPath}/env/bin/env $out/usr/bin/env
+    # UTC, as the clock was without the file; but lean's server, for one,
+    # does not start without it. /etc/zoneinfo is where NixOS keeps the rest
+    ln -s ${hostPath}/zoneinfo/UTC $out/etc/localtime
+    ln -s ${hostPath}/zoneinfo $out/etc/zoneinfo
     printf "[user]\n\tname = Claude\n\temail = claude@anthropic.com\n" > $out/etc/gitconfig
   '';
 
@@ -123,6 +128,8 @@ let
     "-e" "PATH=${hostPath}/env/bin"
     "-e" "NIX_PATH=nixpkgs=${hostPath}/nixpkgs"
     "-e" "SSL_CERT_FILE=${hostPath}/ca-bundle.crt"
+    # where glibc looks up the zone of a TZ; nixpkgs' has no zones of its own
+    "-e" "TZDIR=${hostPath}/zoneinfo"
   ];
   vmArgs = [ "--group-add" kvm "--device" "/dev/kvm" ];
   glArgs = [
@@ -163,9 +170,10 @@ let
     flavors.alpine = {
       containerfile = ''
         FROM docker.io/library/alpine:3
-        RUN apk add --no-cache bash bubblewrap ca-certificates coreutils curl file findutils gawk git grep jq less libgcc libstdc++ nodejs npm openssh-client procps ripgrep sed socat tree \
+        RUN apk add --no-cache bash bubblewrap ca-certificates coreutils curl file findutils gawk git grep jq less libgcc libstdc++ nodejs npm openssh-client procps ripgrep sed socat tree tzdata \
          && npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
-         && git config --system user.name Claude && git config --system user.email claude@anthropic.com
+         && git config --system user.name Claude && git config --system user.email claude@anthropic.com \
+         && ln -sf /usr/share/zoneinfo/UTC /etc/localtime
         ENV IS_SANDBOX=1 USE_BUILTIN_RIPGREP=0 CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 BASH_DEFAULT_TIMEOUT_MS=600000 BASH_MAX_TIMEOUT_MS=3600000
       '';
       root = null;
