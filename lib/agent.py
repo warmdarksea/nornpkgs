@@ -248,9 +248,12 @@ def copy_in(src, work, dst):
 def entrypoint(cmd, prompt):
     """The container's command: the agent on the first start, the same
     session again on any later one (podman start -ai)."""
-    first = shlex.join(cmd + ([prompt] if prompt else []))
+    claude = os.path.basename(cmd[0]) == "claude"
+    # claude's list flags (--allowedTools, --mcp-config) take every word up
+    # to the next flag, a prompt that follows them included
+    first = shlex.join(cmd + ((["--"] if claude else []) + [prompt] if prompt else []))
     again = f"exec {shlex.join(cmd)}"
-    if os.path.basename(cmd[0]) == "claude":
+    if claude:
         again = f"{shlex.join(cmd)} --continue && exit\n  {again}"
     return f"""#!/bin/sh
 if [ -e "$HOME/.gensokyo-agent-started" ]; then

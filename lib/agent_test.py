@@ -126,7 +126,7 @@ class AgentTest(unittest.TestCase):
         self.new("--name", "ws7", "--model", "some-new-model[1m]", "--effort", "xhigh", "--prompt", "go")
         with open(os.path.join(self.out, "ctx", "root", ".gensokyo-agent", "entrypoint")) as f:
             entry = f.read()
-        self.assertIn("--model 'some-new-model[1m]' --effort xhigh go\n", entry)
+        self.assertIn("--model 'some-new-model[1m]' --effort xhigh -- go\n", entry)
         self.assertIn("--model 'some-new-model[1m]' --effort xhigh --continue && exit\n", entry)
         self.new("--name", "ws8")
         with open(os.path.join(self.out, "ctx", "root", ".gensokyo-agent", "entrypoint")) as f:
@@ -136,8 +136,10 @@ class AgentTest(unittest.TestCase):
     def test_entrypoint_resumes_claude_only(self):
         claude = agent.entrypoint(["claude", "--x"], "it's time")
         self.assertIn("claude --x --continue && exit", claude)
-        self.assertIn("exec claude --x 'it'\"'\"'s time'", claude)
+        # a list flag of claude's would take the prompt for one more of its words
+        self.assertIn("exec claude --x -- 'it'\"'\"'s time'", claude)
         self.assertNotIn("--continue", agent.entrypoint(["codex"], None))
+        self.assertIn("exec codex go\n", agent.entrypoint(["codex"], "go"))
 
     def test_workspace(self):
         data = os.path.join(self.tmp, "data")
@@ -162,7 +164,7 @@ class AgentTest(unittest.TestCase):
         with open(os.path.join(ctx, "home", ".claude.json")) as f:
             self.assertTrue(json.load(f)["projects"][work]["hasTrustDialogAccepted"])
         with open(os.path.join(ctx, "root", ".gensokyo-agent", "entrypoint")) as f:
-            self.assertIn("exec claude --dangerously-skip-permissions go\n", f.read())
+            self.assertIn("exec claude --dangerously-skip-permissions -- go\n", f.read())
         with open(os.path.join(ctx, "work", "CLAUDE.md")) as f:
             md = f.read()
         for line in ("`notes/a`, a copy: a note", "`sets/d`, a read-only volume", "`scratch`, a volume", "`live`, the owner's own"):
