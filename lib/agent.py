@@ -19,13 +19,10 @@ gensokyo-agent [FLAG...] [-- CMD...]     CMD (default: claude) in a workspace: a
 gensokyo-agent --legacy [CMD...]         CMD in a throwaway sandbox on the
                                          current directory
   --name NAME                container and image name (default: generated)
-  --flavor nix|alpine         nix (default): this host's store and nix daemon,
-                              on hosts with the gensokyo-agent module.
-                              alpine: a stock image, root, any podman host
   -c, --connection NAME       podman connection to build and run on
   -s, --secret SPEC           as podman run --secret
   --gpu                       the nvidia devices and CUDA
-  --vm, --no-vm               /dev/kvm; on in the nix flavor, off in alpine
+  --vm, --no-vm               /dev/kvm, on by default
   -d, --device SPEC           as podman run --device. the agent has your
                               groups then, to use it with: /dev/kvm too
   --git [@]PATH[:BASE[:[NEW]]]
@@ -64,8 +61,8 @@ examples:
       history, and a directory of this machine as a read-only volume there
   gensokyo-agent -c library -sp 8800 --git .::
       what the agent serves on 0.0.0.0:8800 answers on localhost:8800 here
-  gensokyo-agent --flavor alpine -s openai-api-key,type=env,target=OPENAI_API_KEY -- codex
-      another agent, a secret of its own, on a host without the module
+  gensokyo-agent -s openai-api-key,type=env,target=OPENAI_API_KEY -- codex
+      another agent, and a secret of its own
   gensokyo-agent --legacy
       claude on the current directory, gone when it exits
 
@@ -170,7 +167,6 @@ def run_here(conf, cmd):
     debug = os.environ.get("DEBUG", "0") == "1"
     cmd = cmd or os.environ.get("AGENT_CMD", conf["defaultCmd"]).split()
     cwd = os.getcwd()
-    nix = conf["flavors"]["nix"]
 
     # rootless podman can't write into a root-owned store path (unmapped uid,
     # no DAC override in the userns), so stage the skeleton somewhere we own
@@ -178,13 +174,13 @@ def run_here(conf, cmd):
     os.makedirs(base, exist_ok=True)
     root = tempfile.mkdtemp(prefix="root.", dir=base)
     try:
-        copy_writable(nix["root"], root)
+        copy_writable(conf["root"], root)
         os.chmod(root, 0o755)  # mkdtemp gives 0700; / must be traversable by the agent uid
-        home = root + nix["home"]
+        home = root + conf["home"]
         write_home(home, cwd)
 
         args = conf["hereArgs"] + [
-            "-v", f"{home}:{nix['home']}:U",  # ours on the host, the agent's inside
+            "-v", f"{home}:{conf['home']}:U",  # ours on the host, the agent's inside
             "-v", f"{cwd}:{cwd}", "-w", cwd,
         ]
         args += token_args(conf, podman)
@@ -215,7 +211,6 @@ def parse_args(argv):
         return None, argv[1:], []
     p = argparse.ArgumentParser(prog="gensokyo-agent", usage=USAGE, add_help=False, allow_abbrev=False)
     p.add_argument("--name")
-    p.add_argument("--flavor", default="nix")
     p.add_argument("-c", "--connection")
     p.add_argument("-s", "--secret", action="append", default=[])
     p.add_argument("--gpu", action="store_true")
@@ -408,11 +403,8 @@ def new_workspace(conf, opts, cmd, passthrough):
     def taken(n):
         return call([*podman, "container", "exists", n]) == 0
 
-    flavor = conf["flavors"].get(opts.flavor) or die(f"--flavor is one of: {' '.join(conf['flavors'])}")
-    if opts.gpu and flavor["gpuArgs"] is None:
-        die(f"--gpu: not in the {opts.flavor} flavor")
     if opts.vm is None:
-        opts.vm = flavor["vm"]
+        opts.vm = True
     if opts.bind and opts.connection:
         die("--bind: a path of this machine cannot be bound on another")
     for port in opts.port:
@@ -458,10 +450,9 @@ def new_workspace(conf, opts, cmd, passthrough):
     try:
         os.mkdir(work)
         root = os.path.join(ctx, "root")
-        if flavor["root"]:
-            copy_writable(flavor["root"], root)
-            # COPY --chown makes the home the agent's only if it makes it
-            shutil.rmtree(root + flavor["home"], ignore_errors=True)
+        copy_writable(conf["root"], root)
+        # COPY --chown makes the home the agent's only if it makes it
+        shutil.rmtree(root + conf["home"], ignore_errors=True)
         os.makedirs(os.path.join(root, ".gensokyo-agent"), exist_ok=True)
         write_home(os.path.join(ctx, "home"), workdir)
 
@@ -510,10 +501,11 @@ def new_workspace(conf, opts, cmd, passthrough):
         with open(os.path.join(work, "CLAUDE.md"), "a") as f:
             f.write(claude_md(name, notes))
 
-        user = flavor["user"]
-        containerfile = flavor["containerfile"] + "".join([
+        user = conf["user"]
+        containerfile = "".join([
+            "FROM scratch\n",
             "COPY root/ /\n",
-            f"COPY --chown={user} home/ {flavor['home']}/\n",
+            f"COPY --chown={user} home/ {conf['home']}/\n",
             f"COPY --chown={user} work/ {workdir}/\n",
         ])
         image = f"localhost/gensokyo-agent/{name}"
@@ -528,14 +520,14 @@ def new_workspace(conf, opts, cmd, passthrough):
         add_remote(conf, g, name, podman, workdir)
 
     args = ["--name", name, "--label", f"gensokyo-agent={name}", "--log-driver", "none", "-w", workdir]
-    args += flavor["runArgs"]
+    args += conf["runArgs"]
     for want in ("gpu", "vm"):
         if getattr(opts, want):
-            args += flavor[f"{want}Args"]
+            args += conf[f"{want}Args"]
     if opts.device:
         # the host's device, with the host's modes, so the agent needs the
         # groups of whoever runs this. podman keeps them only when it adds no
-        # other: not the one the flavor gives the agent for /dev/kvm
+        # other: not the one the agent has for /dev/kvm
         kept, i = [], 0
         while i < len(args):
             if args[i] == "--group-add":
@@ -557,7 +549,7 @@ def new_workspace(conf, opts, cmd, passthrough):
     argv = [*podman, "run", *args, *passthrough, image, "/.gensokyo-agent/entrypoint"]
 
     pm = shlex.join(["podman"] + podman[1:])
-    say(f"workspace {name} ({opts.flavor}) at {workdir}")
+    say(f"workspace {name} at {workdir}")
     say(f"  leave with ctrl-p ctrl-q, return with: {pm} attach {name}")
     say(f"  once it has stopped: {pm} start -ai {name}")
     for g in repos:

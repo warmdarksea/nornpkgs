@@ -159,40 +159,17 @@ let
     inherit token;
     git = "${pkgs.gitMinimal}/bin/git";
     ssh = "${pkgs.openssh}/bin/ssh";
-    # plain gensokyo-agent: the nix flavor on the current directory
+    # gensokyo-agent --legacy: the same sandbox on the current directory
     hereArgs = [ "--rm" "--log-driver" "none" ] ++ nixArgs ++ vmArgs ++ glArgs ++ lib.optionals cudaSupport cudaArgs;
-    # a flavor is the head of a Containerfile, files for /, and podman run arguments
-    flavors.nix = {
-      containerfile = "FROM scratch\n";
-      root = rootfs;
-      user = "${uid}:${gid}";
-      inherit home;
-      runArgs = nixArgs;
-      # --gpu asks; whether the host has the devices is its business
-      gpuArgs = glArgs ++ cudaArgs;
-      # --no-vm for a host without kvm
-      vm = true;
-      inherit vmArgs;
-    };
-    # root in a stock image: nothing of the host but its podman, so any connection will do
-    flavors.alpine = {
-      containerfile = ''
-        FROM docker.io/library/alpine:3
-        RUN apk add --no-cache bash bubblewrap ca-certificates coreutils curl file findutils gawk git grep jq less libgcc libstdc++ nodejs npm openssh-client procps ripgrep sed socat tree tzdata \
-         && npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
-         && git config --system user.name Claude && git config --system user.email claude@anthropic.com \
-         && ln -sf /usr/share/zoneinfo/UTC /etc/localtime
-        ENV IS_SANDBOX=1 USE_BUILTIN_RIPGREP=0 CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 ENABLE_CLAUDEAI_MCP_SERVERS=0 BASH_DEFAULT_TIMEOUT_MS=600000 BASH_MAX_TIMEOUT_MS=3600000
-      '';
-      root = null;
-      user = "0:0";
-      home = "/root";
-      runArgs = [ "--init" "--security-opt" "unmask=ALL" ];   # as in nixArgs
-      gpuArgs = null;
-      vm = false;
-      # root in the container is the user outside, who is in the kvm group there
-      vmArgs = [ "--group-add" "keep-groups" "--device" "/dev/kvm" ];
-    };
+    # a workspace: an image of these files for / and the home, run with these arguments
+    root = rootfs;
+    user = "${uid}:${gid}";
+    inherit home;
+    runArgs = nixArgs;
+    # --gpu asks; whether the host has the devices is its business
+    gpuArgs = glArgs ++ cudaArgs;
+    # on unless --no-vm, for a host without kvm
+    inherit vmArgs;
   });
 
   cli = pkgs.writers.writePython3Bin "gensokyo-agent" { flakeIgnore = [ "E501" ]; }

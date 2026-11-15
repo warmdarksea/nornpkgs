@@ -60,12 +60,8 @@ class AgentTest(unittest.TestCase):
             "defaultCmd": "claude --dangerously-skip-permissions",
             "token": {"secret": "claude-oauth-token", "target": "CLAUDE_CODE_OAUTH_TOKEN"},
             "hereArgs": ["--rm"],
-            "flavors": {
-                "nix": {"containerfile": "FROM scratch\n", "root": root, "user": "4738:384",
-                        "home": "/home/agent", "runArgs": ["--init"], "gpuArgs": ["--device", "/dev/gpu"], "vm": True, "vmArgs": ["--device", "/dev/kvm"]},
-                "alpine": {"containerfile": "FROM alpine\n", "root": None, "user": "0:0",
-                           "home": "/root", "runArgs": [], "gpuArgs": None, "vm": False, "vmArgs": ["--device", "/dev/kvm-alpine"]},
-            },
+            "root": root, "user": "4738:384", "home": "/home/agent",
+            "runArgs": ["--init"], "gpuArgs": ["--device", "/dev/gpu"], "vmArgs": ["--device", "/dev/kvm"],
         }
         self.base = os.path.join(self.tmp, "ws")
         self.enterContext(mock.patch.dict(os.environ, {
@@ -211,12 +207,11 @@ class AgentTest(unittest.TestCase):
         self.assertNotIn("mcp", self.staged("root", ".gensokyo-agent", "entrypoint"))
 
     def test_connection_reaches_every_podman_call(self):
-        run = self.new("--name", "ws2", "-c", "library", "--flavor", "alpine")
+        run = self.new("--name", "ws2", "-c", "library")
         self.assertEqual(run[1:4], ["-c", "library", "run"])
         with open(os.path.join(self.out, "podman")) as f:
             for call in map(json.loads, f):
                 self.assertEqual(call[:2], ["-c", "library"])
-        self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "root", "home")))
 
     def test_ports(self):
         run = " ".join(self.new("--name", "ws5", "-p", "9000", "-sp", "8800"))
@@ -238,8 +233,6 @@ class AgentTest(unittest.TestCase):
     def test_refusals(self):
         data = os.path.join(self.tmp, "data")
         os.mkdir(data)
-        self.dies("--flavor", "alpine", "--gpu")
-        self.dies("--flavor", "debian")
         self.dies("-c", "library", "--bind", f"{data}:live")
         self.dies("--name", "Ws")
         self.dies("--name", "old")
@@ -251,12 +244,11 @@ class AgentTest(unittest.TestCase):
 
     def test_devices_are_asked_for(self):
         self.assertNotIn("/dev/kvm", self.new("--no-vm"))
-        self.assertNotIn("/dev/kvm-alpine", self.new("--flavor", "alpine"))
-        self.assertIn("/dev/kvm-alpine", self.new("--flavor", "alpine", "--vm"))
+        self.assertIn("/dev/kvm", self.new())
         self.assertNotIn("/dev/gpu", self.new())
 
     def test_device_with_the_owners_groups(self):
-        self.conf["flavors"]["nix"]["vmArgs"] = ["--group-add", "302", "--device", "/dev/kvm"]
+        self.conf["vmArgs"] = ["--group-add", "302", "--device", "/dev/kvm"]
         run = self.new("--name", "ws12", "-d", "/dev/ttyUSB0", "--device", "/dev/dri/renderD128:/dev/dri/renderD128:rw", "--memory", "4g")
         self.assertEqual(run[run.index("--group-add"):run.index("--secret")],
                          ["--group-add", "keep-groups", "--device", "/dev/ttyUSB0", "--device", "/dev/dri/renderD128:/dev/dri/renderD128:rw"])
