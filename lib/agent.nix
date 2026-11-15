@@ -28,6 +28,9 @@
 #   gensokyo-agent --legacy               claude in a throwaway sandbox on the current directory
 #   gensokyo-agent --legacy codex         any command there
 #   AGENT_CMD="opencode" gensokyo-agent   change the default
+#
+# MCP servers are the agent's own: the workspace's .mcp.json, which it may edit with the owner's
+# approval. a server is the project's to package (nix run, the sandbox has the daemon), not the module's
 { config, pkgs, lib, ... }:
 let
   cfg = config.gensokyo-agent;

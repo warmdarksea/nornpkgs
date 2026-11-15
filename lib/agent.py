@@ -129,6 +129,8 @@ def write_home(home, workdir):
     with open(os.path.join(home, ".claude", "settings.json"), "w") as f:
         json.dump({
             "skipDangerousModePermissionPrompt": True,
+            # the .mcp.json of the directory claude starts in is not one to ask about
+            "enableAllProjectMcpServers": True,
             "hooks": {"PreToolUse": [{"matcher": ALLOW_TOOLS, "hooks": [{"type": "command", "command": ALLOW}]}]},
         }, f)
 
@@ -266,12 +268,13 @@ def entrypoint(cmd, prompt):
     """The container's command: the agent on the first start, the same
     session again on any later one (podman start -ai)."""
     claude = os.path.basename(cmd[0]) == "claude"
-    # claude's list flags (--allowedTools, --mcp-config) take every word up
+    run = shlex.join(cmd)
+    # claude's list flags (--allowedTools and the like) take every word up
     # to the next flag, a prompt that follows them included
-    first = shlex.join(cmd + ((["--"] if claude else []) + [prompt] if prompt else []))
-    again = f"exec {shlex.join(cmd)}"
+    first = run + ((" --" if claude else "") + " " + shlex.quote(prompt) if prompt else "")
+    again = f"exec {run}"
     if claude:
-        again = f"{shlex.join(cmd)} --continue && exit\n  {again}"
+        again = f"{run} --continue && exit\n  {again}"
     return f"""#!/bin/sh
 if [ -e "$HOME/.gensokyo-agent-started" ]; then
   {again}
@@ -427,10 +430,12 @@ def new_workspace(conf, opts, cmd, passthrough):
              for flag in ("--cp", "--ro", "--rw", "--bind") for spec in getattr(opts, flag[2:])]
     repos = [parse_git(conf, spec, name) for spec in opts.git]
     cmd = cmd or os.environ.get("AGENT_CMD", conf["defaultCmd"]).split()
+    claude = os.path.basename(cmd[0]) == "claude"
+    for flag in ("model", "effort"):
+        if getattr(opts, flag) and not claude:
+            die(f"--{flag}: a flag of claude; {cmd[0]} takes its own after --")
     for flag in ("model", "effort"):
         if getattr(opts, flag):
-            if os.path.basename(cmd[0]) != "claude":
-                die(f"--{flag}: a flag of claude; {cmd[0]} takes its own after --")
             cmd += [f"--{flag}", getattr(opts, flag)]
 
     # the workspace has one path, here while it is assembled and in the
@@ -451,13 +456,10 @@ def new_workspace(conf, opts, cmd, passthrough):
             # COPY --chown makes the home the agent's only if it makes it
             shutil.rmtree(root + flavor["home"], ignore_errors=True)
         os.makedirs(os.path.join(root, ".gensokyo-agent"), exist_ok=True)
-        with open(os.path.join(root, ".gensokyo-agent", "entrypoint"), "w") as f:
-            f.write(entrypoint(cmd, opts.prompt))
-            os.fchmod(f.fileno(), 0o755)
         write_home(os.path.join(ctx, "home"), workdir)
 
         mounts = []
-        notes = {"repositories": [], "files": []}
+        notes = {"repositories": [], "files": [], "MCP servers": []}
         for g in repos:
             clone_in(conf, g, work)
             notes["repositories"].append(
@@ -485,6 +487,19 @@ def new_workspace(conf, opts, cmd, passthrough):
                 notes["files"].append(
                     f"`{dst}`, a {'read-only ' if ro else ''}volume that other workspaces may share"
                     f"{'' if ro else ' and that outlives this one'}{desc}")
+        if claude:
+            # read at every start, without asking: what the agent puts in it
+            # the owner sees when claude asks to edit it
+            if not os.path.lexists(os.path.join(work, ".mcp.json")):
+                with open(os.path.join(work, ".mcp.json"), "w") as f:
+                    f.write('{"mcpServers": {}}\n')
+            notes["MCP servers"].append(
+                "`.mcp.json` here is yours to fill in; claude reads it when it starts. Your edits of it"
+                " are the owner's to approve, and count once they restart you. A server runs in this"
+                " directory: one of a checkout `cd`s there in its command")
+        with open(os.path.join(root, ".gensokyo-agent", "entrypoint"), "w") as f:
+            f.write(entrypoint(cmd, opts.prompt))
+            os.fchmod(f.fileno(), 0o755)
         with open(os.path.join(work, "CLAUDE.md"), "a") as f:
             f.write(claude_md(name, notes))
 

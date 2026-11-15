@@ -136,7 +136,7 @@ class AgentTest(unittest.TestCase):
 
     def test_entrypoint_resumes_claude_only(self):
         claude = agent.entrypoint(["claude", "--x"], "it's time")
-        self.assertIn("claude --x --continue && exit", claude)
+        self.assertIn('claude --x --continue && exit', claude)
         # a list flag of claude's would take the prompt for one more of its words
         self.assertIn("exec claude --x -- 'it'\"'\"'s time'", claude)
         self.assertNotIn("--continue", agent.entrypoint(["codex"], None))
@@ -172,7 +172,7 @@ class AgentTest(unittest.TestCase):
         out = subprocess.run(["sh", "-c", hook["hooks"][0]["command"]], check=True, stdout=subprocess.PIPE, text=True).stdout
         self.assertEqual(json.loads(out)["hookSpecificOutput"]["permissionDecision"], "allow")
         with open(os.path.join(ctx, "root", ".gensokyo-agent", "entrypoint")) as f:
-            self.assertIn("exec claude --dangerously-skip-permissions -- go\n", f.read())
+            self.assertIn('exec claude --dangerously-skip-permissions -- go\n', f.read())
         with open(os.path.join(ctx, "work", "CLAUDE.md")) as f:
             md = f.read()
         for line in ("`notes/a`, a copy: a note", "`sets/d`, a read-only volume", "`scratch`, a volume", "`live`, the owner's own"):
@@ -186,6 +186,26 @@ class AgentTest(unittest.TestCase):
                      "--secret claude-oauth-token,type=env,target=CLAUDE_CODE_OAUTH_TOKEN",
                      f"-v sets-d:{work}/sets/d:ro", f"-v old:{work}/scratch", f"-v {data}:{work}/live", "--memory 4g"):
             self.assertIn(part, joined)
+
+    def staged(self, *path):
+        with open(os.path.join(self.out, "ctx", *path)) as f:
+            return f.read()
+
+    def test_mcp_json_of_the_agents_own(self):
+        self.new("--name", "ws9")
+        self.assertEqual(json.loads(self.staged("work", ".mcp.json")), {"mcpServers": {}})
+        self.assertIn("`.mcp.json` here is yours", self.staged("work", "CLAUDE.md"))
+        self.assertTrue(json.loads(self.staged("home", ".claude", "settings.json"))["enableAllProjectMcpServers"])
+        # one given is kept
+        own = os.path.join(self.tmp, "own.json")
+        with open(own, "w") as f:
+            f.write('{"mcpServers": {"a": {"command": "a"}}}')
+        self.new("--name", "ws10", "--cp", f"{own}:.mcp.json")
+        self.assertIn('"a"', self.staged("work", ".mcp.json"))
+        self.new("--name", "ws11", "--", "codex")
+        self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "work", ".mcp.json")))
+        self.assertNotIn("MCP", self.staged("work", "CLAUDE.md"))
+        self.assertNotIn("mcp", self.staged("root", ".gensokyo-agent", "entrypoint"))
 
     def test_connection_reaches_every_podman_call(self):
         run = self.new("--name", "ws2", "-c", "library", "--flavor", "alpine")
