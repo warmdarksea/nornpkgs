@@ -104,6 +104,17 @@ def copy_writable(src, dst):
                 os.chmod(p, os.stat(p).st_mode | 0o200)
 
 
+# the env scrub puts claude in its default permission mode, whatever the
+# command line says, and an allow rule names a tool or a server: none
+# covers what claude does outside its directory, or a server it has not
+# met. a hook may allow a call all the same, so one allows all of them;
+# but the claude.ai connectors, the owner's accounts elsewhere. it cannot
+# allow what claude asks about in any mode but bypass: an edit of .git,
+# .claude, .mcp.json and the like
+ALLOW_TOOLS = "^(?!mcp__claude_ai_)"
+ALLOW = """echo '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}'"""
+
+
 def write_home(home, workdir):
     """The sandbox has no home of its own to remember the first-run dialogs."""
     os.makedirs(os.path.join(home, ".claude"), exist_ok=True)
@@ -114,7 +125,10 @@ def write_home(home, workdir):
             "projects": {workdir: {"hasTrustDialogAccepted": True}},
         }, f)
     with open(os.path.join(home, ".claude", "settings.json"), "w") as f:
-        json.dump({"skipDangerousModePermissionPrompt": True}, f)
+        json.dump({
+            "skipDangerousModePermissionPrompt": True,
+            "hooks": {"PreToolUse": [{"matcher": ALLOW_TOOLS, "hooks": [{"type": "command", "command": ALLOW}]}]},
+        }, f)
 
 
 def token_args(conf, podman):

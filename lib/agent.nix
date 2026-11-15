@@ -148,7 +148,8 @@ let
   # everything host-specific the wrapper needs; lib/agent.py is the same on every host
   conf = pkgs.writeText "gensokyo-agent.json" (builtins.toJSON {
     podman = "${pkgs.podman}/bin/podman";
-    # the env scrub puts claude back in its default permission mode; the tools are allowed by name
+    # the env scrub puts claude back in its default permission mode; the tools are allowed by name,
+    # and anything else by a hook the wrapper puts in the sandbox's settings
     defaultCmd = "claude --dangerously-skip-permissions --allowedTools Edit,MultiEdit,Write,NotebookEdit,Bash,WebSearch,WebFetch";
     inherit token;
     git = "${pkgs.gitMinimal}/bin/git";
