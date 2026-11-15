@@ -69,6 +69,8 @@ let
     "nix.conf" = config.environment.etc."nix/nix.conf".source;
     "registry.json" = config.environment.etc."nix/registry.json".source;
     zoneinfo = "${pkgs.tzdata}/share/zoneinfo";
+    # this host's zone; one set by hand (timedatectl, time.timeZone = null) is not followed
+    localtime = "${pkgs.tzdata}/share/zoneinfo/${if config.time.timeZone == null then "UTC" else config.time.timeZone}";
   } // lib.optionalAttrs cudaSupport {
     cc = cuda.backendStdenv.cc;
   });
@@ -86,9 +88,9 @@ let
     ln -s ${hostPath}/nix.conf ${hostPath}/registry.json $out/etc/nix/
     ln -s ${hostPath}/env/bin/sh $out/bin/sh
     ln -s ${hostPath}/env/bin/env $out/usr/bin/env
-    # UTC, as the clock was without the file; but lean's server, for one,
-    # does not start without it. /etc/zoneinfo is where NixOS keeps the rest
-    ln -s ${hostPath}/zoneinfo/UTC $out/etc/localtime
+    # lean's server, for one, does not start without /etc/localtime.
+    # /etc/zoneinfo is where NixOS keeps the other zones
+    ln -s ${hostPath}/localtime $out/etc/localtime
     ln -s ${hostPath}/zoneinfo $out/etc/zoneinfo
     printf "[user]\n\tname = Claude\n\temail = claude@anthropic.com\n" > $out/etc/gitconfig
   '';

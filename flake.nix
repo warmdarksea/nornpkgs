@@ -872,6 +872,7 @@
             environment.systemPackages = [ pkgs.gitMinimal ];
             gensokyo.ci = true;
             gensokyo-agent = { enable = true; user = "alice"; };
+            time.timeZone = "Asia/Tokyo";
             users.users.alice = { isNormalUser = true; uid = 1000; };
             hardware.graphics.enable = true;   # /run/opengl-driver, which --legacy binds
             virtualisation.memorySize = 2048;
@@ -895,15 +896,15 @@
             with subtest("the sandbox on the current directory"):
                 out = machine.succeed(agent("--legacy sh -c \"id -u; touch \\$HOME/mine; pwd\""))
                 assert "4738" in out and "/home/alice/w" in out, out
-                # the clock has a zone, and any other can be asked for
-                out = machine.succeed(agent("--legacy sh -c \"readlink -f /etc/localtime; TZ=Asia/Tokyo date +%Z\""))
-                assert "/zoneinfo/UTC" in out and "JST" in out, out
+                # the clock is in the host's zone, and any other can be asked for
+                out = machine.succeed(agent("--legacy sh -c \"readlink -f /etc/localtime; date +%Z; TZ=Europe/Berlin date +%Z\""))
+                assert "/zoneinfo/Asia/Tokyo\nJST\nCET" in out.replace("\r", ""), out
                 assert "nested 2" in machine.succeed(agent("--legacy " + nested))
 
             with subtest("a workspace is the agent's own"):
                 out = machine.succeed(agent(
                     "--name ws1 --cp /etc/hostname:notes/host -- sh -c"
-                    " \"id -u; cat notes/host; touch notes/mine \\$HOME/mine; git config user.name; pwd; TZ=Asia/Tokyo date +%Z\""))
+                    " \"id -u; cat notes/host; touch notes/mine \\$HOME/mine; git config user.name; pwd; date +%Z\""))
                 assert "4738\nmachine\nClaude\n/var/tmp/gensokyo-agent/ws1\nJST" in out.replace("\r", ""), out
                 assert "nested 2" in machine.succeed(agent("--name ws2 -- " + nested))
 
