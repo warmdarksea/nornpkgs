@@ -106,15 +106,22 @@ def copy_writable(src, dst):
                 os.chmod(p, os.stat(p).st_mode | 0o200)
 
 
+def decide(decision):
+    return f"""echo '{{"hookSpecificOutput": {{"hookEventName": "PreToolUse", "permissionDecision": "{decision}"}}}}'"""
+
+
 # the env scrub puts claude in its default permission mode, whatever the
 # command line says, and an allow rule names a tool or a server: none
 # covers what claude does outside its directory, or a server it has not
-# met. a hook may allow a call all the same, so one allows all of them;
-# but the claude.ai connectors, the owner's accounts elsewhere. it cannot
-# allow what claude asks about in any mode but bypass: an edit of .git,
-# .claude, .mcp.json and the like
-ALLOW_TOOLS = "^(?!mcp__claude_ai_)"
-ALLOW = """echo '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}'"""
+# met. a hook may allow a call all the same, so one allows all of them.
+# it cannot allow what claude asks about in any mode but bypass: an edit
+# of .git, .claude, .mcp.json and the like. the claude.ai connectors, the
+# owner's accounts elsewhere, are not loaded (ENABLE_CLAUDEAI_MCP_SERVERS),
+# and refused should one be all the same
+HOOKS = [
+    {"matcher": "^(?!mcp__claude_ai_)", "hooks": [{"type": "command", "command": decide("allow")}]},
+    {"matcher": "^mcp__claude_ai_", "hooks": [{"type": "command", "command": decide("deny")}]},
+]
 
 
 def write_home(home, workdir):
@@ -131,7 +138,7 @@ def write_home(home, workdir):
             "skipDangerousModePermissionPrompt": True,
             # the .mcp.json of the directory claude starts in is not one to ask about
             "enableAllProjectMcpServers": True,
-            "hooks": {"PreToolUse": [{"matcher": ALLOW_TOOLS, "hooks": [{"type": "command", "command": ALLOW}]}]},
+            "hooks": {"PreToolUse": HOOKS},
         }, f)
 
 

@@ -126,6 +126,8 @@ let
     # no credential in the environment of what claude runs, which it then
     # runs in a sandbox of its own (bubblewrap, socat) and no longer unasked
     "-e" "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1"
+    # nor the connectors of the owner's claude.ai account (mail, drives and the like)
+    "-e" "ENABLE_CLAUDEAI_MCP_SERVERS=0"
     # claude kills a command after 2 minutes unless it asked for longer, and
     # may ask for 10 at most; a host evaluation or a build takes more
     "-e" "BASH_DEFAULT_TIMEOUT_MS=600000"
@@ -180,7 +182,7 @@ let
          && npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
          && git config --system user.name Claude && git config --system user.email claude@anthropic.com \
          && ln -sf /usr/share/zoneinfo/UTC /etc/localtime
-        ENV IS_SANDBOX=1 USE_BUILTIN_RIPGREP=0 CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 BASH_DEFAULT_TIMEOUT_MS=600000 BASH_MAX_TIMEOUT_MS=3600000
+        ENV IS_SANDBOX=1 USE_BUILTIN_RIPGREP=0 CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 ENABLE_CLAUDEAI_MCP_SERVERS=0 BASH_DEFAULT_TIMEOUT_MS=600000 BASH_MAX_TIMEOUT_MS=3600000
       '';
       root = null;
       user = "0:0";

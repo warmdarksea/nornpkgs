@@ -164,13 +164,16 @@ class AgentTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(ctx, "root", "home", "agent")))
         with open(os.path.join(ctx, "home", ".claude.json")) as f:
             self.assertTrue(json.load(f)["projects"][work]["hasTrustDialogAccepted"])
-        # every tool call allowed, but those of the owner's claude.ai connectors
+        # every tool call allowed, but those of the owner's claude.ai connectors: refused
         with open(os.path.join(ctx, "home", ".claude", "settings.json")) as f:
-            (hook,) = json.load(f)["hooks"]["PreToolUse"]
-        allowed = [t for t in ("Read", "Bash", "mcp__lean__goal", "mcp__claude_ai_Gmail__send") if re.search(hook["matcher"], t)]
-        self.assertEqual(allowed, ["Read", "Bash", "mcp__lean__goal"])
-        out = subprocess.run(["sh", "-c", hook["hooks"][0]["command"]], check=True, stdout=subprocess.PIPE, text=True).stdout
-        self.assertEqual(json.loads(out)["hookSpecificOutput"]["permissionDecision"], "allow")
+            hooks = json.load(f)["hooks"]["PreToolUse"]
+
+        def decision(tool):
+            (hook,) = [h for h in hooks if re.search(h["matcher"], tool)]
+            out = subprocess.run(["sh", "-c", hook["hooks"][0]["command"]], check=True, stdout=subprocess.PIPE, text=True).stdout
+            return json.loads(out)["hookSpecificOutput"]["permissionDecision"]
+        self.assertEqual([decision(t) for t in ("Read", "Bash", "mcp__lean__goal", "mcp__claude_ai_Gmail__send")],
+                         ["allow", "allow", "allow", "deny"])
         with open(os.path.join(ctx, "root", ".gensokyo-agent", "entrypoint")) as f:
             self.assertIn('exec claude --dangerously-skip-permissions -- go\n', f.read())
         with open(os.path.join(ctx, "work", "CLAUDE.md")) as f:
