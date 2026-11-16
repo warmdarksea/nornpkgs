@@ -38,9 +38,8 @@
         meta.mainProgram = "lean4-hello";
       };
 
-      # lean-lsp-mcp, on this Lean. It wants lean-toolchain beside the
-      # lakefile: nothing else reads that file here (no elan), so it says
-      # what the lock's Lean is, and is changed with it.
+      # lean-lsp-mcp, on this Lean. The lean-toolchain it wants beside the
+      # lakefile is put there as it starts, out of git's sight, naming this Lean.
       lean = nornpkgs.lib.mkLeanMcp { inherit pkgs; };
     in
     {

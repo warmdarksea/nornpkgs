@@ -46,9 +46,8 @@
       # lean-lsp-mcp, on this Lean and this Mathlib: the server tells Lake
       # where nix has Mathlib (.lake/package-overrides.json), so `lake build`
       # in the agent's shell type-checks against it too, and fetches nothing.
-      # It wants lean-toolchain beside the lakefile: nothing else reads that
-      # file here (no elan), so it says what the lock's Lean is, and is
-      # changed with it.
+      # The lean-toolchain it wants beside the lakefile is put there as it
+      # starts, out of git's sight, naming this Lean.
       lean = nornpkgs.lib.mkLeanMcp {
         inherit pkgs;
         leanDeps = [ leanPackages.mathlib ];
