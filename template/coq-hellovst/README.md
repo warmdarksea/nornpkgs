@@ -178,3 +178,14 @@ verbatim from VST's `progs64/verif_io.v`, and `body_print_ulong_aux` follows its
 `body_print_intr` at 64 bits; `src/IO_model.v` reuses its `chars_of_Z` / `intr`
 and the `Program Fixpoint` unfolding machinery. VST is BSD-licensed; see
 `VST/LICENSE` in the store path the flake pins.
+
+## An agent
+
+`gensokyo-agent --closure . --git .::` (nornpkgs' agent harness) starts an agent
+with what the devshell has (`coqc` and `coqdep` that find VST, CompCert and
+ITree, `clightgen`, `ccomp`, `make`) and
+[rocq-mcp](https://github.com/LLM4Rocq/rocq-mcp), built against the same Coq
+and libraries: proofs stepped through with `pet`, tactics tried, the
+environment searched, axioms listed. The server takes the load path from the
+`_CoqProject` in git (`-Q build FibVST`) and steps through a proof against
+`build/*.vo`: `make` first. It talks to nothing outside the machine.

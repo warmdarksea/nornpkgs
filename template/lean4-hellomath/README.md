@@ -60,3 +60,18 @@ Mathlib only to prove things *about* it.
 | `lakefile.lean` | `lean_lib Hellomath` + `lean_exe lean4-hellomath`, both default targets |
 | `flake.nix` | `buildLakePackage`, with `src` filtered down to what lake needs |
 | `Makefile` | ergonomics around `nix build`; `-L` keeps `make run` from re-evaluating the flake |
+
+## an agent
+
+`gensokyo-agent --closure . --git .::` (nornpkgs' agent harness) starts an agent
+with `lean`, `lake`, and [lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp)
+on this project: goals, diagnostics, tactics tried without editing the file,
+search. The server tells lake where nix has Mathlib
+(`.lake/package-overrides.json`), so `lake build` in the agent's shell
+type-checks against it and fetches nothing. `lean-toolchain` is there for the
+server alone, which takes no project without one: it names the lock's Lean, and
+is changed when the lock is.
+
+The tools that send the proof goal to somebody else's server are off
+(`nornpkgs/lib/agent-mcp.nix`); the searches that send what the agent types
+(leansearch, loogle, leanfinder) are on.

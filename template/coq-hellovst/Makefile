@@ -102,6 +102,10 @@ depend: $(BUILD_DIR)/.depend
 
 # For editors / IDEs: a _CoqProject reflecting the current devshell paths.
 # Not needed by the Makefile, which takes its paths from COQPATH.
+# The _CoqProject in git is the first two lines of this one: enough where the
+# libraries are found without it (the devshell, and rocq-mcp in the agent's
+# closure). This writes over it, for an editor started somewhere else: that
+# one has this machine's store paths in it, and is not for a commit.
 .PHONY: _CoqProject
 _CoqProject:
 	@{ echo "-Q $(BUILD_DIR) $(TOP)"; \

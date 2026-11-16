@@ -6,7 +6,11 @@
   # VST 2.16 / CompCert 3.17 will do.
   inputs.nixpkgs.url = "nixpkgs";
 
-  outputs = { self, nixpkgs }:
+  # The agent's harness: what gensokyo-agent --closure gives an agent here.
+  inputs.nornpkgs.url = "github:warmdarksea/nornpkgs";
+  inputs.nornpkgs.inputs.nixpkgs.follows = "nixpkgs";
+
+  outputs = { self, nixpkgs, nornpkgs }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f (mk system));
@@ -141,8 +145,26 @@
               echo "  make smoke  run the compiled program on a few inputs"
             '';
           };
+
+          # gensokyo-agent --closure . --git .::
+          # rocq-mcp with this coq and these libraries, and for the agent's
+          # shell what the devshell has: coqc and coqdep that find the
+          # libraries (there is no COQPATH there), clightgen, ccomp, make.
+          # The server finds the load path in _CoqProject; a proof is stepped
+          # through against build/*.vo, so `make` first.
+          rocq = nornpkgs.lib.mkRocqMcp {
+            inherit pkgs;
+            rocqPackages = cp;
+            rocq = coq;
+            rocqLibs = [ VST compcert.lib ITree vst-io ];
+          };
+          agentClosure = nornpkgs.lib.mkAgentClosure {
+            inherit pkgs;
+            packages = rocq.packages ++ [ compcert pkgs.gnumake ];
+            mcpServers.rocq = rocq.server;
+          };
         in
-        { inherit vst-io fib proofs devShell; };
+        { inherit vst-io fib proofs devShell agentClosure; };
     in
     {
       packages = forAllSystems (o: {
@@ -156,5 +178,7 @@
       });
 
       devShells = forAllSystems (o: { default = o.devShell; });
+
+      agentClosures = forAllSystems (o: { default = o.agentClosure; });
     };
 }

@@ -1,0 +1,2 @@
+-Q build FibVST
+-arg "-w -deprecated-from-Coq"

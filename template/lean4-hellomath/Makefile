@@ -2,6 +2,11 @@
 NIX ?= nix
 NIX_FLAGS ?= --extra-experimental-features 'nix-command flakes'
 
+# the agent's closure (flake.nix, agentClosures) is made by nornpkgs. to build
+# against a checkout of it:  make build NORNPKGS=path:/home/clownpiece/src/nornpkgs
+NORNPKGS ?=
+OVERRIDE := $(if $(NORNPKGS),--override-input nornpkgs '$(NORNPKGS)' --no-write-lock-file)
+
 # the artifacts below are nix out-links: symlinks into the store, where every
 # mtime is epoch 1. without -L make stats *through* the symlink, sees 1970,
 # concludes the artifact is older than every source, and re-runs `nix build` --
@@ -35,7 +40,7 @@ $(BUILD_DIR)/:
 	mkdir -p $@
 
 $(BIN): $(SRCS) | $(BUILD_DIR)/
-	$(NIX) $(NIX_FLAGS) build .#$(NAME) --out-link $@
+	$(NIX) $(NIX_FLAGS) build $(OVERRIDE) .#$(NAME) --out-link $@
 
 # depends on the artifact rather than on the phony `build`, so an out-link that
 # is already in place is run as-is, without nix being consulted at all.
