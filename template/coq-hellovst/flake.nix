@@ -1,9 +1,10 @@
 {
   description = "VST/CompCert template: an end-to-end verified Fibonacci program";
 
-  # Pinned by the committed flake.lock; `nix flake update` re-resolves it
-  # through the machine's nix registry.  Any nixpkgs providing coq 9.1 /
-  # VST 2.16 / CompCert 3.17 will do.
+  # No flake.lock in the template: this resolves through the system nix
+  # registry pin (and nornpkgs, below, to its newest), and nix writes a lock
+  # beside the flake the first time it builds.  Checked against coq 9.1 with
+  # VST 2.17 / CompCert 3.18, and with VST 2.16 / CompCert 3.17.
   inputs.nixpkgs.url = "nixpkgs";
 
   # The agent's harness: what gensokyo-agent --closure gives an agent here.
@@ -22,7 +23,7 @@
           # impossible without it, so the template opts in explicitly.
           pkgs = import nixpkgs { inherit system; config.allowUnfree = true; };
 
-          cp = pkgs.coqPackages;
+          cp = pkgs.rocqPackages;
           inherit (cp) coq VST compcert ITree;
           coqVersion = coq.coq-version;
 
