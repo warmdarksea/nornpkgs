@@ -24,7 +24,24 @@ Definition linked_prog : Clight.program := ltac:(
   | Errors.Error _ => fail 1 "link_progs failed"
   end).
 
-#[export] Instance CompSpecs : compspecs. make_compspecs linked_prog. Defined.
+(** [make_compspecs linked_prog] would be the usual line here.  Since VST 2.17
+    that tactic first looks for bitfields, and to find the composites it
+    matches on the program being clightgen's [Clightdefs.mkprogram ...]; ours
+    is the linker's plain record, so it fails with "No matching clauses for
+    match".  The two steps below are the rest of [make_compspecs], which read
+    the program through [prog_types] and are happy with either shape.
+
+    Leaving the bitfield check out is sound for this program because there is
+    nothing for it to look at: neither unit declares a struct or union, which
+    [linked_prog_no_composites] checks.  If you add one, that lemma fails, and
+    this is where to run VST's [check_no_bitfields] on the composites. *)
+Lemma linked_prog_no_composites : prog_types linked_prog = nil.
+Proof. reflexivity. Qed.
+
+#[export] Instance CompSpecs : compspecs.
+Proof.
+  let cenv := make_composite_env0 linked_prog in make_compspecs_cenv cenv.
+Defined.
 Definition Vprog : varspecs. mk_varspecs linked_prog. Defined.
 
 (** [ext_link] maps an external function's name to its Clight identifier.

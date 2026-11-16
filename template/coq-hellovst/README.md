@@ -2,7 +2,7 @@
 
 A small, complete, **admit-free** Verified Software Toolchain project, meant to be
 copied as the starting point for other verified-C work. Two C translation units,
-two theorems, a Makefile, and a Nix flake that pins everything.
+two theorems, a Makefile, and a Nix flake that builds everything.
 
 The program reads a decimal number from stdin and prints its Fibonacci number in
 base 10:
@@ -98,7 +98,7 @@ Worth knowing before you adapt this template, because both surprised us:
 ## Layout
 
 ```
-flake.nix            pinned toolchain, package, checks, devshell
+flake.nix            toolchain, package, checks, devshell
 Makefile             clightgen + ccomp + coqc, all output into build/
 src/fib.h
 src/fib.c            the unit under proof 1
@@ -164,7 +164,11 @@ keeps the chain meaningful.
   `Clightdefs.mkprogram`, which a linked program is not. Plain `reflexivity` does
   it here, since neither unit declares a struct or union. The same applies to
   `expand_main_pre`, which `Verif_main.body_main` therefore does by hand.
-- **VST 2.16 is the classic, pre-Iris line.** `mpred = pred rmap`; use `sepcon`,
+- **So does `make_compspecs`, since VST 2.17** (`src/Whole_prog.v`): its new
+  bitfield check matches on `Clightdefs.mkprogram` too. `CompSpecs` is built
+  from the two steps underneath it instead, and a lemma checks that the linked
+  program has no composites for the skipped check to have looked at.
+- **VST 2.x is the classic, pre-Iris line.** `mpred = pred rmap`; use `sepcon`,
   `entailer!`, `|--`, not the Iris proof mode. `VST/veric/bi.v` ships unbuilt.
 - **`VST/progs64/io_specs.v` ships source-only** (upstream's Makefile gates the
   ITree-dependent files), so `flake.nix` defines a small `vst-io` derivation that
@@ -177,7 +181,7 @@ keeps the chain meaningful.
 verbatim from VST's `progs64/verif_io.v`, and `body_print_ulong_aux` follows its
 `body_print_intr` at 64 bits; `src/IO_model.v` reuses its `chars_of_Z` / `intr`
 and the `Program Fixpoint` unfolding machinery. VST is BSD-licensed; see
-`VST/LICENSE` in the store path the flake pins.
+`VST/LICENSE` in the store path the flake builds against.
 
 ## An agent
 
