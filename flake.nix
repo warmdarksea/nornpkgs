@@ -199,6 +199,14 @@
     # Example at the top of lib/agent-closure.nix.
     lib.mkAgentClosure = { pkgs, ... }@args:
       import lib/agent-closure.nix pkgs (removeAttrs args [ "pkgs" ]);
+    # MCP servers for a closure, for theorem proving: Lean (nixpkgs'
+    # lean-lsp-mcp) and Rocq/Coq (pkgs/rocq-mcp), each { packages, server },
+    # with the caller's prover and libraries. lib/agent-mcp.nix says what
+    # each takes; template/lean4-hellomath and template/coq-hellovst use them.
+    lib.mkLeanMcp = { pkgs, ... }@args:
+      (import lib/agent-mcp.nix pkgs).mkLeanMcp (removeAttrs args [ "pkgs" ]);
+    lib.mkRocqMcp = { pkgs, ... }@args:
+      (import lib/agent-mcp.nix pkgs).mkRocqMcp (removeAttrs args [ "pkgs" ]);
 
     # nix modules
 
