@@ -28,7 +28,7 @@ BIN  := $(BUILD_DIR)/$(NAME)
 # a compiled olean for. lakefile.lean is lake's own config, not a module.
 LEANS := $(shell find . -name '*.lean' ! -name lakefile.lean \
                    -not -path './.lake/*' -not -path './$(BUILD_DIR)/*')
-SRCS  := flake.nix flake.lock lakefile.lean lake-manifest.json $(LEANS)
+SRCS  := flake.nix $(wildcard flake.lock) lakefile.lean lake-manifest.json $(LEANS)
 
 .PHONY: build run test clean
 

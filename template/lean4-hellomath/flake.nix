@@ -1,8 +1,9 @@
 {
   description = "lean 4 proofs with mathlib; building type-checks them";
 
-  # Pinned by the committed flake.lock; `nix flake update` re-resolves it
-  # through the machine's nix registry.
+  # No flake.lock in the template: this resolves through the system nix
+  # registry pin (and nornpkgs, below, to its newest), and nix writes a lock
+  # beside the flake the first time it builds.
   inputs.nixpkgs.url = "nixpkgs";
 
   # The agent's harness: what gensokyo-agent --closure gives an agent here.
