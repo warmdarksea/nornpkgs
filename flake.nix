@@ -1030,6 +1030,14 @@
     packages.x86_64-linux.slopbooru-release = (slopbooruFor pkgs).release;
     packages.x86_64-linux.slopbooru-fleet = nornpkgs.slopbooru-fleet.timeshare-toml;
 
+    # MCP servers for an agent closure (lib.mkAgentClosure) that nixpkgs does
+    # not have. rocq-mcp: Rocq/Coq proofs through `pet` (coq-lsp); it brings
+    # its Rocq with it, rocq-mcp.toolchain (pkgs/rocq-mcp says how to choose
+    # the libraries). pytanque is its client of pet. The one for Lean is
+    # nixpkgs' lean-lsp-mcp.
+    packages.x86_64-linux.rocq-mcp = pkgs.callPackage ./pkgs/rocq-mcp { };
+    packages.x86_64-linux.pytanque = self.packages.x86_64-linux.rocq-mcp.pytanque;
+
     images.gensokyo-recovery =
       self.nixosConfigurations.gensokyo-recovery.config.system.build.image;
     };
