@@ -32,13 +32,17 @@ AST_V   := $(addprefix $(BUILD_DIR)/,$(addsuffix .v,$(ASTS)))
 VOFILES := $(addprefix $(BUILD_DIR)/,$(addsuffix .vo,$(ASTS) $(PROOFS)))
 OFILES  := $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(ASTS)))
 
-.PHONY: all build bin run proofs audit smoke clean depend
+.PHONY: all build bin run proofs test audit smoke clean depend
 .DELETE_ON_ERROR:
 
 all: bin proofs
 
 # `make build` is what every other template in this repo calls it.
 build: all
+
+# and `make test`: no admits or axioms of our own, and the binary agrees with
+# the model.
+test: audit smoke
 
 bin: $(BUILD_DIR)/fib
 

@@ -127,6 +127,7 @@ $ nix develop          # coqc, clightgen, ccomp, VST, CompCert, ITree on PATH
 $ make                 # ~25 s from clean: clightgen, ccomp, and every proof
 $ make audit           # what the theorems depend on; fails on any admit
 $ make smoke           # run the binary against values computed from the Coq model
+$ make test            # both of those
 $ make _CoqProject     # for your editor; the Makefile itself uses COQPATH
 ```
 
