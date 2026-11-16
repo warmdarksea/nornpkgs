@@ -163,7 +163,10 @@ bump:
 # what `make test` boots and builds on a host of each arch
 NIX_HOSTS_AMD64=base hell library furnace
 NIX_HOSTS_AARCH64=littledevil
-NIX_TEMPLATES_AMD64=py-hello rust-hello lean4-hello
+NIX_TEMPLATES_AMD64=py-hello rust-hello lean4-hello coq-hellovst
+# the templates whose Makefile runs the tools itself, inside `nix develop`,
+# where the others call nix: test_template_% runs these in their devshell
+NIX_TEMPLATES_DEVSHELL=coq-hellovst
 NIX_TEMPLATES_AARCH64=
 
 FLAKE?=.
@@ -236,7 +239,7 @@ test_template_%: FORCE | $(BUILD_DIR)
 	rm -rf $(BUILD_DIR)/template-$* && mkdir -p $(BUILD_DIR)/template-$*
 	cp -r template/$*/. $(BUILD_DIR)/template-$*
 	cd $(BUILD_DIR)/template-$* && git init -q && git add -A
-	$(MAKE) -C $(BUILD_DIR)/template-$* build run test NORNPKGS=$(FLAKE_ABS)
+	$(if $(filter $*,$(NIX_TEMPLATES_DEVSHELL)),cd $(BUILD_DIR)/template-$* && nix develop --override-input nornpkgs "$(FLAKE_ABS)" --no-write-lock-file -c make build run test,$(MAKE) -C $(BUILD_DIR)/template-$* build run test NORNPKGS=$(FLAKE_ABS))
 
 # remote building
 .PHONY: remote_build_sys_closure remote_build_reset remote_build_log remote_build_status remote_build_check remote_pull_sys_closure
