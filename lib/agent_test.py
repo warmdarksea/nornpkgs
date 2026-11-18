@@ -300,6 +300,12 @@ class AgentTest(unittest.TestCase):
     def test_generated_name(self):
         name = self.new()[3]
         self.assertRegex(name, r"^[a-z]+_[a-z]+$")
+        left, right = name.split("_")
+        self.assertIn(left, agent.ADJECTIVES)
+        self.assertIn(right, agent.SURNAMES)
+        self.assertEqual((len(agent.ADJECTIVES), len(agent.SURNAMES)), (108, 236))
+        with mock.patch("random.choice", side_effect=["boring", "wozniak", "boring", "turing"]):
+            self.assertEqual(agent.random_name(), "boring_turing")
 
     def test_devices_are_asked_for(self):
         self.assertNotIn("/dev/kvm", self.new("--no-vm"))

@@ -80,12 +80,58 @@ afterwards, with podman (and -c where the workspace is elsewhere):
   podman rm NAME && podman rmi gensokyo-agent/NAME
 """
 
-ADJECTIVES = """amber brisk calm cosy dapper eager fuzzy gentle hazy idle
-jolly keen lucid mellow nimble odd plucky quiet rosy sleepy tidy upbeat vivid
-wistful zesty""".split()
-NOUNS = """badger comet dumpling ember fennel gecko heron iris jackdaw kettle
-lantern marmot nettle otter pebble quince rook sparrow thistle urchin vole
-walnut yarrow zephyr""".split()
+# the container names of moby's legacy names-generator.go, ported: two
+# lists and the one exception. Apache-2.0, from
+# https://github.com/moby/moby/blob/f8b81d90660723258fd2a5692bb61d9911ac6bc4/internal/namesgenerator/legacy/names-generator.go
+ADJECTIVES = """admiring adoring affectionate agitated amazing angry awesome beautiful
+blissful bold boring brave busy charming clever compassionate competent
+condescending confident cool cranky crazy dazzling determined distracted
+dreamy eager ecstatic elastic elated elegant eloquent epic exciting fervent
+festive flamboyant focused friendly frosty funny gallant gifted goofy
+gracious great happy hardcore heuristic hopeful hungry infallible inspiring
+intelligent interesting jolly jovial keen kind laughing loving lucid
+magical modest musing mystifying naughty nervous nice nifty nostalgic
+objective optimistic peaceful pedantic pensive practical priceless quirky
+quizzical recursing relaxed reverent romantic sad serene sharp silly sleepy
+stoic strange stupefied suspicious sweet tender thirsty trusting unruffled
+upbeat vibrant vigilant vigorous wizardly wonderful xenodochial youthful
+zealous ze""".split()
+# notable scientists and hackers; the file has a line on each
+SURNAMES = """agnesi albattani allen almeida antonelli archimedes ardinghelli aryabhata
+austin babbage banach banzai bardeen bartik bassi beaver bell benz bhabha
+bhaskara black blackburn blackwell bohr booth borg bose bouman boyd
+brahmagupta brattain brown buck burnell cannon carson cartwright carver
+cerf chandrasekhar chaplygin chatelet chatterjee chaum chebyshev clarke
+cohen colden cori cray curie curran darwin davinci dewdney dhawan diffie
+dijkstra dirac driscoll dubinsky easley edison einstein elbakyan elgamal
+elion ellis engelbart euclid euler faraday feistel fermat fermi feynman
+franklin gagarin galileo galois ganguly gates gauss germain goldberg
+goldstine goldwasser golick goodall gould greider grothendieck haibt
+hamilton haslett hawking heisenberg hellman hermann herschel hertz
+heyrovsky hodgkin hofstadter hoover hopper hugle hypatia ishizaka jackson
+jang jemison jennings jepsen johnson joliot jones kalam kapitsa kare
+keldysh keller kepler khayyam khorana kilby kirch knuth kowalevski lalande
+lamarr lamport leakey leavitt lederberg lehmann lewin lichterman liskov
+lovelace lumiere mahavira margulis matsumoto maxwell mayer mccarthy
+mcclintock mclaren mclean mcnulty meitner mendel mendeleev meninsky merkle
+mestorf mirzakhani montalcini moore morse moser murdock napier nash neumann
+newton nightingale nobel noether northcutt noyce panini pare pascal pasteur
+payne perlman pike poincare poitras proskuriakova ptolemy raman ramanujan
+rhodes ride ritchie robinson roentgen rosalind rubin saha sammet sanderson
+satoshi shamir shannon shaw shirley shockley shtern sinoussi snyder solomon
+spence stonebraker sutherland swanson swartz swirles taussig tesla tharp
+thompson torvalds tu turing varahamihira vaughan villani visvesvaraya
+volhard wescoff wilbur wiles williams williamson wilson wing wozniak wright
+wu yalow yonath zhukovsky""".split()
+
+
+def random_name():
+    """adjective_surname, as docker names a container."""
+    while True:
+        name = f"{random.choice(ADJECTIVES)}_{random.choice(SURNAMES)}"
+        if name != "boring_wozniak":  # Steve Wozniak is not boring
+            return name
+
 
 NAME_RE = r"[a-z0-9][a-z0-9_.-]*"
 
@@ -464,7 +510,7 @@ def new_workspace(conf, opts, cmd, passthrough):
     name = opts.name
     if name is None:
         while name is None or taken(name):
-            name = f"{random.choice(ADJECTIVES)}_{random.choice(NOUNS)}"
+            name = random_name()
     elif not re.fullmatch(NAME_RE, name):
         die(f"--name {name}: lowercase letters, digits, _ . - only")
     elif taken(name):
