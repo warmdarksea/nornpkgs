@@ -283,8 +283,9 @@ class AgentTest(unittest.TestCase):
 
     def test_ports(self):
         run = " ".join(self.new("--name", "ws5", "-p", "9000", "--publish", "127.0.0.1:9001:9001",
-                                "-p8080:80", "-sp", "8800", "-p", "9002:9002/udp"))
-        self.assertIn("-p 9000 -p 127.0.0.1:9001:9001 -p 8080:80 -p 9002:9002/udp -p 127.0.0.1:8800:8800", run)
+                                "-p8080:80", "-sp", "8800", "-p", "9002/udp"))
+        # a port alone is that port here too
+        self.assertIn("-p 9000:9000 -p 127.0.0.1:9001:9001 -p 8080:80 -p 9002:9002/udp -p 127.0.0.1:8800:8800", run)
         self.assertFalse(os.path.exists(os.path.join(self.out, "ssh")))
 
         run = " ".join(self.new("--name", "ws6", "-c", "library", "-sp", "8800", "-L", "1:h:2"))

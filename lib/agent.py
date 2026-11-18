@@ -46,7 +46,9 @@ gensokyo-agent --legacy [CMD...]         CMD in a throwaway sandbox on the
                               it for the long context. default:
                               claude-opus-5-5[1m]
   --effort LEVEL              claude --effort: low, medium, high, xhigh, max
-  -p, --publish SPEC          as podman run -p
+  -p, --publish SPEC          as podman run -p, but a PORT alone is
+                              PORT:PORT, the same port on every interface
+                              here (podman's would be a random one)
   -L SPEC                     as ssh -L, to the host of -c; the tunnel stays
                               up after this command returns
   -sp PORT                    both for one port: localhost:PORT here is
@@ -509,6 +511,8 @@ def new_workspace(conf, opts, cmd, passthrough):
         opts.vm = True
     if opts.bind and opts.connection:
         die("--bind: a path of this machine cannot be bound on another")
+    # a port alone is the same port on the host, not podman's random one
+    opts.publish = [re.sub(r"^(\d+)(/\w+)?$", r"\1:\1\2", spec) for spec in opts.publish]
     for port in opts.port:
         if not port.isdigit():
             die(f"-sp {port}: a port number")
