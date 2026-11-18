@@ -147,6 +147,9 @@ class AgentTest(unittest.TestCase):
         self.new("--name", "ws8")
         with open(os.path.join(self.out, "ctx", "root", ".gensokyo-agent", "entrypoint")) as f:
             self.assertNotIn("--model", f.read())
+        # that of the settings then
+        with open(os.path.join(self.out, "ctx", "home", ".claude", "settings.json")) as f:
+            self.assertEqual(json.load(f)["model"], "claude-opus-5-5[1m]")
         self.dies("--model", "opus", "--", "codex")
 
     def test_entrypoint_resumes_claude_only(self):
@@ -178,7 +181,13 @@ class AgentTest(unittest.TestCase):
         # the agent's home is made by the chown'ed COPY, not by the skeleton
         self.assertFalse(os.path.exists(os.path.join(ctx, "root", "home", "agent")))
         with open(os.path.join(ctx, "home", ".claude.json")) as f:
-            self.assertTrue(json.load(f)["projects"][work]["hasTrustDialogAccepted"])
+            state = json.load(f)
+        self.assertTrue(state["projects"][work]["hasTrustDialogAccepted"])
+        self.assertTrue(state["hasSeenAutoModeEntryWarning"])
+        with open(os.path.join(ctx, "home", ".claude", "settings.json")) as f:
+            settings = json.load(f)
+        # claude drops the opt-in when the default mode is not auto
+        self.assertEqual((settings["permissions"]["defaultMode"], settings["skipAutoPermissionPrompt"]), ("auto", True))
         # every tool call allowed, but those of the owner's claude.ai connectors: refused
         with open(os.path.join(ctx, "home", ".claude", "settings.json")) as f:
             hooks = json.load(f)["hooks"]["PreToolUse"]

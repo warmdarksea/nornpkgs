@@ -43,7 +43,8 @@ gensokyo-agent --legacy [CMD...]         CMD in a throwaway sandbox on the
   --prompt TEXT               what the agent starts on
   --model MODEL               claude --model: fable, opus, sonnet, haiku,
                               opusplan, or a full model name; [1m] after
-                              it for the long context. default: claude's
+                              it for the long context. default:
+                              claude-opus-5-5[1m]
   --effort LEVEL              claude --effort: low, medium, high, xhigh, max
   -p, --publish SPEC          as podman run -p
   -L SPEC                     as ssh -L, to the host of -c; the tunnel stays
@@ -174,6 +175,10 @@ HOOKS = [
 ]
 
 
+# claude's model unless --model says otherwise, with the long context
+MODEL = "claude-opus-5-5[1m]"
+
+
 def write_home(home, workdir):
     """The sandbox has no home of its own to remember the first-run dialogs."""
     os.makedirs(os.path.join(home, ".claude"), exist_ok=True)
@@ -181,10 +186,19 @@ def write_home(home, workdir):
         json.dump({
             "hasCompletedOnboarding": True,
             "theme": "auto",
+            # the notices of auto mode: what it is, and the offer to make it the default
+            "hasSeenAutoModeEntryWarning": True,
+            "hasSeenAutoDefaultNotice": True,
+            "hasSeenAutoDefaultNudge": True,
             "projects": {workdir: {"hasTrustDialogAccepted": True}},
         }, f)
     with open(os.path.join(home, ".claude", "settings.json"), "w") as f:
         json.dump({
+            "model": MODEL,
+            # auto mode is the one to start in, and its opt-in dialog has been
+            # accepted; claude forgets the latter when the default is another mode
+            "permissions": {"defaultMode": "auto"},
+            "skipAutoPermissionPrompt": True,
             "skipDangerousModePermissionPrompt": True,
             # the .mcp.json of the directory claude starts in is not one to ask about
             "enableAllProjectMcpServers": True,
