@@ -134,22 +134,22 @@ resource "cloudflare_dns_record" "akkoma" {
 }
 
 # gehenna
-resource "cloudflare_pages_project" "gehenna_prod" {
+resource "cloudflare_pages_project" "gehenna" {
   account_id        = var.cf_account_id
-  name              = "gehenna-prod"
+  name              = "gehenna"
   production_branch = "master"
 }
 
 resource "cloudflare_pages_domain" "gehenna_prod" {
   account_id   = var.cf_account_id
-  project_name = cloudflare_pages_project.gehenna_prod.name
+  project_name = cloudflare_pages_project.gehenna.name
   name         = "gehenna.littledevil.org"
 }
 
 resource "cloudflare_dns_record" "gehenna_prod" {
   zone_id = var.cf_zone_id_littledevil_org
   name    = "gehenna"
-  content = cloudflare_pages_project.gehenna_prod.subdomain
+  content = cloudflare_pages_project.gehenna.subdomain
   type    = "CNAME"
   proxied = true
   ttl     = 1
@@ -819,7 +819,7 @@ resource "null_resource" "littledevil_cloudflare" {
     cloudflare_pages_project.akkoma,
     cloudflare_pages_domain.akkoma,
     cloudflare_dns_record.akkoma,
-    cloudflare_pages_project.gehenna_prod,
+    cloudflare_pages_project.gehenna,
     cloudflare_pages_domain.gehenna_prod,
     cloudflare_dns_record.gehenna_prod,
     cloudflare_pages_project.gehenna_test,
