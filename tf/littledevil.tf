@@ -833,6 +833,13 @@ resource "null_resource" "littledevil_cloudflare" {
     cloudflare_r2_bucket.prod_upload,
     cloudflare_r2_custom_domain.prod_upload,
   ]
+
+  # without a change of its own this is a no-op, and tofu drops no-op
+  # resources from the apply graph, so -target on it would apply nothing
+  # (the plan shows the deps' changes, the apply does 0 of them)
+  triggers = {
+    always = timestamp()
+  }
 }
 
 resource "null_resource" "oci_prod_bootstrap" {
