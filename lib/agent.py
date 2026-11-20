@@ -26,6 +26,12 @@ gensokyo-agent --legacy [CMD...]         CMD in a throwaway sandbox on the
   --vm, --no-vm               /dev/kvm, on by default
   -d, --device SPEC           as podman run --device. the agent has your
                               groups then, to use it with: /dev/kvm too
+  --from NAME                 carry on from the workspace NAME, which is left
+                              as it is: its claude home (the conversation, its
+                              memory) and its path, so claude --continue picks
+                              up where it was. its files are not brought; the
+                              owner fetches its commits and passes them with
+                              --git. for one that needs another closure, say
   --closure FLAKE[#NAME]      build the flake's agentClosures.<system>.NAME
                               (default: default) here, and give the agent
                               its packages and MCP servers. local only
@@ -71,6 +77,10 @@ examples:
   gensokyo-agent --closure .#lean --git .::
       with the packages and MCP servers of this flake's closure lean, made
       with nornpkgs.lib.mkAgentClosure
+  gensokyo-agent --from jolly_swartz --closure .#lean --git .:jolly_swartz:
+      the conversation of jolly_swartz again, with another closure, on the
+      branch fetched from it (git fetch jolly_swartz && git branch
+      jolly_swartz jolly_swartz/jolly_swartz first)
   gensokyo-agent -s openai-api-key,type=env,target=OPENAI_API_KEY -- codex
       another agent, and a secret of its own
   gensokyo-agent --legacy
@@ -285,6 +295,7 @@ def parse_args(argv):
     p.add_argument("--gpu", action="store_true")
     p.add_argument("--vm", action=argparse.BooleanOptionalAction)
     p.add_argument("-d", "--device", action="append", default=[])
+    p.add_argument("--from", dest="from_")
     p.add_argument("--closure")
     p.add_argument("--prompt")
     p.add_argument("--model")
@@ -336,14 +347,16 @@ def copy_in(src, work, dst):
         shutil.copy2(src, target)
 
 
-def entrypoint(cmd, prompt):
+def entrypoint(cmd, prompt, resume=False):
     """The container's command: the agent on the first start, the same
-    session again on any later one (podman start -ai)."""
+    session again on any later one (podman start -ai); with resume, on
+    the first too, that of the workspace it carries on from."""
     claude = os.path.basename(cmd[0]) == "claude"
     run = shlex.join(cmd)
     # claude's list flags (--allowedTools and the like) take every word up
     # to the next flag, a prompt that follows them included
-    first = run + ((" --" if claude else "") + " " + shlex.quote(prompt) if prompt else "")
+    first = run + (" --continue" if claude and resume else "")
+    first += ((" --" if claude else "") + " " + shlex.quote(prompt) if prompt else "")
     again = f"exec {run}"
     if claude:
         again = f"{run} --continue && exit\n  {again}"
@@ -495,6 +508,20 @@ def build_closure(conf, spec, name, call, taken):
     return closure, list(servers)
 
 
+def inspect_workspace(podman, old):
+    """The path of the workspace OLD, a container of gensokyo-agent."""
+    r = subprocess.run([*podman, "container", "inspect", "--format", "json", old],
+                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    try:
+        (c,) = json.loads(r.stdout) if r.returncode == 0 else [None]
+        workdir = c["Config"]["WorkingDir"]
+        if (c["Config"].get("Labels") or {}).get("gensokyo-agent") is None or not os.path.isabs(workdir):
+            raise LookupError
+    except (ValueError, LookupError, TypeError):
+        die(f"--from {old}: no workspace of that name here")
+    return workdir
+
+
 def new_workspace(conf, opts, cmd, passthrough):
     podman = [conf["podman"]] + (["-c", opts.connection] if opts.connection else [])
     debug = os.environ.get("DEBUG", "0") == "1"
@@ -523,6 +550,8 @@ def new_workspace(conf, opts, cmd, passthrough):
         die("-L: without -c the workspace is on this machine, -p is all it takes")
     if opts.closure and opts.connection:
         die("--closure: the closure is built here, for a workspace here")
+    # the path the conversation knows, and that of its history in the home
+    fromdir = inspect_workspace(podman, opts.from_) if opts.from_ else None
     target = ssh_target(conf, opts.connection) if opts.tunnel else None
 
     name = opts.name
@@ -551,10 +580,12 @@ def new_workspace(conf, opts, cmd, passthrough):
         closure, servers = build_closure(conf, opts.closure, name, call, taken)
 
     # the workspace has one path, here while it is assembled and in the
-    # container afterwards. not under /tmp, that is a tmpfs in the sandbox
+    # container afterwards. not under /tmp, that is a tmpfs in the sandbox.
+    # one carried on from has the path of the first: claude keeps a
+    # conversation by its directory, and it is full of paths there
     base = os.environ.get("GENSOKYO_AGENT_TMPDIR", "/var/tmp/gensokyo-agent")
-    workdir = os.path.join(base, name)
-    ctx = workdir + ".ctx"
+    workdir = fromdir or os.path.join(base, name)
+    ctx = os.path.join(base, name + ".ctx")
     work = os.path.join(ctx, "work")
     if not os.path.isdir(base):
         os.makedirs(base)
@@ -567,10 +598,21 @@ def new_workspace(conf, opts, cmd, passthrough):
         # COPY --chown makes the home the agent's only if it makes it
         shutil.rmtree(root + conf["home"], ignore_errors=True)
         os.makedirs(os.path.join(root, ".gensokyo-agent"), exist_ok=True)
+        os.mkdir(os.path.join(ctx, "home"))
+        if fromdir:
+            # stopped or not; the settings and the first-run state are this one's
+            src = f"{opts.from_}:{conf['home']}/.claude"
+            if call([*podman, "cp", src, os.path.join(ctx, "home", ".claude")]) != 0:
+                die(f"--from {opts.from_}: podman cp {src} failed")
         write_home(os.path.join(ctx, "home"), workdir)
 
         mounts = []
-        notes = {"repositories": [], "files": [], "closure": [], "MCP servers": []}
+        notes = {"history": [], "repositories": [], "files": [], "closure": [], "MCP servers": []}
+        if fromdir:
+            notes["history"].append(
+                f"The conversation so far is that of the workspace `{opts.from_}`, at this same path;"
+                " the owner started this one in its place. Its files are not here: only what the owner"
+                " brought, listed below. What was not committed, or not fetched by the owner, is gone")
         for g in repos:
             clone_in(conf, g, work)
             notes["repositories"].append(
@@ -615,7 +657,7 @@ def new_workspace(conf, opts, cmd, passthrough):
                 f"`{conf['closure']['at']}`, built by the owner from `{opts.closure}`: its `bin` is first on your PATH."
                 " A change to it takes a new workspace")
         with open(os.path.join(root, ".gensokyo-agent", "entrypoint"), "w") as f:
-            f.write(entrypoint(cmd, opts.prompt))
+            f.write(entrypoint(cmd, opts.prompt, resume=bool(fromdir)))
             os.fchmod(f.fileno(), 0o755)
         with open(os.path.join(work, "CLAUDE.md"), "a") as f:
             f.write(claude_md(name, notes))
@@ -670,6 +712,8 @@ def new_workspace(conf, opts, cmd, passthrough):
 
     pm = shlex.join(["podman"] + podman[1:])
     say(f"workspace {name} at {workdir}")
+    if fromdir:
+        say(f"  carries on from {opts.from_}, which is left as it was: {pm} rm {opts.from_} && {pm} rmi localhost/gensokyo-agent/{opts.from_}")
     say(f"  leave with ctrl-p ctrl-q, return with: {pm} attach {name}")
     say(f"  once it has stopped: {pm} start -ai {name}")
     for g in repos:

@@ -23,6 +23,15 @@ if "connection" in args:
                       {{"Name": "pipe", "URI": "unix:///run/podman.sock"}}]))
 if "exists" in args:
     sys.exit(0 if args[-1] in ("claude-oauth-token", "old") else 1)
+if "inspect" in args:
+    # old, a workspace that carried on from one at /var/tmp/gensokyo-agent/older; bare, no workspace
+    found = {{"old": {{"Labels": {{"gensokyo-agent": "old"}}, "WorkingDir": "/var/tmp/gensokyo-agent/older"}},
+             "bare": {{"Labels": None, "WorkingDir": "/"}}}}
+    if args[-1] not in found:
+        sys.exit(125)
+    print(json.dumps([{{"Config": found[args[-1]]}}]))
+if "cp" in args:
+    shutil.copytree(os.environ["STUB_FROM"], args[-1], symlinks=True)
 if "build" in args:
     shutil.rmtree(os.path.join(out, "ctx"), ignore_errors=True)
     shutil.copytree(args[-1], os.path.join(out, "ctx"), symlinks=True)
@@ -159,6 +168,8 @@ class AgentTest(unittest.TestCase):
         self.assertIn("exec claude --x -- 'it'\"'\"'s time'", claude)
         self.assertNotIn("--continue", agent.entrypoint(["codex"], None))
         self.assertIn("exec codex go\n", agent.entrypoint(["codex"], "go"))
+        self.assertIn("exec claude --continue -- go\n", agent.entrypoint(["claude"], "go", resume=True))
+        self.assertIn("exec codex go\n", agent.entrypoint(["codex"], "go", resume=True))
 
     def test_workspace(self):
         data = os.path.join(self.tmp, "data")
@@ -205,6 +216,7 @@ class AgentTest(unittest.TestCase):
         for line in ("`notes/a`, a copy: a note", "`sets/d`, a read-only volume", "`scratch`, a volume", "`live`, the owner's own"):
             self.assertIn(line, md)
         self.assertFalse(os.path.exists(work + ".ctx"))
+        self.assertNotIn("history", md)
 
         self.assertEqual(run[1:5], ["run", "--name", "ws1", "--label"])
         self.assertEqual(run[-2:], ["localhost/gensokyo-agent/ws1", "/.gensokyo-agent/entrypoint"])
@@ -273,6 +285,40 @@ class AgentTest(unittest.TestCase):
         os.mkdir(os.environ["STUB_CLOSURE"])
         self.dies("--name", "ws17", "--closure", ".")
         self.assertFalse(os.path.exists(os.path.join(state, "gensokyo-agent", "ws17")))
+
+    def test_from_carries_on_the_conversation(self):
+        hist = os.path.join(self.tmp, "from")
+        proj = os.path.join(hist, "projects", "-var-tmp-gensokyo-agent-older")
+        os.makedirs(proj)
+        with open(os.path.join(proj, "s.jsonl"), "w") as f:
+            f.write("{}\n")
+        with open(os.path.join(hist, "settings.json"), "w") as f:
+            f.write("{}")
+        os.environ["STUB_FROM"] = hist
+        top = self.repo()
+        run = self.new("--name", "ws18", "-c", "library", "--from", "old", "--git", f"{top}::", "--prompt", "go on")
+        with open(os.path.join(self.out, "podman")) as f:
+            self.assertIn(["-c", "library", "cp", "old:/home/agent/.claude", os.path.join(self.base, "ws18.ctx", "home", ".claude")],
+                          list(map(json.loads, f)))
+        self.assertEqual(self.staged("home", ".claude", "projects", "-var-tmp-gensokyo-agent-older", "s.jsonl"), "{}\n")
+        # this workspace's settings, not the old one's
+        self.assertEqual(json.loads(self.staged("home", ".claude", "settings.json"))["permissions"]["defaultMode"], "auto")
+        older = "/var/tmp/gensokyo-agent/older"
+        self.assertTrue(json.loads(self.staged("home", ".claude.json"))["projects"][older]["hasTrustDialogAccepted"])
+        with open(os.path.join(self.out, "Containerfile")) as f:
+            self.assertIn(f"COPY --chown=4738:384 work/ {older}/\n", f.read())
+        self.assertIn(f"-w {older}", " ".join(run))
+        self.assertEqual(run[run.index("--name") + 1], "ws18")
+        self.assertTrue(git(top, "config", "remote.ws18.url").endswith(f" sh ws18 %S {older}/src/proj podman -c library"))
+        entry = self.staged("root", ".gensokyo-agent", "entrypoint")
+        self.assertIn(f"exec claude --dangerously-skip-permissions {MCP} --continue -- 'go on'\n", entry)
+        self.assertIn("conversation so far is that of the workspace `old`", self.staged("work", "CLAUDE.md"))
+        self.assertFalse(os.path.exists(os.path.join(self.base, "ws18.ctx")))
+        # no --continue for another agent; its home comes along all the same
+        self.new("--name", "ws19", "--from", "old", "--", "codex")
+        self.assertNotIn("--continue", self.staged("root", ".gensokyo-agent", "entrypoint"))
+        self.dies("--from", "bare")
+        self.dies("--from", "nowhere")
 
     def test_connection_reaches_every_podman_call(self):
         run = self.new("--name", "ws2", "-c", "library")

@@ -7,12 +7,15 @@ _gensokyo_agent() {
     --model)
       mapfile -t COMPREPLY < <(compgen -W "fable opus sonnet haiku opusplan" -- "$cur")
       return ;;
+    --from)
+      mapfile -t COMPREPLY < <(compgen -W "$(podman ps -a --filter label=gensokyo-agent --format '{{.Names}}' 2>/dev/null)" -- "$cur")
+      return ;;
     --effort)
       mapfile -t COMPREPLY < <(compgen -W "low medium high xhigh max" -- "$cur")
       return ;;
   esac
   if [[ $cur == -* ]]; then
-    mapfile -t COMPREPLY < <(compgen -W "--legacy --name --connection --secret --gpu --vm --no-vm --device --closure --git --cp --ro --rw --bind --prompt --model --effort --publish -p -L -sp --help" -- "$cur")
+    mapfile -t COMPREPLY < <(compgen -W "--legacy --name --connection --secret --gpu --vm --no-vm --device --closure --from --git --cp --ro --rw --bind --prompt --model --effort --publish -p -L -sp --help" -- "$cur")
   fi
 }
 # paths are the default: most of the other flags start with one

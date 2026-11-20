@@ -77,6 +77,15 @@ in
         machine.succeed(f"{podman} start -a ws1")
         machine.succeed(f"{podman} rm ws1 ws2")
 
+    with subtest("a workspace carries on from another: its claude home, at its path"):
+        machine.succeed(agent(
+            "--name fr1 -- sh -c \"mkdir -p \\$HOME/.claude/projects/p && echo said > \\$HOME/.claude/projects/p/s.jsonl\""))
+        out = machine.succeed(agent(
+            "--name fr2 --from fr1 -- sh -c"
+            " \"cat \\$HOME/.claude/projects/p/s.jsonl; pwd; test -w \\$HOME/.claude/projects/p/s.jsonl && echo mine\""))
+        assert "said\n/var/tmp/gensokyo-agent/fr1\nmine" in out.replace("\r", ""), out
+        machine.succeed(f"{podman} rm fr1 fr2")
+
     with subtest("a device the owner may use, the agent may"):
         machine.succeed("mknod -m 660 /dev/gadget c 1 3 && chgrp gadget /dev/gadget")
         out = machine.succeed(agent(

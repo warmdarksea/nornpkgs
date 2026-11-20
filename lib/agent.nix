@@ -27,6 +27,10 @@
 #   gensokyo-agent --closure .#NAME --git .::
 #                                         with the packages and MCP servers of this flake's
 #                                         agentClosures.<system>.NAME (lib/agent-closure.nix)
+#   gensokyo-agent --from OLD --closure .#NAME --git .:OLD:
+#                                         a new workspace that carries on OLD's conversation (its
+#                                         claude home, at its path), say for another closure. its
+#                                         files are not brought: fetch its branch and pass that
 #   gensokyo-agent -- codex               another agent in it
 #   gensokyo-agent --legacy               claude in a throwaway sandbox on the current directory
 #   gensokyo-agent --legacy codex         any command there
