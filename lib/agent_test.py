@@ -1,4 +1,5 @@
 import contextlib
+import io
 import json
 import os
 import re
@@ -14,7 +15,7 @@ import agent
 # a podman that knows a few containers on this host and one on library, the
 # token secret, and keeps what it was given
 STUB = """#!{python}
-import json, os, shutil, sys
+import json, os, shutil, sys, tarfile
 args = sys.argv[1:]
 out = os.environ["STUB_OUT"]
 with open(os.path.join(out, os.path.basename(sys.argv[0])), "a") as f:
@@ -59,6 +60,10 @@ if "cp" in args:
         src = os.environ.get("STUB_PROJECTS", "").replace("NAME", args[-2].split(":")[0])
         if not os.path.isdir(src):
             sys.exit(125)
+    if args[-1] == "-":
+        with tarfile.open(fileobj=sys.stdout.buffer, mode="w|") as tar:
+            tar.add(src, "projects")
+        sys.exit(0)
     if src:
         shutil.copytree(src, args[-1], symlinks=True)
     else:
@@ -492,43 +497,73 @@ class AgentTest(unittest.TestCase):
         self.assertEqual(copy[-3:], ["--from", "ssh-ng://alice@library.example", closure])
         self.assertEqual(root[-3:], ["--out-link", os.path.join(roots, "lib", "closure"), closure])
 
-    def test_history_gathers_every_conversation(self):
+    def conversations(self):
         projects = os.path.join(self.tmp, "projects-NAME")
+        said = {"rec": "<command-name>/x</command-name>", "lib": "on library"}
         for n in ("rec", "lib"):
             sess = os.path.join(projects.replace("NAME", n), "-var-tmp-gensokyo-agent-" + n)
             os.makedirs(sess)
-            with open(os.path.join(sess, "s.jsonl"), "w") as f:
-                f.write(n + "\n")
+            with open(os.path.join(sess, "s" + n + ".jsonl"), "w") as f:
+                for line in ({"type": "summary"}, {"type": "user", "isMeta": True, "message": {"content": "meta"}},
+                             {"type": "user", "message": {"content": said[n]}},
+                             {"type": "user", "message": {"content": [{"type": "text", "text": "hi\n  claude, " + n}]}}):
+                    f.write(json.dumps(line) + "\n")
+            os.utime(os.path.join(sess, "s" + n + ".jsonl"), (1e9 if n == "lib" else 2e9,) * 2)
+            # what is not a transcript is not listed
+            os.makedirs(os.path.join(sess, "s" + n, "tool-results"))
+            with open(os.path.join(sess, "s" + n, "tool-results", "t.txt"), "w") as f:
+                f.write("x")
         home = os.path.join(self.tmp, "home")
         os.makedirs(os.path.join(home, ".claude", "projects", "-mine"))
         with open(os.path.join(home, ".claude", "projects", "-mine", "m.jsonl"), "w") as f:
-            f.write("mine\n")
+            f.write(json.dumps({"type": "user", "message": {"content": "mine"}}) + "\n")
+        os.utime(os.path.join(home, ".claude", "projects", "-mine", "m.jsonl"), (3e9, 3e9))
+        self.enterContext(mock.patch.dict(os.environ, {"STUB_PROJECTS": projects, "HOME": home}))
+        os.environ.pop("XDG_DATA_HOME", None)
+        return projects
+
+    def test_history_lists_every_conversation(self):
+        self.conversations()
+        with contextlib.redirect_stdout(io.StringIO()) as out, quiet():
+            agent.list_history(self.conf, [])
+        lines = out.getvalue().splitlines()
+        # oldest first; the first thing the owner said, not a command; pipe is here again
+        self.assertEqual([ln.split()[2:] for ln in lines], [
+            ["library/lib", "0.0M", "slib", "on", "library"],
+            ["local/rec", "0.0M", "srec", "hi", "claude,", "rec"],
+            ["local/_owner", "0.0M", "m", "mine"]])
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "home", ".local")))
+        with contextlib.redirect_stdout(io.StringIO()) as out, quiet():
+            agent.list_history(self.conf, ["-c", "library"])
+        self.assertEqual([ln.split()[2] for ln in out.getvalue().splitlines()], ["library/lib", "local/_owner"])
+
+    def test_copy_history_gathers_every_conversation(self):
+        projects = self.conversations()
         dest = os.path.join(self.tmp, "hist")
         os.makedirs(os.path.join(dest, "local", "gone", "projects"))
-        self.enterContext(mock.patch.dict(os.environ, {"STUB_PROJECTS": projects, "HOME": home}))
         with quiet():
-            agent.history(self.conf, [dest])
-        with open(os.path.join(dest, "local", "rec", "projects", "-var-tmp-gensokyo-agent-rec", "s.jsonl")) as f:
-            self.assertEqual(f.read(), "rec\n")
-        with open(os.path.join(dest, "library", "lib", "projects", "-var-tmp-gensokyo-agent-lib", "s.jsonl")) as f:
-            self.assertEqual(f.read(), "lib\n")
+            agent.copy_history(self.conf, [dest])
+        rec = os.path.join(dest, "local", "rec", "projects", "-var-tmp-gensokyo-agent-rec", "srec.jsonl")
+        self.assertTrue(os.path.isfile(rec))
+        self.assertTrue(os.path.isfile(os.path.join(dest, "local", "rec", "projects", "-var-tmp-gensokyo-agent-rec", "srec", "tool-results", "t.txt")))
+        self.assertTrue(os.path.isfile(os.path.join(dest, "library", "lib", "projects", "-var-tmp-gensokyo-agent-lib", "slib.jsonl")))
         with open(os.path.join(dest, "local", "_owner", "projects", "-mine", "m.jsonl")) as f:
-            self.assertEqual(f.read(), "mine\n")
+            self.assertIn("mine", f.read())
         # pipe is here again: once; old has none; what was gathered before stays
         self.assertFalse(os.path.exists(os.path.join(dest, "pipe")))
         self.assertEqual(sorted(os.listdir(os.path.join(dest, "local"))), ["_owner", "gone", "rec"])
         self.assertEqual([n for n in os.listdir(dest) if n.startswith(".")], [])
         # a transcript grown since is taken again
-        with open(os.path.join(projects.replace("NAME", "rec"), "-var-tmp-gensokyo-agent-rec", "s.jsonl"), "a") as f:
+        with open(os.path.join(projects.replace("NAME", "rec"), "-var-tmp-gensokyo-agent-rec", "srec.jsonl"), "a") as f:
             f.write("more\n")
         with quiet():
-            agent.history(self.conf, ["-c", "library", dest])
-        with open(os.path.join(dest, "local", "rec", "projects", "-var-tmp-gensokyo-agent-rec", "s.jsonl")) as f:
-            self.assertEqual(f.read(), "rec\n")
+            agent.copy_history(self.conf, [dest])
+        with open(rec) as f:
+            self.assertTrue(f.read().endswith("more\n"))
+        # the default place
         with quiet():
-            agent.history(self.conf, [dest])
-        with open(os.path.join(dest, "local", "rec", "projects", "-var-tmp-gensokyo-agent-rec", "s.jsonl")) as f:
-            self.assertEqual(f.read(), "rec\nmore\n")
+            agent.copy_history(self.conf, ["-c", "library"])
+        self.assertTrue(os.path.isdir(os.path.join(self.tmp, "home", ".local", "share", "gensokyo-agent", "history", "library", "lib")))
 
     def test_root_script_parses(self):
         subprocess.run(["sh", "-n", "-c", agent.ROOT], check=True)

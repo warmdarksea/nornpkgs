@@ -1,4 +1,5 @@
 import argparse
+import io
 import json
 import os
 import random
@@ -8,6 +9,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import urllib.parse
@@ -19,13 +21,15 @@ gensokyo-agent [FLAG...] [-- CMD...]     CMD (default: claude) in a workspace: a
                                          container that stays
 gensokyo-agent --legacy [CMD...]         CMD in a throwaway sandbox on the
                                          current directory
-gensokyo-agent --history [-c CONN]... [DIR]
-                                         the conversations of every workspace,
+gensokyo-agent --history [-c CONN]...    the conversations of every workspace,
                                          here and on every connection (or those
-                                         of -c), and yours, gathered in DIR
-                                         (default: ~/.local/share/gensokyo-agent/
-                                         history) as CONN/NAME/projects; nothing
-                                         there is ever removed
+                                         of -c), and yours: when, where, how
+                                         long, and what you said first
+gensokyo-agent --copy-history [-c CONN]... [DIR]
+                                         those gathered in DIR (default:
+                                         ~/.local/share/gensokyo-agent/history)
+                                         as CONN/NAME/projects; nothing there
+                                         is ever removed
   --name NAME                container and image name (default: generated)
   -c, --connection NAME       podman connection to build and run on
   -s, --secret SPEC           as podman run --secret
@@ -988,22 +992,22 @@ def merge_tree(src, dst):
             shutil.copy2(os.path.join(d, f), target, follow_symlinks=False)
 
 
-def history(conf, argv):
-    """--history: the claude homes' projects/ of every workspace, gathered
-    here. read off the containers, stopped or not; nothing goes into them"""
-    p = argparse.ArgumentParser(prog="gensokyo-agent --history", usage=USAGE, add_help=False, allow_abbrev=False)
+def history_args(argv, prog, takes_dir):
+    p = argparse.ArgumentParser(prog=f"gensokyo-agent {prog}", usage=USAGE, add_help=False, allow_abbrev=False)
     p.add_argument("-c", "--connection", action="append", default=[])
-    p.add_argument("dir", nargs="?")
-    opts = p.parse_args(argv)
-    data = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
-    dest = os.path.abspath(os.path.expanduser(opts.dir or os.path.join(data, "gensokyo-agent", "history")))
-    conns = opts.connection
+    if takes_dir:
+        p.add_argument("dir", nargs="?")
+    return p.parse_args(argv)
+
+
+def each_workspace(conf, conns):
+    """(where, podman, name) of every workspace here and on every connection,
+    or on those named; one this host has under two connections, once"""
     if not conns:
         out = subprocess.run([conf["podman"], "system", "connection", "ls", "--format", "json"],
                              stdout=subprocess.PIPE, text=True).stdout
         conns = [None] + [c["Name"] for c in json.loads(out or "[]")]
-    os.makedirs(dest, exist_ok=True)
-    seen, gathered = set(), 0
+    seen = set()
     for conn in conns:
         podman = [conf["podman"]] + (["-c", conn] if conn else [])
         where = conn or "local"
@@ -1017,17 +1021,90 @@ def history(conf, argv):
             say(f"{where}: not reached, skipped")
             continue
         for c in found:
-            # this host may be both here and a connection
-            if c["Id"] in seen:
+            if c["Id"] not in seen:
+                seen.add(c["Id"])
+                yield where, podman, c["Names"][0]
+
+
+def projects_tar(conf, podman, name):
+    """The projects/ of a workspace's claude home, as podman cp streams it;
+    what the agent wrote, so read as such. None when it has none"""
+    r = subprocess.run([*podman, "cp", f"{name}:{conf['home']}/.claude/projects", "-"],
+                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    if r.returncode != 0:
+        return None
+    try:
+        return tarfile.open(fileobj=io.BytesIO(r.stdout))
+    except tarfile.TarError:
+        return None
+
+
+def first_prompt(lines):
+    """What the owner said first in a transcript, on one line."""
+    for line in lines:
+        try:
+            d = json.loads(line)
+            if d.get("type") != "user" or d.get("isMeta"):
                 continue
-            seen.add(c["Id"])
-            name = c["Names"][0]
-            with tempfile.TemporaryDirectory(dir=dest, prefix=".") as tmp:
-                got = os.path.join(tmp, "projects")
-                if subprocess.run([*podman, "cp", f"{name}:{conf['home']}/.claude/projects", got],
-                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
-                    say(f"{where}/{name}: no conversations")
-                    continue
+            content = d["message"]["content"]
+        except (ValueError, LookupError, TypeError, AttributeError):
+            continue
+        if isinstance(content, list):
+            content = next((c.get("text") for c in content if isinstance(c, dict) and c.get("type") == "text"), None)
+        # commands, reminders and the like come wrapped in tags
+        if isinstance(content, str) and content.strip() and not content.lstrip().startswith("<"):
+            return " ".join(content.split())
+    return ""
+
+
+SESSION = re.compile(r"^(?:projects/)?[^/]+/([^/]+)\.jsonl$")
+
+
+def list_history(conf, argv):
+    """--history: a line for every conversation, the oldest first."""
+    opts = history_args(argv, "--history", False)
+    rows = []
+    for where, podman, name in each_workspace(conf, opts.connection):
+        tar = projects_tar(conf, podman, name)
+        for m in tar.getmembers() if tar else []:
+            s = SESSION.match(m.name)
+            if s and m.isfile():
+                rows.append((m.mtime, f"{where}/{name}", m.size, s[1], first_prompt(tar.extractfile(m))))
+    own = os.path.expanduser("~/.claude/projects")
+    for d, _, files in os.walk(own):
+        for f in files:
+            path = os.path.join(d, f)
+            s = SESSION.match(os.path.relpath(path, own))
+            if s:
+                with open(path, "rb") as fh:
+                    rows.append((os.path.getmtime(path), "local/_owner", os.path.getsize(path), s[1], first_prompt(fh)))
+    rows.sort()
+    width = max([len(r[1]) for r in rows] + [0])
+    for mtime, ws, size, session, prompt in rows:
+        when = time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime))
+        print(f"{when}  {ws:<{width}}  {size / 1e6:6.1f}M  {session[:8]}  {prompt[:80]}")
+    say(f"{len(rows)} conversation{'' if len(rows) == 1 else 's'}, {sum(r[2] for r in rows) / 1e6:.1f} MB; "
+        "gensokyo-agent --copy-history to keep a copy")
+
+
+def copy_history(conf, argv):
+    """--copy-history: every workspace's projects/ gathered in a directory
+    here, merged into what an earlier run left there."""
+    opts = history_args(argv, "--copy-history", True)
+    data = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+    dest = os.path.abspath(os.path.expanduser(opts.dir or os.path.join(data, "gensokyo-agent", "history")))
+    os.makedirs(dest, exist_ok=True)
+    gathered = 0
+    for where, podman, name in each_workspace(conf, opts.connection):
+        tar = projects_tar(conf, podman, name)
+        if tar is None:
+            say(f"{where}/{name}: no conversations")
+            continue
+        with tempfile.TemporaryDirectory(dir=dest, prefix=".") as tmp:
+            # nothing outside tmp, no devices, no links that lead out
+            tar.extractall(tmp, filter="data")
+            got = os.path.join(tmp, "projects")
+            if os.path.isdir(got):
                 merge_tree(got, os.path.join(dest, where, name, "projects"))
                 gathered += 1
     own = os.path.expanduser("~/.claude/projects")
@@ -1040,7 +1117,9 @@ def main():
     for sig in (signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, lambda *_: sys.exit(1))
     if sys.argv[1:2] == ["--history"]:
-        sys.exit(history(load_conf(), sys.argv[2:]))
+        sys.exit(list_history(load_conf(), sys.argv[2:]))
+    if sys.argv[1:2] == ["--copy-history"]:
+        sys.exit(copy_history(load_conf(), sys.argv[2:]))
     opts, cmd, passthrough = parse_args(sys.argv[1:])
     conf = load_conf()
     if opts is None:
