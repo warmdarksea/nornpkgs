@@ -4,7 +4,7 @@
 { hostPkgs }:
 hostPkgs.runCommand "agent-cli-test" { nativeBuildInputs = [ hostPkgs.python3 hostPkgs.gitMinimal ]; } ''
   cp ${../lib/agent.py} agent.py
-  cp ${../lib/agent_test.py} agent_test.py
+  cp ${./agent_test.py} agent_test.py
   HOME=$PWD python3 -W error -m unittest -v agent_test
   touch $out
 ''
