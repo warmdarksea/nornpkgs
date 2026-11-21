@@ -13,8 +13,12 @@
     ]
   ) (if builtins.isList pkg.meta.license then pkg.meta.license else [ pkg.meta.license ]));
 
-  nix.settings.keep-failed = true;
   nixpkgs.config.allowUnfree = true;
+  nix.settings.keep-failed = true;
+  nix.settings.experimental-features = [ "nix-command" "flakes" "cgroups" ];
+  nix.settings.use-cgroups = true;
+  nix.settings.trusted-users = [ "patchouli" ];
+
 
   # the zfs storage driver and its dataset live in inst/, the nvidia runtime in hw/
   virtualisation.docker.enable = true;
