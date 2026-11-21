@@ -19,6 +19,13 @@ gensokyo-agent [FLAG...] [-- CMD...]     CMD (default: claude) in a workspace: a
                                          container that stays
 gensokyo-agent --legacy [CMD...]         CMD in a throwaway sandbox on the
                                          current directory
+gensokyo-agent --history [-c CONN]... [DIR]
+                                         the conversations of every workspace,
+                                         here and on every connection (or those
+                                         of -c), and yours, gathered in DIR
+                                         (default: ~/.local/share/gensokyo-agent/
+                                         history) as CONN/NAME/projects; nothing
+                                         there is ever removed
   --name NAME                container and image name (default: generated)
   -c, --connection NAME       podman connection to build and run on
   -s, --secret SPEC           as podman run --secret
@@ -968,9 +975,72 @@ def new_workspace(conf, opts, cmd, passthrough):
     os.execvp(argv[0], argv)
 
 
+def merge_tree(src, dst):
+    """src into dst, files of the same name replaced, none removed: a
+    transcript only grows, and is named by its session."""
+    for d, dirs, files in os.walk(src):
+        out = os.path.join(dst, os.path.relpath(d, src))
+        os.makedirs(out, exist_ok=True)
+        for f in files:
+            target = os.path.join(out, f)
+            if os.path.lexists(target) and not os.path.isdir(target):
+                os.unlink(target)
+            shutil.copy2(os.path.join(d, f), target, follow_symlinks=False)
+
+
+def history(conf, argv):
+    """--history: the claude homes' projects/ of every workspace, gathered
+    here. read off the containers, stopped or not; nothing goes into them"""
+    p = argparse.ArgumentParser(prog="gensokyo-agent --history", usage=USAGE, add_help=False, allow_abbrev=False)
+    p.add_argument("-c", "--connection", action="append", default=[])
+    p.add_argument("dir", nargs="?")
+    opts = p.parse_args(argv)
+    data = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+    dest = os.path.abspath(os.path.expanduser(opts.dir or os.path.join(data, "gensokyo-agent", "history")))
+    conns = opts.connection
+    if not conns:
+        out = subprocess.run([conf["podman"], "system", "connection", "ls", "--format", "json"],
+                             stdout=subprocess.PIPE, text=True).stdout
+        conns = [None] + [c["Name"] for c in json.loads(out or "[]")]
+    os.makedirs(dest, exist_ok=True)
+    seen, gathered = set(), 0
+    for conn in conns:
+        podman = [conf["podman"]] + (["-c", conn] if conn else [])
+        where = conn or "local"
+        try:
+            r = subprocess.run([*podman, "ps", "-a", "--filter", "label=gensokyo-agent", "--format", "json"],
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=60)
+            found = json.loads(r.stdout or "[]") if r.returncode == 0 else None
+        except (subprocess.TimeoutExpired, ValueError):
+            found = None
+        if found is None:
+            say(f"{where}: not reached, skipped")
+            continue
+        for c in found:
+            # this host may be both here and a connection
+            if c["Id"] in seen:
+                continue
+            seen.add(c["Id"])
+            name = c["Names"][0]
+            with tempfile.TemporaryDirectory(dir=dest, prefix=".") as tmp:
+                got = os.path.join(tmp, "projects")
+                if subprocess.run([*podman, "cp", f"{name}:{conf['home']}/.claude/projects", got],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
+                    say(f"{where}/{name}: no conversations")
+                    continue
+                merge_tree(got, os.path.join(dest, where, name, "projects"))
+                gathered += 1
+    own = os.path.expanduser("~/.claude/projects")
+    if os.path.isdir(own):
+        merge_tree(own, os.path.join(dest, "local", "_owner", "projects"))
+    say(f"{gathered} workspaces{' and yours' if os.path.isdir(own) else ''} in {dest}")
+
+
 def main():
     for sig in (signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, lambda *_: sys.exit(1))
+    if sys.argv[1:2] == ["--history"]:
+        sys.exit(history(load_conf(), sys.argv[2:]))
     opts, cmd, passthrough = parse_args(sys.argv[1:])
     conf = load_conf()
     if opts is None:

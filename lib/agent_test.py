@@ -42,7 +42,11 @@ found = {{
         "lib": {{"Config": {{"Labels": {{"gensokyo-agent": "lib", "gensokyo-agent.opts": label(os.environ.get("STUB_REC_CLOSURE"))}},
                            "WorkingDir": ws + "/lib"}}, "State": {{"Running": False}}, "Image": "l1b"}},
     }},
-}}.get(conn, {{}})
+}}
+# pipe is this host again
+found = found[None] if conn in (None, "pipe") else found.get(conn, {{}})
+if "ps" in args:
+    print(json.dumps([{{"Id": "id-" + n, "Names": [n]}} for n, c in found.items() if (c["Config"]["Labels"] or {{}}).get("gensokyo-agent")]))
 if "exists" in args:
     sys.exit(0 if args[-1] in ("claude-oauth-token", *found) else 1)
 if "inspect" in args:
@@ -51,6 +55,10 @@ if "inspect" in args:
     print(json.dumps([found[args[-1]]]))
 if "cp" in args:
     src = os.environ["STUB_FROM"] if args[-2].endswith("/.claude") else os.environ.get("STUB_WORK")
+    if args[-2].endswith("/.claude/projects"):
+        src = os.environ.get("STUB_PROJECTS", "").replace("NAME", args[-2].split(":")[0])
+        if not os.path.isdir(src):
+            sys.exit(125)
     if src:
         shutil.copytree(src, args[-1], symlinks=True)
     else:
@@ -483,6 +491,44 @@ class AgentTest(unittest.TestCase):
         copy, root = self.calls("nix")
         self.assertEqual(copy[-3:], ["--from", "ssh-ng://alice@library.example", closure])
         self.assertEqual(root[-3:], ["--out-link", os.path.join(roots, "lib", "closure"), closure])
+
+    def test_history_gathers_every_conversation(self):
+        projects = os.path.join(self.tmp, "projects-NAME")
+        for n in ("rec", "lib"):
+            sess = os.path.join(projects.replace("NAME", n), "-var-tmp-gensokyo-agent-" + n)
+            os.makedirs(sess)
+            with open(os.path.join(sess, "s.jsonl"), "w") as f:
+                f.write(n + "\n")
+        home = os.path.join(self.tmp, "home")
+        os.makedirs(os.path.join(home, ".claude", "projects", "-mine"))
+        with open(os.path.join(home, ".claude", "projects", "-mine", "m.jsonl"), "w") as f:
+            f.write("mine\n")
+        dest = os.path.join(self.tmp, "hist")
+        os.makedirs(os.path.join(dest, "local", "gone", "projects"))
+        self.enterContext(mock.patch.dict(os.environ, {"STUB_PROJECTS": projects, "HOME": home}))
+        with quiet():
+            agent.history(self.conf, [dest])
+        with open(os.path.join(dest, "local", "rec", "projects", "-var-tmp-gensokyo-agent-rec", "s.jsonl")) as f:
+            self.assertEqual(f.read(), "rec\n")
+        with open(os.path.join(dest, "library", "lib", "projects", "-var-tmp-gensokyo-agent-lib", "s.jsonl")) as f:
+            self.assertEqual(f.read(), "lib\n")
+        with open(os.path.join(dest, "local", "_owner", "projects", "-mine", "m.jsonl")) as f:
+            self.assertEqual(f.read(), "mine\n")
+        # pipe is here again: once; old has none; what was gathered before stays
+        self.assertFalse(os.path.exists(os.path.join(dest, "pipe")))
+        self.assertEqual(sorted(os.listdir(os.path.join(dest, "local"))), ["_owner", "gone", "rec"])
+        self.assertEqual([n for n in os.listdir(dest) if n.startswith(".")], [])
+        # a transcript grown since is taken again
+        with open(os.path.join(projects.replace("NAME", "rec"), "-var-tmp-gensokyo-agent-rec", "s.jsonl"), "a") as f:
+            f.write("more\n")
+        with quiet():
+            agent.history(self.conf, ["-c", "library", dest])
+        with open(os.path.join(dest, "local", "rec", "projects", "-var-tmp-gensokyo-agent-rec", "s.jsonl")) as f:
+            self.assertEqual(f.read(), "rec\n")
+        with quiet():
+            agent.history(self.conf, [dest])
+        with open(os.path.join(dest, "local", "rec", "projects", "-var-tmp-gensokyo-agent-rec", "s.jsonl")) as f:
+            self.assertEqual(f.read(), "rec\nmore\n")
 
     def test_root_script_parses(self):
         subprocess.run(["sh", "-n", "-c", agent.ROOT], check=True)
