@@ -27,10 +27,13 @@
 #   gensokyo-agent --closure .#NAME --git .::
 #                                         with the packages and MCP servers of this flake's
 #                                         agentClosures.<system>.NAME (lib/agent-closure.nix)
-#   gensokyo-agent --from OLD --closure .#NAME --git .:OLD:
-#                                         a new workspace that carries on OLD's conversation (its
-#                                         claude home, at its path), say for another closure. its
-#                                         files are not brought: fetch its branch and pass that
+#   gensokyo-agent --from OLD --closure .#NAME
+#                                         OLD again (its claude home, at its path, and its files),
+#                                         say for another closure: it is replaced under its name
+#   gensokyo-agent -c HOST --from CONN/OLD --git-add-remote .
+#                                         a copy of OLD on the host of CONN, closure and all, on
+#                                         HOST; this checkout gets the remote OLD to it, if it has
+#                                         none of that name already
 #   gensokyo-agent -- codex               another agent in it
 #   gensokyo-agent --legacy               claude in a throwaway sandbox on the current directory
 #   gensokyo-agent --legacy codex         any command there

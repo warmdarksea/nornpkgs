@@ -86,6 +86,16 @@ in
         assert "said\n/var/tmp/gensokyo-agent/fr1\nmine" in out.replace("\r", ""), out
         machine.succeed(f"{podman} rm fr1 fr2")
 
+    with subtest("and under its own name replaces it, files and all"):
+        machine.succeed(agent(
+            "--name fr3 -- sh -c \"echo kept > mine; mkdir -p \\$HOME/.claude && echo said > \\$HOME/.claude/s\""))
+        out = machine.succeed(agent(
+            "--from fr3 -- sh -c \"cat mine \\$HOME/.claude/s; grep -c workspace.fr3 CLAUDE.md; test -w mine && echo mine\""))
+        assert "kept\nsaid\n1\nmine" in out.replace("\r", ""), out
+        names = machine.succeed(podman + " ps -a --format {{.Names}}").split()
+        assert names.count("fr3") == 1 and "fr3.replaced" not in names, names
+        machine.succeed(f"{podman} rm fr3")
+
     with subtest("a device the owner may use, the agent may"):
         machine.succeed("mknod -m 660 /dev/gadget c 1 3 && chgrp gadget /dev/gadget")
         out = machine.succeed(agent(
@@ -102,6 +112,10 @@ in
         root = "/home/alice/.local/state/gensokyo-agent/cl1/closure"
         machine.succeed(f"test $(readlink {root}) = ${fakeClosure hostPkgs}")
         machine.succeed(f"nix-store --gc --print-roots | grep -F {root}")
+        # and one carried on from brings it along, rooted still
+        out = machine.succeed(agent("--from cl1 -- sh -c \"fake-mcp; grep -q cl1..had CLAUDE.md && echo noted\""))
+        assert "fake\nnoted" in out.replace("\r", ""), out
+        machine.succeed(f"test $(readlink {root}) = ${fakeClosure hostPkgs}")
         # without --closure, the module's own, which has no servers
         out = machine.succeed(agent("--name cl2 -- cat /.gensokyo-agent/closure/share/gensokyo-agent/mcp.json"))
         assert '{"mcpServers":{}}' in out, out

@@ -11,42 +11,74 @@ from unittest import mock
 
 import agent
 
-# a podman that says nothing exists but the token secret, and keeps what it was given
+# a podman that knows a few containers on this host and one on library, the
+# token secret, and keeps what it was given
 STUB = """#!{python}
 import json, os, shutil, sys
 args = sys.argv[1:]
 out = os.environ["STUB_OUT"]
 with open(os.path.join(out, os.path.basename(sys.argv[0])), "a") as f:
     f.write(json.dumps(args) + "\\n")
+conn = args[1] if args[:1] == ["-c"] else None
 if "connection" in args:
     print(json.dumps([{{"Name": "library", "URI": "ssh://alice@library.example:2222/run/user/1000/podman/podman.sock", "Identity": "/id"}},
                       {{"Name": "pipe", "URI": "unix:///run/podman.sock"}}]))
+def label(closure):
+    return json.dumps({{"closure": closure, "servers": ["lean"], "opts": {{}}}})
+# old: made before the label, carried on from one at .../older, with a volume; rec: one with
+# the label and a closure, running; lib: rec's kind on library; bare: no workspace
+ws = os.environ.get("STUB_WS", "/var/tmp/gensokyo-agent")
+found = {{
+    None: {{
+        "old": {{"Config": {{"Labels": {{"gensokyo-agent": "old"}}, "WorkingDir": ws + "/older"}},
+                "Mounts": [{{"Destination": "/.gensokyo-agent/closure", "Source": "/etc/gensokyo-agent/closure"}},
+                           {{"Destination": ws + "/older/data", "Source": "/vol"}}]}},
+        "rec": {{"Config": {{"Labels": {{"gensokyo-agent": "rec", "gensokyo-agent.opts": label(os.environ.get("STUB_REC_CLOSURE"))}},
+                           "WorkingDir": ws + "/rec"}}, "State": {{"Running": True}}, "Image": "0ld1mage",
+                "Mounts": [{{"Destination": ws + "/rec/data", "Source": "/vol"}}]}},
+        "bare": {{"Config": {{"Labels": None, "WorkingDir": "/"}}}},
+    }},
+    "library": {{
+        "lib": {{"Config": {{"Labels": {{"gensokyo-agent": "lib", "gensokyo-agent.opts": label(os.environ.get("STUB_REC_CLOSURE"))}},
+                           "WorkingDir": ws + "/lib"}}, "State": {{"Running": False}}, "Image": "l1b"}},
+    }},
+}}.get(conn, {{}})
 if "exists" in args:
-    sys.exit(0 if args[-1] in ("claude-oauth-token", "old") else 1)
+    sys.exit(0 if args[-1] in ("claude-oauth-token", *found) else 1)
 if "inspect" in args:
-    # old, a workspace that carried on from one at /var/tmp/gensokyo-agent/older; bare, no workspace
-    found = {{"old": {{"Labels": {{"gensokyo-agent": "old"}}, "WorkingDir": "/var/tmp/gensokyo-agent/older"}},
-             "bare": {{"Labels": None, "WorkingDir": "/"}}}}
     if args[-1] not in found:
         sys.exit(125)
-    print(json.dumps([{{"Config": found[args[-1]]}}]))
+    print(json.dumps([found[args[-1]]]))
 if "cp" in args:
-    shutil.copytree(os.environ["STUB_FROM"], args[-1], symlinks=True)
+    src = os.environ["STUB_FROM"] if args[-2].endswith("/.claude") else os.environ.get("STUB_WORK")
+    if src:
+        shutil.copytree(src, args[-1], symlinks=True)
+    else:
+        os.mkdir(args[-1])
 if "build" in args:
     shutil.rmtree(os.path.join(out, "ctx"), ignore_errors=True)
     shutil.copytree(args[-1], os.path.join(out, "ctx"), symlinks=True)
     shutil.move(os.path.join(out, "ctx", "Containerfile"), os.path.join(out, "Containerfile"))
 """
 
-# a nix whose build links the out-link to $STUB_CLOSURE
+# a nix whose build links the out-link to the store path it is given, or to
+# $STUB_CLOSURE for a flake; and whose copy copies nothing
 NIX = """#!{python}
 import json, os, sys
 args = sys.argv[1:]
 with open(os.path.join(os.environ["STUB_OUT"], "nix"), "a") as f:
     f.write(json.dumps(args) + "\\n")
-if not os.path.isdir(os.environ["STUB_CLOSURE"]):
+with open(os.path.join(os.environ["STUB_OUT"], "nixenv"), "a") as f:
+    f.write(json.dumps(os.environ.get("NIX_SSHOPTS")) + "\\n")
+if "copy" in args:
+    sys.exit(0)
+built = args[-1] if "#" not in args[-1] else os.environ["STUB_CLOSURE"]
+if not os.path.isdir(built):
     sys.exit(1)
-os.symlink(os.environ["STUB_CLOSURE"], args[args.index("--out-link") + 1])
+link = args[args.index("--out-link") + 1]
+if os.path.lexists(link):
+    os.remove(link)
+os.symlink(built, link)
 """
 MCP = "--mcp-config /.gensokyo-agent/closure/share/gensokyo-agent/mcp.json"
 
@@ -93,7 +125,7 @@ class AgentTest(unittest.TestCase):
         }
         self.base = os.path.join(self.tmp, "ws")
         self.enterContext(mock.patch.dict(os.environ, {
-            "STUB_OUT": self.out, "GENSOKYO_AGENT_TMPDIR": self.base,
+            "STUB_OUT": self.out, "GENSOKYO_AGENT_TMPDIR": self.base, "STUB_WS": self.base,
             "GIT_AUTHOR_NAME": "o", "GIT_AUTHOR_EMAIL": "o@o",
             "GIT_COMMITTER_NAME": "o", "GIT_COMMITTER_EMAIL": "o@o",
         }))
@@ -277,7 +309,16 @@ class AgentTest(unittest.TestCase):
         with open(os.path.join(self.out, "nix")) as f:
             self.assertEqual(f.read().splitlines()[-1].split(", ")[-1], '"nixpkgs#agentClosures.x86_64-linux.default"]')
 
-        self.dies("--closure", ".", "-c", "library")
+        # for library: built here, copied there and rooted there, not here
+        os.remove(os.path.join(self.out, "nix"))
+        run = self.new("--name", "ws20", "-c", "library", "--closure", ".#lean")
+        build, copy = self.calls("nix")
+        self.assertNotEqual(os.path.dirname(build[-2]), os.path.join(state, "gensokyo-agent", "ws20"))
+        self.assertFalse(os.path.exists(build[-2]))
+        self.assertEqual(copy[-3:], ["--to", "ssh-ng://alice@library.example", closure])
+        self.assertTrue(self.calls("ssh")[-1][-1].endswith(f" sh ws20 {closure}"))
+        self.assertIn(f"{closure}:/.gensokyo-agent/closure:ro", run)
+        self.assertFalse(os.path.exists(os.path.join(state, "gensokyo-agent", "ws20")))
         os.environ["STUB_CLOSURE"] = os.path.join(self.tmp, "missing")
         self.dies("--name", "ws16", "--closure", ".")
         # a store path that is not a closure of mkAgentClosure
@@ -286,39 +327,165 @@ class AgentTest(unittest.TestCase):
         self.dies("--name", "ws17", "--closure", ".")
         self.assertFalse(os.path.exists(os.path.join(state, "gensokyo-agent", "ws17")))
 
-    def test_from_carries_on_the_conversation(self):
+    def calls(self, prog="podman"):
+        with open(os.path.join(self.out, prog)) as f:
+            return list(map(json.loads, f))
+
+    def history(self):
         hist = os.path.join(self.tmp, "from")
-        proj = os.path.join(hist, "projects", "-var-tmp-gensokyo-agent-older")
-        os.makedirs(proj)
+        proj = os.path.join(hist, "projects", "-p")
+        os.makedirs(proj, exist_ok=True)
         with open(os.path.join(proj, "s.jsonl"), "w") as f:
             f.write("{}\n")
         with open(os.path.join(hist, "settings.json"), "w") as f:
             f.write("{}")
         os.environ["STUB_FROM"] = hist
+
+    def test_from_carries_on_the_conversation(self):
+        self.history()
         top = self.repo()
-        run = self.new("--name", "ws18", "-c", "library", "--from", "old", "--git", f"{top}::", "--prompt", "go on")
-        with open(os.path.join(self.out, "podman")) as f:
-            self.assertIn(["-c", "library", "cp", "old:/home/agent/.claude", os.path.join(self.base, "ws18.ctx", "home", ".claude")],
-                          list(map(json.loads, f)))
-        self.assertEqual(self.staged("home", ".claude", "projects", "-var-tmp-gensokyo-agent-older", "s.jsonl"), "{}\n")
+        # from here to library, under another name, the conversation only
+        run = self.new("--name", "ws18", "-c", "library", "--from", "old", "--no-copy", "--git", f"{top}::", "--prompt", "go on")
+        older = os.path.join(self.base, "older")
+        self.assertIn(["cp", "old:/home/agent/.claude", os.path.join(self.base, "ws18.ctx", "home", ".claude")], self.calls())
+        self.assertNotIn("stop", [c[0] for c in self.calls()])
+        self.assertEqual(self.staged("home", ".claude", "projects", "-p", "s.jsonl"), "{}\n")
         # this workspace's settings, not the old one's
         self.assertEqual(json.loads(self.staged("home", ".claude", "settings.json"))["permissions"]["defaultMode"], "auto")
-        older = "/var/tmp/gensokyo-agent/older"
         self.assertTrue(json.loads(self.staged("home", ".claude.json"))["projects"][older]["hasTrustDialogAccepted"])
         with open(os.path.join(self.out, "Containerfile")) as f:
             self.assertIn(f"COPY --chown=4738:384 work/ {older}/\n", f.read())
         self.assertIn(f"-w {older}", " ".join(run))
+        self.assertEqual(run[1:5], ["-c", "library", "run", "--name"])
         self.assertEqual(run[run.index("--name") + 1], "ws18")
         self.assertTrue(git(top, "config", "remote.ws18.url").endswith(f" sh ws18 %S {older}/src/proj podman -c library"))
         entry = self.staged("root", ".gensokyo-agent", "entrypoint")
         self.assertIn(f"exec claude --dangerously-skip-permissions {MCP} --continue -- 'go on'\n", entry)
-        self.assertIn("conversation so far is that of the workspace `old`", self.staged("work", "CLAUDE.md"))
+        md = self.staged("work", "CLAUDE.md")
+        self.assertIn("conversation so far is that of the workspace `old`", md)
+        self.assertIn("on another machine", md)
+        self.assertIn("Its files are not here", md)
+        # its closure was the default one: that of library then, and nothing copied
+        self.assertIn("/etc/gensokyo-agent/closure:/.gensokyo-agent/closure:ro", run)
+        self.assertFalse(os.path.exists(os.path.join(self.out, "nix")))
         self.assertFalse(os.path.exists(os.path.join(self.base, "ws18.ctx")))
         # no --continue for another agent; its home comes along all the same
         self.new("--name", "ws19", "--from", "old", "--", "codex")
         self.assertNotIn("--continue", self.staged("root", ".gensokyo-agent", "entrypoint"))
         self.dies("--from", "bare")
         self.dies("--from", "nowhere")
+        self.dies("--from", "library/old")
+        self.dies("--copy")
+        # old is on this host, its name taken
+        self.dies("--from", "lib", "-c", "library")
+
+    def carried(self):
+        """rec's workspace: an uncommitted file, a checkout, a volume's mount
+        point and the CLAUDE.md of the owner's and the wrapper's"""
+        work = os.path.join(self.tmp, "recwork")
+        clone = os.path.join(work, "src", "proj")
+        os.makedirs(os.path.join(clone, ".git"))
+        os.makedirs(os.path.join(work, "data"))
+        with open(os.path.join(work, "data", "big"), "w") as f:
+            f.write("volume")
+        with open(os.path.join(work, "u"), "w") as f:
+            f.write("uncommitted")
+        with open(os.path.join(work, "CLAUDE.md"), "w") as f:
+            f.write("the owner's\n# workspace rec\n\nstale\n")
+        with open(os.path.join(work, ".mcp.json"), "w") as f:
+            f.write('{"mcpServers": {"mine": {}}}')
+        os.environ["STUB_WORK"] = work
+        closure = os.path.join(self.tmp, "rec-closure")
+        os.mkdir(closure)
+        os.environ["STUB_REC_CLOSURE"] = closure
+        state = os.path.join(self.tmp, "state")
+        os.environ["XDG_STATE_HOME"] = state
+        return closure, os.path.join(state, "gensokyo-agent")
+
+    def test_from_replaces_it_on_its_host(self):
+        self.history()
+        closure, roots = self.carried()
+        top = self.repo()
+        recdir = os.path.join(self.base, "rec")
+        start = self.new("--from", "rec", "--git-add-remote", top)
+        calls = self.calls()
+        # stopped, then copied whole
+        self.assertLess(calls.index(["stop", "rec"]), calls.index(["cp", "rec:" + recdir, os.path.join(self.base, "rec.ctx", "work")]))
+        self.assertEqual(self.staged("work", "u"), "uncommitted")
+        self.assertTrue(os.path.isdir(os.path.join(self.out, "ctx", "work", "src", "proj", ".git")))
+        # but not what was mounted there
+        self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "work", "data")))
+        self.assertEqual(json.loads(self.staged("work", ".mcp.json")), {"mcpServers": {"mine": {}}})
+        md = self.staged("work", "CLAUDE.md")
+        self.assertTrue(md.startswith("the owner's\n# workspace rec\n"), md)
+        self.assertNotIn("stale", md)
+        self.assertEqual(md.count("# workspace"), 1)
+        self.assertIn("Its files came along", md)
+        self.assertNotIn("another machine", md)
+        self.assertIn("`src/proj`, a checkout as `rec` left it", md)
+        self.assertIn("the one `rec` had", md)
+        self.assertIn("`lean`: the owner's, from the closure", md)
+        # its closure, rooted here under its name
+        self.assertEqual(self.calls("nix")[-1][-3:], ["--out-link", os.path.join(roots, "rec", "closure"), closure])
+        self.assertNotIn("copy", self.calls("nix")[-1])
+        # the old one steps aside, the new one is made, and the old one goes
+        verbs = [c[0] for c in calls]
+        i = verbs.index("rename")
+        self.assertEqual(verbs[i:i + 4], ["rename", "create", "rm", "rmi"])
+        self.assertEqual((calls[i], calls[i + 2], calls[i + 3]), (["rename", "rec", "rec.replaced"], ["rm", "rec.replaced"], ["rmi", "0ld1mage"]))
+        create = calls[i + 1]
+        self.assertEqual(create[create.index("--name") + 1], "rec")
+        self.assertIn(f"{closure}:/.gensokyo-agent/closure:ro", create)
+        self.assertEqual(create[-2:], ["localhost/gensokyo-agent/rec", "/.gensokyo-agent/entrypoint"])
+        record = json.loads(create[create.index("gensokyo-agent=rec") + 2].split("=", 1)[1])
+        self.assertEqual((record["closure"], record["servers"]), (closure, ["lean"]))
+        self.assertNotIn("git_add_remote", record["opts"])
+        self.assertEqual(start[1:], ["start", "-a", "rec"])
+        # the remote, only that: the checkout is the one that came along
+        url = git(top, "config", "remote.rec.url")
+        self.assertTrue(url.endswith(f" sh rec %S {recdir}/src/proj podman"), url)
+        self.assertEqual(git(top, "config", "remote.rec.push"), "refs/heads/*:refs/remotes/owner/*")
+        # the same remote again is no change; one elsewhere is not replaced
+        self.new("--from", "rec", "--git-add-remote", top)
+        self.dies("--from", "rec", "-c", "library", "--git-add-remote", top)
+        self.assertEqual(git(top, "config", "remote.rec.url"), url)
+        # nor is there a checkout to point at without its files
+        git(top, "remote", "remove", "rec")
+        self.dies("--from", "rec", "--no-copy", "--git-add-remote", top)
+        self.assertEqual(git(top, "remote"), "")
+
+    def test_from_another_host(self):
+        self.history()
+        closure, roots = self.carried()
+        # from here to library: its closure goes there and is rooted there
+        run = self.new("-c", "library", "--from", "rec")
+        self.assertEqual(run[1:4], ["-c", "library", "run"])
+        self.assertEqual(run[run.index("--name") + 1], "rec")
+        self.assertIn(f"{closure}:/.gensokyo-agent/closure:ro", run)
+        self.assertIn(["stop", "rec"], self.calls())
+        self.assertNotIn("rename", [c[0] for c in self.calls()])
+        (copy,) = self.calls("nix")
+        self.assertEqual(copy[-4:], ["--no-check-sigs", "--to", "ssh-ng://alice@library.example", closure])
+        self.assertEqual(self.calls("nixenv"), ["-p 2222 -i /id"])
+        ssh = self.calls("ssh")[-1]
+        self.assertEqual(ssh[:5], ["-p", "2222", "-i", "/id", "alice@library.example"])
+        self.assertTrue(ssh[5].startswith("sh -c ") and ssh[5].endswith(f" sh rec {closure}"), ssh[5])
+        self.assertFalse(os.path.exists(os.path.join(roots, "rec")))
+        md = self.staged("work", "CLAUDE.md")
+        self.assertIn("on another machine", md)
+        self.assertIn("a `result` link", md)
+        # and from library to here, by way of its connection
+        os.remove(os.path.join(self.out, "nix"))
+        run = self.new("--from", "library/lib", "--no-copy")
+        self.assertEqual(run[1:3], ["run", "--name"])
+        self.assertEqual(run[run.index("--name") + 1], "lib")
+        self.assertIn(["-c", "library", "cp", "lib:/home/agent/.claude", os.path.join(self.base, "lib.ctx", "home", ".claude")], self.calls())
+        copy, root = self.calls("nix")
+        self.assertEqual(copy[-3:], ["--from", "ssh-ng://alice@library.example", closure])
+        self.assertEqual(root[-3:], ["--out-link", os.path.join(roots, "lib", "closure"), closure])
+
+    def test_root_script_parses(self):
+        subprocess.run(["sh", "-n", "-c", agent.ROOT], check=True)
 
     def test_connection_reaches_every_podman_call(self):
         run = self.new("--name", "ws2", "-c", "library")
