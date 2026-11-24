@@ -132,9 +132,17 @@ class AgentTest(unittest.TestCase):
             "closure": {"at": "/.gensokyo-agent/closure", "default": "/etc/gensokyo-agent/closure"},
             "defaultCmd": "claude --dangerously-skip-permissions",
             "token": {"secret": "claude-oauth-token", "target": "CLAUDE_CODE_OAUTH_TOKEN"},
-            "agentTokens": {"agy": {"secret": "gemini-api-key", "target": "GEMINI_API_KEY",
-                                    "home": {".gemini/antigravity-cli/settings.json": {"modelProvider": "gemini"}},
-                                    "missing": "agy starts logged out"}},
+            # as lib/agent.nix has them
+            "agents": {
+                "claude": {"flags": {"model": ["--model", "%s"], "effort": ["--effort", "%s"]}},
+                "agy": {
+                    "flags": {"model": ["--model", "%s"], "effort": ["--effort", "%s"]},
+                    "token": {"secret": "gemini-api-key", "target": "GEMINI_API_KEY",
+                              "home": {".gemini/antigravity-cli/settings.json": {"modelProvider": "gemini"}},
+                              "missing": "agy starts logged out"},
+                },
+                "codex": {"flags": {"model": ["-m", "%s"], "effort": ["-c", "model_reasoning_effort=%s"]}},
+            },
             "hereArgs": ["--rm"],
             "root": root, "user": "4738:384", "home": "/home/agent",
             "runArgs": ["--init"], "gpuArgs": ["--device", "/dev/gpu"], "vmArgs": ["--device", "/dev/kvm"],
@@ -207,7 +215,13 @@ class AgentTest(unittest.TestCase):
         # that of the settings then
         with open(os.path.join(self.out, "ctx", "home", ".claude", "settings.json")) as f:
             self.assertEqual(json.load(f)["model"], "claude-opus-5-5[1m]")
-        self.dies("--model", "opus", "--", "codex")
+        # each agent's own way, and none for one the wrapper does not know
+        self.new("--name", "ws15", "--model", "gpt-9", "--effort", "high", "--", "codex", "--x")
+        self.assertIn("exec codex --x -m gpt-9 -c model_reasoning_effort=high\n", self.staged("root", ".gensokyo-agent", "entrypoint"))
+        self.new("--name", "ws16", "--model", "gemini-9-pro", "--effort", "max", "--", "agy")
+        self.assertIn("exec agy --model gemini-9-pro --effort max\n", self.staged("root", ".gensokyo-agent", "entrypoint"))
+        self.dies("--model", "opus", "--", "opencode")
+        self.dies("--effort", "high", "--", "opencode")
 
     def test_entrypoint_resumes_claude_only(self):
         claude = agent.entrypoint(["claude", "--x"], "it's time")

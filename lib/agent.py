@@ -70,11 +70,14 @@ gensokyo-agent --copy-history [-c CONN]... [DIR]
                               and one that exists is used as it is
   --bind SRC:DST[:DESC]       SRC itself at DST; local only
   --prompt TEXT               what the agent starts on
-  --model MODEL               claude --model: fable, opus, sonnet, haiku,
-                              opusplan, or a full model name; [1m] after
-                              it for the long context. default:
-                              claude-opus-5-5[1m]
-  --effort LEVEL              claude --effort: low, medium, high, xhigh, max
+  --model MODEL               the agent's model, as it names them. claude:
+                              fable, opus, sonnet, haiku, opusplan, or a
+                              full model name; [1m] after it for the long
+                              context. default: claude-opus-5-5[1m]. agy:
+                              agy models lists them. codex: -m
+  --effort LEVEL              claude, agy: low, medium, high, xhigh, max.
+                              codex: its model_reasoning_effort. any other
+                              agent takes either after --, its own way
   -p, --publish SPEC          as podman run -p, but a PORT alone is
                               PORT:PORT, the same port on every interface
                               here (podman's would be a random one)
@@ -250,10 +253,15 @@ def write_home(home, workdir):
         }, f)
 
 
+def agent_conf(conf, cmd):
+    """What the wrapper knows of the agent cmd runs (agents in lib/agent.nix)."""
+    return conf.get("agents", {}).get(os.path.basename(cmd[0]), {})
+
+
 def token_args(conf, podman, cmd, home):
     """The login of the agent cmd runs: claude's token, or that of an agent
-    with its own (agentTokens), and what that one needs in the home."""
-    token = conf.get("agentTokens", {}).get(os.path.basename(cmd[0]), conf["token"])
+    with its own, and what that one needs in the home."""
+    token = agent_conf(conf, cmd).get("token", conf["token"])
     if subprocess.call([*podman, "secret", "exists", token["secret"]], stdout=subprocess.DEVNULL) != 0:
         why = token.get("missing", "the agent starts logged out; create it from `claude setup-token`")
         say(f"no podman secret {token['secret']} here, {why} with: {' '.join(podman)} secret create {token['secret']} -")
@@ -744,12 +752,13 @@ def new_workspace(conf, opts, cmd, passthrough):
 
     cmd = cmd or os.environ.get("AGENT_CMD", conf["defaultCmd"]).split()
     claude = os.path.basename(cmd[0]) == "claude"
+    agent = agent_conf(conf, cmd)
     for flag in ("model", "effort"):
-        if getattr(opts, flag) and not claude:
-            die(f"--{flag}: a flag of claude; {cmd[0]} takes its own after --")
+        if getattr(opts, flag) and flag not in agent.get("flags", {}):
+            die(f"--{flag}: not one the wrapper knows for {cmd[0]}, give it its own after --")
     for flag in ("model", "effort"):
         if getattr(opts, flag):
-            cmd += [f"--{flag}", getattr(opts, flag)]
+            cmd += [arg.replace("%s", getattr(opts, flag)) for arg in agent["flags"][flag]]
     if claude:
         cmd += ["--mcp-config", f"{conf['closure']['at']}/share/gensokyo-agent/mcp.json"]
 
