@@ -703,25 +703,27 @@ class AgentTest(unittest.TestCase):
         git(top, "checkout", "-q", "-b", "topic")
 
         def form(spec):
-            g = agent.parse_git(self.conf, spec, "ws")
+            g = agent.parse_git(self.conf, spec)
             return g["base"], g["branch"], g["full"]
         self.assertEqual(form(top), ("topic", "topic", False))
         self.assertEqual(form(f"{top}:master"), ("master", "master", False))
-        self.assertEqual(form(f"{top}:master:"), ("master", "ws", False))
-        self.assertEqual(form(f"{top}::"), ("topic", "ws", False))
+        self.assertEqual(form(f"{top}:master:"), ("master", "master", False))
+        # the workspace's branch is master, whatever it started from
+        self.assertEqual(form(f"{top}::"), ("topic", "master", False))
         self.assertEqual(form(f"@{top}:v1:fix"), ("v1", "fix", True))
         for bad in (f"{top}:v1", f"{top}:nope", self.tmp, f"{top}:a:b:c"):
             with self.assertRaises(SystemExit), quiet():
-                agent.parse_git(self.conf, bad, "ws")
+                agent.parse_git(self.conf, bad)
 
     def test_git_clone_and_remote(self):
         top = self.repo()
-        run = self.new("--name", "ws3", "-c", "library", "--git", f"{top}:master:")
+        git(top, "branch", "topic")
+        run = self.new("--name", "ws3", "-c", "library", "--git", f"{top}:topic:")
         work = os.path.join(self.base, "ws3")
         clone = os.path.join(self.out, "ctx", "work", "src", "proj")
-        self.assertEqual(git(clone, "symbolic-ref", "--short", "HEAD"), "ws3")
-        self.assertEqual(git(clone, "rev-parse", "HEAD"), git(top, "rev-parse", "master"))
-        self.assertEqual(git(clone, "rev-parse", "owner/master"), git(top, "rev-parse", "master"))
+        self.assertEqual(git(clone, "symbolic-ref", "--short", "HEAD"), "master")
+        self.assertEqual(git(clone, "rev-parse", "HEAD"), git(top, "rev-parse", "topic"))
+        self.assertEqual(git(clone, "rev-parse", "owner/topic"), git(top, "rev-parse", "topic"))
         self.assertEqual(git(clone, "rev-list", "--count", "HEAD"), "1")
         self.assertEqual(git(clone, "remote"), "")
         self.assertEqual(git(clone, "status", "--porcelain"), "")
@@ -731,7 +733,7 @@ class AgentTest(unittest.TestCase):
         self.assertEqual(git(top, "config", "remote.ws3.push"), "refs/heads/*:refs/remotes/owner/*")
         self.assertEqual(git(top, "config", "protocol.ext.allow"), "user")
         with open(os.path.join(self.out, "ctx", "work", "CLAUDE.md")) as f:
-            self.assertIn("`src/proj`, on `ws3`, started from the owner's `master`", f.read())
+            self.assertIn("`src/proj`, on `master`, started from the owner's `topic`", f.read())
         self.assertEqual(run[3], "run")
         # the name is a remote of the checkout now
         self.dies("--name", "ws3", "--git", top)

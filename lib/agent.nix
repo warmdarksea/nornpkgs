@@ -24,7 +24,7 @@
 #
 # Usage (gensokyo-agent --help has the flags and examples):
 #   gensokyo-agent --git .:master: --prompt "fix the build"
-#                                         a workspace: a clone on a new branch (and whatever --cp,
+#                                         a workspace: a clone on master (and whatever --cp,
 #                                         --ro, --rw add), built into an image, in a container that
 #                                         stays until podman rm. the checkout gets a remote to fetch
 #                                         its commits from. -c NAME puts it all on another host

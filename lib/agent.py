@@ -59,7 +59,8 @@ gensokyo-agent --copy-history [-c CONN]... [DIR]
                               commit deep (@: all of it), and give PATH a
                               remote NAME to fetch the work from. BASE: the
                               branch to be on, default the current one.
-                              NEW: a branch to start from it, default NAME
+                              NEW: a branch to start from it, default
+                              master: the owner fetches NAME/master
   --git-add-remote PATH       only the remote: give the checkout at PATH a
                               remote NAME to the src/ checkout the workspace
                               has already, one --from brought. a remote NAME
@@ -90,9 +91,10 @@ DST is relative to the workspace; DESC ends up in its CLAUDE.md.
 
 examples:
   gensokyo-agent --git .::
-      claude in a workspace, on this checkout cloned to a new branch. the
-      checkout gets a remote of the workspace's name: git fetch NAME, which
-      starts the workspace for as long as it takes if it had stopped
+      claude in a workspace, on this checkout's branch cloned to master
+      there. the checkout gets a remote of the workspace's name: git fetch
+      NAME, which starts the workspace for as long as it takes if it had
+      stopped, brings that as NAME/master
   gensokyo-agent --git ~/src/nornpkgs:master:fix-build --prompt "make ci_check pass"
       the branch to start from and the one to make, and what to do there
   gensokyo-agent -c library --gpu --git @.:: --ro ~/datasets/foo:data/foo:"the training set"
@@ -112,7 +114,7 @@ examples:
       (git remote remove jolly_swartz first, if it was the old one's)
   gensokyo-agent --from jolly_swartz --no-copy --git .:jolly_swartz:
       its conversation only, on the branch fetched from it (git fetch
-      jolly_swartz && git branch jolly_swartz jolly_swartz/jolly_swartz)
+      jolly_swartz && git branch jolly_swartz jolly_swartz/master)
   gensokyo-agent -s openai-api-key,type=env,target=OPENAI_API_KEY -- codex
       another agent, and a secret of its own
   gensokyo-agent --git .:: -- agy --dangerously-skip-permissions
@@ -448,7 +450,7 @@ def git_out(conf, repo, *args):
     return r.stdout.strip() if r.returncode == 0 else None
 
 
-def parse_git(conf, spec, name):
+def parse_git(conf, spec):
     """[@]PATH[:BASE[:[NEW]]] -> the repository, what to clone and the branch to be on"""
     full = spec.startswith("@")
     parts = spec.removeprefix("@").split(":")
@@ -464,7 +466,7 @@ def parse_git(conf, spec, name):
     if not ref:
         die(f"--git {spec}: {base} is not a branch or tag of {top}")
     if len(parts) == 3:
-        branch = parts[2] or name
+        branch = parts[2] or "master"
     elif ref.startswith("refs/heads/"):
         branch = base
     else:
@@ -750,7 +752,7 @@ def new_workspace(conf, opts, cmd, passthrough):
         die(f"--name {name}: there is a container of that name{' on ' + opts.connection if opts.connection else ''}")
     items = [(flag, *parse_item(flag, spec))
              for flag in ("--cp", "--ro", "--rw", "--bind") for spec in getattr(opts, flag[2:])]
-    repos = [parse_git(conf, spec, name) for spec in opts.git]
+    repos = [parse_git(conf, spec) for spec in opts.git]
     adds = [parse_add_remote(conf, spec) for spec in opts.git_add_remote]
 
     # the workspace has one path, here while it is assembled and in the
