@@ -130,8 +130,9 @@ let
   #           it agy starts logged out, and its google login (the URL it
   #           prints, the code pasted back) lasts in a file of the workspace's
   #           home, there being no keyring: once per workspace
-  #   mcp     where the closure's MCP servers go in its home, as it has them
-  #           (the conversion is lib/agent.py's); claude is given them by flag
+  #   mcp     where the closure's MCP servers go in its home, and in which of
+  #           the formats lib/agent.py converts them to; claude is given them
+  #           by flag
   #   instructions
   #           the file it reads for its instructions, a link to the
   #           workspace's CLAUDE.md
@@ -146,10 +147,15 @@ let
         home.".gemini/antigravity-cli/settings.json" = { modelProvider = "gemini"; };
         missing = "agy starts logged out, sign in with the URL it prints; or, for an API key from aistudio.google.com";
       };
-      mcp = ".gemini/config/mcp_config.json";
+      mcp = { path = ".gemini/config/mcp_config.json"; format = "agy"; };
       instructions = "AGENTS.md";
     };
-    codex.flags = { model = [ "-m" "%s" ]; effort = [ "-c" "model_reasoning_effort=%s" ]; };
+    codex = {
+      flags = { model = [ "-m" "%s" ]; effort = [ "-c" "model_reasoning_effort=%s" ]; };
+      # the whole of its config: there is none else in the sandbox
+      mcp = { path = ".codex/config.toml"; format = "codex"; };
+      instructions = "AGENTS.md";
+    };
   };
 
   nixArgs = [

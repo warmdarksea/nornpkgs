@@ -261,15 +261,26 @@ def agent_conf(conf, cmd):
 
 
 # the closure's MCP servers, as claude has them, for an agent that reads them
-# from a file of its own (agy): the ${VAR} and ${VAR:-DEFAULT} claude fills in
-# from its environment filled in from the workspace's, and a server by url one
-# by serverUrl
-MCP_JQ = """.mcpServers |= map_values(
-  walk(if type == "string"
-       then gsub("\\\\$\\\\{(?<n>[A-Za-z_][A-Za-z0-9_]*)(?<o>:-(?<d>[^}]*))?\\\\}";
-                 if .o != null and ($ENV[.n] // "") == "" then .d else $ENV[.n] // "" end)
-       else . end)
-  | if .url then {serverUrl: .url} + (if .headers then {headers} else {} end) else del(.type) end)"""
+# from a file of its own, in its format: the ${VAR} and ${VAR:-DEFAULT} claude
+# fills in from its environment filled in first, from the workspace's
+MCP_EXPAND = """.mcpServers |= map_values(walk(if type == "string"
+  then gsub("\\\\$\\\\{(?<n>[A-Za-z_][A-Za-z0-9_]*)(?<o>:-(?<d>[^}]*))?\\\\}";
+            if .o != null and ($ENV[.n] // "") == "" then .d else $ENV[.n] // "" end)
+  else . end))"""
+MCP_FORMATS = {
+    # agy's mcp_config.json: a server by url one by serverUrl
+    "agy": """.mcpServers |= map_values(
+  if .url then {serverUrl: .url} + (if .headers then {headers} else {} end) else del(.type) end)""",
+    # codex's config.toml, a table each; JSON's strings and arrays are TOML's
+    "codex": """.mcpServers | to_entries[]
+| "[mcp_servers.\\(.key | tojson)]",
+  (.value | if .url then {url, http_headers: .headers} else {command, args, env} end
+   | to_entries[] | select(.value != null)
+   | "\\(.key) = \\(if (.value | type) == "object"
+                  then "{ " + (.value | to_entries | map("\\(.key | tojson) = \\(.value | tojson)") | join(", ")) + " }"
+                  else .value | tojson end)"),
+  "" """,
+}
 
 
 def token_args(conf, podman, cmd, home):
@@ -901,13 +912,14 @@ def new_workspace(conf, opts, cmd, passthrough):
         setup = ""
         if agent.get("mcp"):
             # in the workspace, at the first start: its PWD and HOME are the ones to fill in
-            mcp = f"\"$HOME\"/{shlex.quote(agent['mcp'])}"
+            mcp = f"\"$HOME\"/{shlex.quote(agent['mcp']['path'])}"
+            jq = shlex.quote(MCP_EXPAND + " | " + MCP_FORMATS[agent["mcp"]["format"]])
             setup = (f"mkdir -p \"$(dirname {mcp})\"\n"
-                     f"PWD=\"$PWD\" jq {shlex.quote(MCP_JQ)} {conf['closure']['at']}/share/gensokyo-agent/mcp.json > {mcp}\n")
+                     f"PWD=\"$PWD\" jq -r {jq} {conf['closure']['at']}/share/gensokyo-agent/mcp.json > {mcp}\n")
             if servers:
                 notes["MCP servers"].append(f"{', '.join(f'`{n}`' for n in servers)}: the owner's, from the closure")
             notes["MCP servers"].append(
-                f"`~/{agent['mcp']}` is yours to fill in (`{os.path.basename(cmd[0])} mcp add`); it holds the owner's"
+                f"`~/{agent['mcp']['path']}` is yours to fill in (`{os.path.basename(cmd[0])} mcp add`); it holds the owner's"
                 " servers of the closure as well, written there when the workspace first started")
         if custom:
             made = f"built by the owner from `{opts.closure}`" if opts.closure else f"the one `{old['name']}` had"

@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from unittest import mock
 
@@ -140,10 +141,14 @@ class AgentTest(unittest.TestCase):
                     "token": {"secret": "gemini-api-key", "target": "GEMINI_API_KEY",
                               "home": {".gemini/antigravity-cli/settings.json": {"modelProvider": "gemini"}},
                               "missing": "agy starts logged out"},
-                    "mcp": ".gemini/config/mcp_config.json",
+                    "mcp": {"path": ".gemini/config/mcp_config.json", "format": "agy"},
                     "instructions": "AGENTS.md",
                 },
-                "codex": {"flags": {"model": ["-m", "%s"], "effort": ["-c", "model_reasoning_effort=%s"]}},
+                "codex": {
+                    "flags": {"model": ["-m", "%s"], "effort": ["-c", "model_reasoning_effort=%s"]},
+                    "mcp": {"path": ".codex/config.toml", "format": "codex"},
+                    "instructions": "AGENTS.md",
+                },
             },
             "hereArgs": ["--rm"],
             "root": root, "user": "4738:384", "home": "/home/agent",
@@ -305,7 +310,7 @@ class AgentTest(unittest.TestCase):
             f.write('{"mcpServers": {"a": {"command": "a"}}}')
         self.new("--name", "ws10", "--cp", f"{own}:.mcp.json")
         self.assertIn('"a"', self.staged("work", ".mcp.json"))
-        self.new("--name", "ws11", "--", "codex")
+        self.new("--name", "ws11", "--", "opencode")
         self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "work", ".mcp.json")))
         self.assertNotIn("MCP", self.staged("work", "CLAUDE.md"))
         self.assertNotIn("mcp", self.staged("root", ".gensokyo-agent", "entrypoint"))
@@ -328,13 +333,8 @@ class AgentTest(unittest.TestCase):
             self.assertNotIn("gemini", run)
             self.assertFalse(os.path.exists(settings))
 
-    def test_agy_has_the_closures_servers_its_way(self):
-        self.new("--name", "ws17", "--", "agy")
-        entry = self.staged("root", ".gensokyo-agent", "entrypoint")
-        self.assertTrue(os.path.islink(os.path.join(self.out, "ctx", "work", "AGENTS.md")))
-        self.assertIn("`~/.gemini/config/mcp_config.json` is yours", self.staged("work", "AGENTS.md"))
-        self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "work", ".mcp.json")))
-        # the first start, in a workspace at /ws, converts the closure's servers
+    def test_agy_and_codex_have_the_closures_servers_their_way(self):
+        # the first start, in the workspace, converts the closure's servers
         closure = os.path.join(self.tmp, "closure")
         os.makedirs(os.path.join(closure, "share", "gensokyo-agent"))
         with open(os.path.join(closure, "share", "gensokyo-agent", "mcp.json"), "w") as f:
@@ -344,16 +344,30 @@ class AgentTest(unittest.TestCase):
                 "web": {"type": "http", "url": "https://e/${NOPE:-mcp}", "headers": {"A": "b"}},
             }}, f)
         home, ws = os.path.join(self.tmp, "home"), os.path.join(self.tmp, "wsdir")
-        os.makedirs(home)
         os.makedirs(ws)
-        script = entry.replace("/.gensokyo-agent/closure", closure).replace("exec agy\n", ":\n")
-        subprocess.run(["sh", "-c", script], cwd=ws, check=True, env={"HOME": home, "PATH": os.environ["PATH"]})
-        with open(os.path.join(home, ".gemini", "config", "mcp_config.json")) as f:
-            self.assertEqual(json.load(f), {"mcpServers": {
-                "lean": {"command": "/nix/store/x/bin/lean-mcp", "args": [ws + "/a"],
-                         "env": {"P": ws + "/src/p", "D": "dflt", "E": "", "L": "$HOME"}},
-                "web": {"serverUrl": "https://e/mcp", "headers": {"A": "b"}},
-            }})
+        lean = {"command": "/nix/store/x/bin/lean-mcp", "args": [ws + "/a"],
+                "env": {"P": ws + "/src/p", "D": "dflt", "E": "", "L": "$HOME"}}
+
+        def first_start(name, cmd, path):
+            self.new("--name", name, "--", cmd)
+            self.assertTrue(os.path.islink(os.path.join(self.out, "ctx", "work", "AGENTS.md")))
+            self.assertIn(f"`~/{path}` is yours", self.staged("work", "AGENTS.md"))
+            self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "work", ".mcp.json")))
+            script = self.staged("root", ".gensokyo-agent", "entrypoint")
+            script = script.replace("/.gensokyo-agent/closure", closure).replace(f"exec {cmd}\n", ":\n")
+            shutil.rmtree(home, ignore_errors=True)
+            os.makedirs(home)
+            subprocess.run(["sh", "-c", script], cwd=ws, check=True, env={"HOME": home, "PATH": os.environ["PATH"]})
+            with open(os.path.join(home, path), "rb") as f:
+                return f.read()
+        self.assertEqual(json.loads(first_start("ws17", "agy", ".gemini/config/mcp_config.json")), {"mcpServers": {
+            "lean": lean,
+            "web": {"serverUrl": "https://e/mcp", "headers": {"A": "b"}},
+        }})
+        self.assertEqual(tomllib.loads(first_start("ws19", "codex", ".codex/config.toml").decode()), {"mcp_servers": {
+            "lean": lean,
+            "web": {"url": "https://e/mcp", "http_headers": {"A": "b"}},
+        }})
         # claude has them by flag, and no such step
         self.new("--name", "ws18")
         self.assertNotIn("jq", self.staged("root", ".gensokyo-agent", "entrypoint"))
