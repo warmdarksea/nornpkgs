@@ -1,5 +1,6 @@
 { config, lib, pkgs, ... }: let
   unfreePkgNames = [
+    "antigravity-cli" # lib/agent.nix
     "claude-code" # lib/agent.nix
     "corefonts"
     "vcv-rack"

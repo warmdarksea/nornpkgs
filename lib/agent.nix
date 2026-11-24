@@ -1,4 +1,4 @@
-# gensokyo-agent — rootless podman sandbox for coding agents (claude, codex, opencode).
+# gensokyo-agent — rootless podman sandbox for coding agents (claude, codex, opencode, agy).
 # Import on each host; everything is derived from that host's config.
 #
 # Per-host:
@@ -64,6 +64,7 @@ let
       bubblewrap socat   # what claude runs its commands in, see CLAUDE_CODE_SUBPROCESS_ENV_SCRUB
     ] ++ lib.optionals (!config.gensokyo.ci) [
       claude-code codex opencode
+      antigravity-cli   # agy, google's. unfree: sys/hell allows it by name
     ] ++ lib.optionals cudaSupport [
       cuda.cudatoolkit
       config.hardware.nvidia.package.bin
