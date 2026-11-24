@@ -258,6 +258,18 @@ def agent_conf(conf, cmd):
     return conf.get("agents", {}).get(os.path.basename(cmd[0]), {})
 
 
+# the closure's MCP servers, as claude has them, for an agent that reads them
+# from a file of its own (agy): the ${VAR} and ${VAR:-DEFAULT} claude fills in
+# from its environment filled in from the workspace's, and a server by url one
+# by serverUrl
+MCP_JQ = """.mcpServers |= map_values(
+  walk(if type == "string"
+       then gsub("\\\\$\\\\{(?<n>[A-Za-z_][A-Za-z0-9_]*)(?<o>:-(?<d>[^}]*))?\\\\}";
+                 if .o != null and ($ENV[.n] // "") == "" then .d else $ENV[.n] // "" end)
+       else . end)
+  | if .url then {serverUrl: .url} + (if .headers then {headers} else {} end) else del(.type) end)"""
+
+
 def token_args(conf, podman, cmd, home):
     """The login of the agent cmd runs: claude's token, or that of an agent
     with its own, and what that one needs in the home."""
@@ -395,10 +407,11 @@ def copy_in(src, work, dst):
         shutil.copy2(src, target)
 
 
-def entrypoint(cmd, prompt, resume=False):
+def entrypoint(cmd, prompt, resume=False, setup=""):
     """The container's command: the agent on the first start, the same
     session again on any later one (podman start -ai); with resume, on
-    the first too, that of the workspace it carries on from."""
+    the first too, that of the workspace it carries on from. setup runs
+    before the first."""
     claude = os.path.basename(cmd[0]) == "claude"
     run = shlex.join(cmd)
     # claude's list flags (--allowedTools and the like) take every word up
@@ -413,7 +426,7 @@ if [ -e "$HOME/.gensokyo-agent-started" ]; then
   {again}
 fi
 : > "$HOME/.gensokyo-agent-started"
-exec {first}
+{setup}exec {first}
 """
 
 
@@ -883,16 +896,30 @@ def new_workspace(conf, opts, cmd, passthrough):
                 "`.mcp.json` here is yours to fill in; claude reads it when it starts. Your edits of it"
                 " are the owner's to approve, and count once they restart you. A server runs in this"
                 " directory: one of a checkout `cd`s there in its command")
+        setup = ""
+        if agent.get("mcp"):
+            # in the workspace, at the first start: its PWD and HOME are the ones to fill in
+            mcp = f"\"$HOME\"/{shlex.quote(agent['mcp'])}"
+            setup = (f"mkdir -p \"$(dirname {mcp})\"\n"
+                     f"PWD=\"$PWD\" jq {shlex.quote(MCP_JQ)} {conf['closure']['at']}/share/gensokyo-agent/mcp.json > {mcp}\n")
+            if servers:
+                notes["MCP servers"].append(f"{', '.join(f'`{n}`' for n in servers)}: the owner's, from the closure")
+            notes["MCP servers"].append(
+                f"`~/{agent['mcp']}` is yours to fill in (`{os.path.basename(cmd[0])} mcp add`); it holds the owner's"
+                " servers of the closure as well, written there when the workspace first started")
         if custom:
             made = f"built by the owner from `{opts.closure}`" if opts.closure else f"the one `{old['name']}` had"
             notes["closure"].append(
                 f"`{conf['closure']['at']}`, {made}: its `bin` is first on your PATH."
                 " A change to it takes a new workspace")
         with open(os.path.join(root, ".gensokyo-agent", "entrypoint"), "w") as f:
-            f.write(entrypoint(cmd, opts.prompt, resume=bool(old)))
+            f.write(entrypoint(cmd, opts.prompt, resume=bool(old), setup=setup))
             os.fchmod(f.fileno(), 0o755)
         with open(os.path.join(work, "CLAUDE.md"), "a") as f:
             f.write(claude_md(name, notes))
+        # an agent that reads another file reads this one there
+        if agent.get("instructions") and not os.path.lexists(os.path.join(work, agent["instructions"])):
+            os.symlink("CLAUDE.md", os.path.join(work, agent["instructions"]))
 
         user = conf["user"]
         containerfile = "".join([

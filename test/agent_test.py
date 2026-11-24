@@ -140,6 +140,8 @@ class AgentTest(unittest.TestCase):
                     "token": {"secret": "gemini-api-key", "target": "GEMINI_API_KEY",
                               "home": {".gemini/antigravity-cli/settings.json": {"modelProvider": "gemini"}},
                               "missing": "agy starts logged out"},
+                    "mcp": ".gemini/config/mcp_config.json",
+                    "instructions": "AGENTS.md",
                 },
                 "codex": {"flags": {"model": ["-m", "%s"], "effort": ["-c", "model_reasoning_effort=%s"]}},
             },
@@ -325,6 +327,37 @@ class AgentTest(unittest.TestCase):
             self.assertIn("--secret claude-oauth-token,type=env,target=CLAUDE_CODE_OAUTH_TOKEN", run)
             self.assertNotIn("gemini", run)
             self.assertFalse(os.path.exists(settings))
+
+    def test_agy_has_the_closures_servers_its_way(self):
+        self.new("--name", "ws17", "--", "agy")
+        entry = self.staged("root", ".gensokyo-agent", "entrypoint")
+        self.assertTrue(os.path.islink(os.path.join(self.out, "ctx", "work", "AGENTS.md")))
+        self.assertIn("`~/.gemini/config/mcp_config.json` is yours", self.staged("work", "AGENTS.md"))
+        self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "work", ".mcp.json")))
+        # the first start, in a workspace at /ws, converts the closure's servers
+        closure = os.path.join(self.tmp, "closure")
+        os.makedirs(os.path.join(closure, "share", "gensokyo-agent"))
+        with open(os.path.join(closure, "share", "gensokyo-agent", "mcp.json"), "w") as f:
+            json.dump({"mcpServers": {
+                "lean": {"type": "stdio", "command": "/nix/store/x/bin/lean-mcp", "args": ["${PWD}/a"],
+                         "env": {"P": "${PWD}/src/p", "D": "${NOPE:-dflt}", "E": "${NOPE}", "L": "$HOME"}},
+                "web": {"type": "http", "url": "https://e/${NOPE:-mcp}", "headers": {"A": "b"}},
+            }}, f)
+        home, ws = os.path.join(self.tmp, "home"), os.path.join(self.tmp, "wsdir")
+        os.makedirs(home)
+        os.makedirs(ws)
+        script = entry.replace("/.gensokyo-agent/closure", closure).replace("exec agy\n", ":\n")
+        subprocess.run(["sh", "-c", script], cwd=ws, check=True, env={"HOME": home, "PATH": os.environ["PATH"]})
+        with open(os.path.join(home, ".gemini", "config", "mcp_config.json")) as f:
+            self.assertEqual(json.load(f), {"mcpServers": {
+                "lean": {"command": "/nix/store/x/bin/lean-mcp", "args": [ws + "/a"],
+                         "env": {"P": ws + "/src/p", "D": "dflt", "E": "", "L": "$HOME"}},
+                "web": {"serverUrl": "https://e/mcp", "headers": {"A": "b"}},
+            }})
+        # claude has them by flag, and no such step
+        self.new("--name", "ws18")
+        self.assertNotIn("jq", self.staged("root", ".gensokyo-agent", "entrypoint"))
+        self.assertFalse(os.path.lexists(os.path.join(self.out, "ctx", "work", "AGENTS.md")))
 
     def test_closure_is_built_and_rooted(self):
         state = os.path.join(self.tmp, "state")
