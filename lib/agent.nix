@@ -16,6 +16,11 @@
 #   gensokyo-agent claude setup-token            # browser flow, prints a 1-year token
 #   printf %s "$token" | podman secret create claude-oauth-token -
 # The sandbox keeps no home between runs, so that secret is the login.
+# agy (antigravity-cli) gets neither that nor anything unless, from an API key
+# of aistudio.google.com (billed by the key's project, not a subscription):
+#   printf %s "$key" | podman secret create gemini-api-key -
+# without it, agy's google login: the URL it prints, once per workspace.
+#   gensokyo-agent --git .:: -- agy --dangerously-skip-permissions
 #
 # Usage (gensokyo-agent --help has the flags and examples):
 #   gensokyo-agent --git .:master: --prompt "fix the build"
@@ -117,6 +122,18 @@ let
   # the one secret every sandbox gets; from `claude setup-token`, never
   # ANTHROPIC_API_KEY, that bills API credits
   token = { secret = "claude-oauth-token"; target = "CLAUDE_CODE_OAUTH_TOKEN"; };
+  # an agent with a secret of its own gets that instead, by the name of its
+  # command: not claude's token, which agy, scrubbing nothing, would hand to
+  # every command it runs. without the secret agy starts logged out, and its
+  # google login (the URL it prints, the code pasted back) lasts in a file of
+  # the workspace's home, there being no keyring: once per workspace
+  agentTokens.agy = {
+    secret = "gemini-api-key";
+    target = "GEMINI_API_KEY";
+    # agy reads the key only with this in its settings, and will not start without the key then
+    home.".gemini/antigravity-cli/settings.json" = { modelProvider = "gemini"; };
+    missing = "agy starts logged out, sign in with the URL it prints; or, for an API key from aistudio.google.com";
+  };
 
   nixArgs = [
     # catatonit as pid 1. without it the agent itself is pid 1, and pid 1
@@ -172,7 +189,7 @@ let
     # the env scrub puts claude back in its default permission mode; the tools are allowed by name,
     # and anything else by a hook the wrapper puts in the sandbox's settings
     defaultCmd = "claude --dangerously-skip-permissions --allowedTools Edit,MultiEdit,Write,NotebookEdit,Bash,WebSearch,WebFetch";
-    inherit token;
+    inherit token agentTokens;
     git = "${pkgs.gitMinimal}/bin/git";
     nix = "${config.nix.package}/bin/nix";
     system = pkgs.stdenv.hostPlatform.system;

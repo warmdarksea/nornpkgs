@@ -49,7 +49,7 @@ found = found[None] if conn in (None, "pipe") else found.get(conn, {{}})
 if "ps" in args:
     print(json.dumps([{{"Id": "id-" + n, "Names": [n]}} for n, c in found.items() if (c["Config"]["Labels"] or {{}}).get("gensokyo-agent")]))
 if "exists" in args:
-    sys.exit(0 if args[-1] in ("claude-oauth-token", *found) else 1)
+    sys.exit(0 if args[-1] in ("claude-oauth-token", *os.environ.get("STUB_SECRETS", "").split(), *found) else 1)
 if "inspect" in args:
     if args[-1] not in found:
         sys.exit(125)
@@ -132,6 +132,9 @@ class AgentTest(unittest.TestCase):
             "closure": {"at": "/.gensokyo-agent/closure", "default": "/etc/gensokyo-agent/closure"},
             "defaultCmd": "claude --dangerously-skip-permissions",
             "token": {"secret": "claude-oauth-token", "target": "CLAUDE_CODE_OAUTH_TOKEN"},
+            "agentTokens": {"agy": {"secret": "gemini-api-key", "target": "GEMINI_API_KEY",
+                                    "home": {".gemini/antigravity-cli/settings.json": {"modelProvider": "gemini"}},
+                                    "missing": "agy starts logged out"}},
             "hereArgs": ["--rm"],
             "root": root, "user": "4738:384", "home": "/home/agent",
             "runArgs": ["--init"], "gpuArgs": ["--device", "/dev/gpu"], "vmArgs": ["--device", "/dev/kvm"],
@@ -290,6 +293,24 @@ class AgentTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "work", ".mcp.json")))
         self.assertNotIn("MCP", self.staged("work", "CLAUDE.md"))
         self.assertNotIn("mcp", self.staged("root", ".gensokyo-agent", "entrypoint"))
+
+    def test_each_agent_its_own_login(self):
+        settings = os.path.join(self.out, "ctx", "home", ".gemini", "antigravity-cli", "settings.json")
+        # agy without its secret: logged out, and never claude's token
+        run = " ".join(self.new("--name", "ws12", "--", "agy"))
+        self.assertNotIn("--secret", run)
+        self.assertFalse(os.path.exists(settings))
+        with mock.patch.dict(os.environ, {"STUB_SECRETS": "gemini-api-key"}):
+            run = " ".join(self.new("--name", "ws13", "--", "/bin/agy", "-p", "x"))
+            self.assertIn("--secret gemini-api-key,type=env,target=GEMINI_API_KEY", run)
+            self.assertNotIn("claude-oauth-token", run)
+            with open(settings) as f:
+                self.assertEqual(json.load(f), {"modelProvider": "gemini"})
+            # nor the others agy's
+            run = " ".join(self.new("--name", "ws14"))
+            self.assertIn("--secret claude-oauth-token,type=env,target=CLAUDE_CODE_OAUTH_TOKEN", run)
+            self.assertNotIn("gemini", run)
+            self.assertFalse(os.path.exists(settings))
 
     def test_closure_is_built_and_rooted(self):
         state = os.path.join(self.tmp, "state")

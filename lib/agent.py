@@ -112,6 +112,9 @@ examples:
       jolly_swartz && git branch jolly_swartz jolly_swartz/jolly_swartz)
   gensokyo-agent -s openai-api-key,type=env,target=OPENAI_API_KEY -- codex
       another agent, and a secret of its own
+  gensokyo-agent --git .:: -- agy --dangerously-skip-permissions
+      google's agent, with the podman secret gemini-api-key if there is
+      one (and not claude's token), or its google login, once per workspace
   gensokyo-agent --legacy
       claude on the current directory, gone when it exits
 
@@ -247,12 +250,18 @@ def write_home(home, workdir):
         }, f)
 
 
-def token_args(conf, podman):
-    token = conf["token"]
+def token_args(conf, podman, cmd, home):
+    """The login of the agent cmd runs: claude's token, or that of an agent
+    with its own (agentTokens), and what that one needs in the home."""
+    token = conf.get("agentTokens", {}).get(os.path.basename(cmd[0]), conf["token"])
     if subprocess.call([*podman, "secret", "exists", token["secret"]], stdout=subprocess.DEVNULL) != 0:
-        say(f"no podman secret {token['secret']} here, the agent starts logged out; "
-            f"create it from `claude setup-token` with: {' '.join(podman)} secret create {token['secret']} -")
+        why = token.get("missing", "the agent starts logged out; create it from `claude setup-token`")
+        say(f"no podman secret {token['secret']} here, {why} with: {' '.join(podman)} secret create {token['secret']} -")
         return []
+    for path, content in token.get("home", {}).items():
+        os.makedirs(os.path.dirname(os.path.join(home, path)), exist_ok=True)
+        with open(os.path.join(home, path), "w") as f:
+            json.dump(content, f)
     return ["--secret", f"{token['secret']},type=env,target={token['target']}"]
 
 
@@ -291,7 +300,7 @@ def run_here(conf, cmd):
             "-v", f"{home}:{conf['home']}:U",  # ours on the host, the agent's inside
             "-v", f"{cwd}:{cwd}", "-w", cwd,
         ]
-        args += token_args(conf, podman)
+        args += token_args(conf, podman, cmd, home)
         if sys.stdin.isatty():
             args.append("-it")
         if debug:
@@ -800,6 +809,7 @@ def new_workspace(conf, opts, cmd, passthrough):
             if call([*old["podman"], "cp", src, os.path.join(ctx, "home", ".claude")]) != 0:
                 die(f"--from {opts.from_}: podman cp {src} failed")
         write_home(os.path.join(ctx, "home"), workdir)
+        login = token_args(conf, podman, cmd, os.path.join(ctx, "home"))
 
         mounts = []
         notes = {"history": [], "repositories": [], "files": [], "closure": [], "MCP servers": []}
@@ -918,7 +928,7 @@ def new_workspace(conf, opts, cmd, passthrough):
         args = kept + ["--group-add", "keep-groups"]
         for spec in opts.device:
             args += ["--device", spec]
-    args += token_args(conf, podman)
+    args += login
     for spec in opts.secret:
         args += ["--secret", spec]
     args += mounts
