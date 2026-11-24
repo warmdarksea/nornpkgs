@@ -138,9 +138,12 @@ class AgentTest(unittest.TestCase):
                 "claude": {"flags": {"model": ["--model", "%s"], "effort": ["--effort", "%s"]}},
                 "agy": {
                     "flags": {"model": ["--model", "%s"], "effort": ["--effort", "%s"]},
-                    "token": {"secret": "gemini-api-key", "target": "GEMINI_API_KEY",
-                              "home": {".gemini/antigravity-cli/settings.json": {"modelProvider": "gemini"}},
-                              "missing": "agy starts logged out"},
+                    "tokens": [
+                        {"secret": "agy-oauth-token", "file": ".gemini/antigravity-cli/antigravity-oauth-token"},
+                        {"secret": "gemini-api-key", "target": "GEMINI_API_KEY",
+                         "home": {".gemini/antigravity-cli/settings.json": {"modelProvider": "gemini"}}},
+                    ],
+                    "missing": "agy starts logged out",
                     "mcp": {"path": ".gemini/config/mcp_config.json", "format": "agy"},
                     "instructions": "AGENTS.md",
                 },
@@ -332,6 +335,41 @@ class AgentTest(unittest.TestCase):
             self.assertIn("--secret claude-oauth-token,type=env,target=CLAUDE_CODE_OAUTH_TOKEN", run)
             self.assertNotIn("gemini", run)
             self.assertFalse(os.path.exists(settings))
+
+    def test_agy_google_login_is_a_file_it_may_rewrite(self):
+        # the login first, the key only without it
+        with mock.patch.dict(os.environ, {"STUB_SECRETS": "agy-oauth-token gemini-api-key"}):
+            run = self.new("--name", "ws20", "--", "agy")
+        self.assertIn("agy-oauth-token,type=mount,uid=4738,gid=384,mode=0400", run)
+        self.assertNotIn("gemini-api-key", " ".join(run))
+        # nor the settings that make agy want the key
+        self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "home", ".gemini", "antigravity-cli", "settings.json")))
+        # copied at the first start, the agent's to rewrite
+        secrets, home = os.path.join(self.tmp, "secrets"), os.path.join(self.tmp, "home")
+        os.makedirs(secrets)
+        os.makedirs(home)
+        with open(os.path.join(secrets, "agy-oauth-token"), "w") as f:
+            f.write('{"refresh_token": "1//x"}')
+        script = self.staged("root", ".gensokyo-agent", "entrypoint").replace("/run/secrets", secrets)
+        script = script.replace("exec agy\n", ":\n").replace("/.gensokyo-agent/closure", self.tmp)
+        os.makedirs(os.path.join(self.tmp, "share", "gensokyo-agent"))
+        with open(os.path.join(self.tmp, "share", "gensokyo-agent", "mcp.json"), "w") as f:
+            f.write('{"mcpServers": {}}')
+        subprocess.run(["sh", "-c", script], cwd=self.tmp, check=True, env={"HOME": home, "PATH": os.environ["PATH"]})
+        token = os.path.join(home, ".gemini", "antigravity-cli", "antigravity-oauth-token")
+        with open(token) as f:
+            self.assertEqual(f.read(), '{"refresh_token": "1//x"}')
+        self.assertEqual(os.stat(token).st_mode & 0o777, 0o600)
+        # --legacy: before the agent, there being no first start
+        self.enterContext(mock.patch.dict(os.environ, {"STUB_SECRETS": "agy-oauth-token", "XDG_RUNTIME_DIR": self.tmp}))
+        self.enterContext(mock.patch("os.getcwd", return_value=self.tmp))
+        with quiet():
+            agent.run_here(self.conf, ["agy", "-c"])
+        (run,) = [c for c in self.calls() if "run" in c]
+        self.assertIn("agy-oauth-token,type=mount,uid=4738,gid=384,mode=0400", run)
+        self.assertEqual(run[-6:-4], ["sh", "-c"])
+        self.assertIn("install -m 600 /run/secrets/agy-oauth-token", run[-4])
+        self.assertEqual(run[-3:], ["sh", "agy", "-c"])
 
     def test_agy_and_codex_have_the_closures_servers_their_way(self):
         # the first start, in the workspace, converts the closure's servers

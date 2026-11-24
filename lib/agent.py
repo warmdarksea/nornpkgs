@@ -118,8 +118,9 @@ examples:
   gensokyo-agent -s openai-api-key,type=env,target=OPENAI_API_KEY -- codex
       another agent, and a secret of its own
   gensokyo-agent --git .:: -- agy --dangerously-skip-permissions
-      google's agent, with the podman secret gemini-api-key if there is
-      one (and not claude's token), or its google login, once per workspace
+      google's agent, logged in by the podman secret agy-oauth-token (its
+      google login, saved from a workspace) or gemini-api-key (an API
+      key), never claude's token; with neither it asks you to sign in
   gensokyo-agent --legacy
       claude on the current directory, gone when it exits
 
@@ -284,18 +285,32 @@ MCP_FORMATS = {
 
 
 def token_args(conf, podman, cmd, home):
-    """The login of the agent cmd runs: claude's token, or that of an agent
-    with its own, and what that one needs in the home."""
-    token = agent_conf(conf, cmd).get("token", conf["token"])
-    if subprocess.call([*podman, "secret", "exists", token["secret"]], stdout=subprocess.DEVNULL) != 0:
-        why = token.get("missing", "the agent starts logged out; create it from `claude setup-token`")
-        say(f"no podman secret {token['secret']} here, {why} with: {' '.join(podman)} secret create {token['secret']} -")
-        return []
+    """The login of the agent cmd runs: claude's token, or the first of an
+    agent's own there is a secret for, and what that one needs in the home.
+    Returns podman's arguments and what the first start runs: a login that
+    is a file is copied into the home then, where the agent may rewrite it
+    (a secret is read-only)."""
+    agent = agent_conf(conf, cmd)
+    tokens = agent.get("tokens", [conf["token"]])
+    for token in tokens:
+        if subprocess.call([*podman, "secret", "exists", token["secret"]], stdout=subprocess.DEVNULL) == 0:
+            break
+    else:
+        why = agent.get("missing", "the agent starts logged out; create it from `claude setup-token`")
+        names = " or ".join(t["secret"] for t in tokens)
+        name = tokens[0]["secret"] if len(tokens) == 1 else "NAME"
+        say(f"no podman secret {names} here, {why}: {' '.join(podman)} secret create {name} -")
+        return [], ""
     for path, content in token.get("home", {}).items():
         os.makedirs(os.path.dirname(os.path.join(home, path)), exist_ok=True)
         with open(os.path.join(home, path), "w") as f:
             json.dump(content, f)
-    return ["--secret", f"{token['secret']},type=env,target={token['target']}"]
+    if "file" not in token:
+        return ["--secret", f"{token['secret']},type=env,target={token['target']}"], ""
+    uid, gid = conf["user"].split(":")
+    dst = f"\"$HOME\"/{shlex.quote(token['file'])}"
+    return (["--secret", f"{token['secret']},type=mount,uid={uid},gid={gid},mode=0400"],
+            f"mkdir -p \"$(dirname {dst})\"\ninstall -m 600 /run/secrets/{shlex.quote(token['secret'])} {dst}\n")
 
 
 def die(msg):
@@ -333,7 +348,10 @@ def run_here(conf, cmd):
             "-v", f"{home}:{conf['home']}:U",  # ours on the host, the agent's inside
             "-v", f"{cwd}:{cwd}", "-w", cwd,
         ]
-        args += token_args(conf, podman, cmd, home)
+        login, setup = token_args(conf, podman, cmd, home)
+        args += login
+        if setup:
+            cmd = ["sh", "-c", setup + 'exec "$@"', "sh", *cmd]
         if sys.stdin.isatty():
             args.append("-it")
         if debug:
@@ -844,7 +862,7 @@ def new_workspace(conf, opts, cmd, passthrough):
             if call([*old["podman"], "cp", src, os.path.join(ctx, "home", ".claude")]) != 0:
                 die(f"--from {opts.from_}: podman cp {src} failed")
         write_home(os.path.join(ctx, "home"), workdir)
-        login = token_args(conf, podman, cmd, os.path.join(ctx, "home"))
+        login, setup = token_args(conf, podman, cmd, os.path.join(ctx, "home"))
 
         mounts = []
         notes = {"history": [], "repositories": [], "files": [], "closure": [], "MCP servers": []}
@@ -909,13 +927,12 @@ def new_workspace(conf, opts, cmd, passthrough):
                 "`.mcp.json` here is yours to fill in; claude reads it when it starts. Your edits of it"
                 " are the owner's to approve, and count once they restart you. A server runs in this"
                 " directory: one of a checkout `cd`s there in its command")
-        setup = ""
         if agent.get("mcp"):
             # in the workspace, at the first start: its PWD and HOME are the ones to fill in
             mcp = f"\"$HOME\"/{shlex.quote(agent['mcp']['path'])}"
             jq = shlex.quote(MCP_EXPAND + " | " + MCP_FORMATS[agent["mcp"]["format"]])
-            setup = (f"mkdir -p \"$(dirname {mcp})\"\n"
-                     f"PWD=\"$PWD\" jq -r {jq} {conf['closure']['at']}/share/gensokyo-agent/mcp.json > {mcp}\n")
+            setup += (f"mkdir -p \"$(dirname {mcp})\"\n"
+                      f"PWD=\"$PWD\" jq -r {jq} {conf['closure']['at']}/share/gensokyo-agent/mcp.json > {mcp}\n")
             if servers:
                 notes["MCP servers"].append(f"{', '.join(f'`{n}`' for n in servers)}: the owner's, from the closure")
             notes["MCP servers"].append(

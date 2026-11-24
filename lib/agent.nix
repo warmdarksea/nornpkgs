@@ -16,10 +16,11 @@
 #   gensokyo-agent claude setup-token            # browser flow, prints a 1-year token
 #   printf %s "$token" | podman secret create claude-oauth-token -
 # The sandbox keeps no home between runs, so that secret is the login.
-# agy (antigravity-cli) gets neither that nor anything unless, from an API key
-# of aistudio.google.com (billed by the key's project, not a subscription):
+# agy (antigravity-cli) gets not that but its own: its google login, signed in
+# once in a workspace (the URL it prints, the code pasted back) and saved,
+#   podman cp NAME:/home/agent/.gemini/antigravity-cli/antigravity-oauth-token - | tar -xO | podman secret create agy-oauth-token -
+# or, failing that, an API key of aistudio.google.com (billed by its project):
 #   printf %s "$key" | podman secret create gemini-api-key -
-# without it, agy's google login: the URL it prints, once per workspace.
 #   gensokyo-agent --git .:: -- agy --dangerously-skip-permissions
 #
 # Usage (gensokyo-agent --help has the flags and examples):
@@ -125,11 +126,13 @@ let
   # what the wrapper knows of each agent, by the name of its command:
   #   flags   how it takes --model and --effort (%s the value); an agent
   #           without them is refused either, and takes its own after --
-  #   token   a secret of its own, in place of claude's: agy, scrubbing
-  #           nothing, would hand claude's to every command it runs. without
-  #           it agy starts logged out, and its google login (the URL it
-  #           prints, the code pasted back) lasts in a file of the workspace's
-  #           home, there being no keyring: once per workspace
+  #   tokens  its own logins, in place of claude's (agy, scrubbing nothing,
+  #           would hand claude's to every command it runs): the first there
+  #           is a podman secret for, as the variable target, or copied to
+  #           the file file of the home at the first start. without any agy
+  #           starts logged out, and its google login (the URL it prints, the
+  #           code pasted back) lasts in that file, there being no keyring:
+  #           once per workspace, unless it is made the secret
   #   mcp     where the closure's MCP servers go in its home, and in which of
   #           the formats lib/agent.py converts them to; claude is given them
   #           by flag
@@ -140,13 +143,19 @@ let
     claude.flags = { model = [ "--model" "%s" ]; effort = [ "--effort" "%s" ]; };
     agy = {
       flags = { model = [ "--model" "%s" ]; effort = [ "--effort" "%s" ]; };
-      token = {
-        secret = "gemini-api-key";
-        target = "GEMINI_API_KEY";
-        # agy reads the key only with this in its settings, and will not start without the key then
-        home.".gemini/antigravity-cli/settings.json" = { modelProvider = "gemini"; };
-        missing = "agy starts logged out, sign in with the URL it prints; or, for an API key from aistudio.google.com";
-      };
+      tokens = [
+        # the google login of a workspace, a subscription's:
+        #   podman cp NAME:/home/agent/.gemini/antigravity-cli/antigravity-oauth-token - | tar -xO | podman secret create agy-oauth-token -
+        { secret = "agy-oauth-token"; file = ".gemini/antigravity-cli/antigravity-oauth-token"; }
+        # an API key of aistudio.google.com, billed by its project
+        {
+          secret = "gemini-api-key";
+          target = "GEMINI_API_KEY";
+          # agy reads the key only with this in its settings, and will not start without the key then
+          home.".gemini/antigravity-cli/settings.json" = { modelProvider = "gemini"; };
+        }
+      ];
+      missing = "agy starts logged out: sign in with the URL it prints, then save that login (lib/agent.nix says how); or an API key of aistudio.google.com";
       mcp = { path = ".gemini/config/mcp_config.json"; format = "agy"; };
       instructions = "AGENTS.md";
     };
