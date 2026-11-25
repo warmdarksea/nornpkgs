@@ -21,7 +21,7 @@
 #   podman cp NAME:/home/agent/.gemini/antigravity-cli/antigravity-oauth-token - | tar -xO | podman secret create agy-oauth-token -
 # or, failing that, an API key of aistudio.google.com (billed by its project):
 #   printf %s "$key" | podman secret create gemini-api-key -
-#   gensokyo-agent --git .:: -- agy --dangerously-skip-permissions
+#   gensokyo-agent --git .:: --harness antigravity
 #
 # Usage (gensokyo-agent --help has the flags and examples):
 #   gensokyo-agent --git .:master: --prompt "fix the build"
@@ -40,7 +40,7 @@
 #                                         a copy of OLD on the host of CONN, closure and all, on
 #                                         HOST; this checkout gets the remote OLD to it, if it has
 #                                         none of that name already
-#   gensokyo-agent -- codex               another agent in it
+#   gensokyo-agent --harness codex        another agent in it, gpt there
 #   gensokyo-agent --legacy               claude in a throwaway sandbox on the current directory
 #   gensokyo-agent --legacy codex         any command there
 #   AGENT_CMD="opencode" gensokyo-agent   change the default
@@ -50,15 +50,47 @@
 { config, pkgs, lib, ... }:
 let
   cfg = config.gensokyo-agent;
-  u = config.users.users.claude;
   g = config.users.groups.agent;
   cudaSupport = pkgs.config.cudaSupport or false;
   cuda = pkgs.cudaPackages;
   gencode = lib.concatStringsSep " " cuda.flags.gencode;
-  uid = toString u.uid;
   gid = toString g.gid;
   kvm = toString config.ids.gids.kvm;
   home = "/home/agent";             # container-only, and gone with the container
+
+  # who the agent is in the sandbox: one user per maker of models, claude's
+  # whichever claude it is, and agent for any other. uid gensokyo-agent.uid
+  # and on, in this order, all of the group agent; what it commits as
+  agentUsers = lib.imap0 (i: u: u // { uid = cfg.uid + i; }) [
+    { name = "claude"; git = { name = "Claude"; email = "claude@anthropic.com"; }; }
+    { name = "gpt"; git = { name = "GPT"; email = "gpt@gensokyo.internal"; }; }
+    { name = "gemini"; git = { name = "Gemini"; email = "gemini@gensokyo.internal"; }; }
+    { name = "deepseek"; git = { name = "DeepSeek"; email = "deepseek@gensokyo.internal"; }; }
+    { name = "qwen"; git = { name = "Qwen"; email = "qwen@gensokyo.internal"; }; }
+    { name = "kimi"; git = { name = "Kimi"; email = "kimi@gensokyo.internal"; }; }
+    { name = "inkling"; git = { name = "Inkling"; email = "inkling@gensokyo.internal"; }; }
+    { name = "agent"; git = { name = "Agent"; email = "agent@gensokyo.internal"; }; }
+  ];
+  # gensokyo-agent --harness NAME: the command, and the user of its own
+  # models when --model names none
+  harnesses = {
+    # the env scrub puts claude back in its default permission mode; the tools are allowed by name,
+    # and anything else by a hook the wrapper puts in the sandbox's settings
+    claude-code = { cmd = "claude --dangerously-skip-permissions --allowedTools Edit,MultiEdit,Write,NotebookEdit,Bash,WebSearch,WebFetch"; user = "claude"; };
+    antigravity = { cmd = "agy --dangerously-skip-permissions"; user = "gemini"; };
+    # the container is the sandbox
+    codex = { cmd = "codex --dangerously-bypass-approvals-and-sandbox"; user = "gpt"; };
+  };
+  # --model's user: the first whose pattern (python's re, ignoring case) it matches
+  modelUsers = [
+    [ "claude|opus|sonnet|haiku|fable" "claude" ]
+    [ "gpt|codex|^o[0-9]" "gpt" ]
+    [ "gemini" "gemini" ]
+    [ "deepseek" "deepseek" ]
+    [ "qwen" "qwen" ]
+    [ "kimi|moonshot" "kimi" ]
+    [ "inkling" "inkling" ]
+  ];
 
   env = pkgs.buildEnv {
     name = "gensokyo-agent-env";
@@ -101,7 +133,7 @@ let
   });
 
   nss = pkgs.dockerTools.fakeNss.override {
-    extraPasswdLines = [ "claude:x:${uid}:${gid}::${home}:/bin/sh" ];
+    extraPasswdLines = map (u: "${u.name}:x:${toString u.uid}:${gid}::${home}:/bin/sh") agentUsers;
     extraGroupLines = [ "agent:x:${gid}:" ];
   };
 
@@ -117,7 +149,7 @@ let
     # /etc/zoneinfo is where NixOS keeps the other zones
     ln -s ${hostPath}/localtime $out/etc/localtime
     ln -s ${hostPath}/zoneinfo $out/etc/zoneinfo
-    printf "[user]\n\tname = Claude\n\temail = claude@anthropic.com\n" > $out/etc/gitconfig
+    # /etc/gitconfig, the user's name and address, is the wrapper's
   '';
 
   # the one secret every sandbox gets; from `claude setup-token`, never
@@ -189,9 +221,9 @@ let
     # `kill -0`, which makes a pidfile look live long after the process
     # has gone. nixpkgs' podman points init_path at catatonit already.
     "--init"
-    "--uidmap" "0:0:1" "--uidmap" "${uid}:@${uid}:1"
+    # the user's uid (the wrapper's to add, as it picks the user) and gid
+    "--uidmap" "0:0:1"
     "--gidmap" "0:0:1" "--gidmap" "${gid}:@${gid}:1" "--gidmap" "${kvm}:@${kvm}:1"
-    "--user" "${uid}:${gid}"
     "--mount" "type=tmpfs,destination=/tmp,tmpfs-mode=1777,tmpfs-size=8g"
     # a sandbox inside this one (claude's, for the commands it runs) mounts its
     # own /proc, which the kernel refuses while parts of ours are masked
@@ -236,10 +268,10 @@ let
   # everything host-specific the wrapper needs; lib/agent.py is the same on every host
   conf = pkgs.writeText "gensokyo-agent.json" (builtins.toJSON {
     podman = "${pkgs.podman}/bin/podman";
-    # the env scrub puts claude back in its default permission mode; the tools are allowed by name,
-    # and anything else by a hook the wrapper puts in the sandbox's settings
-    defaultCmd = "claude --dangerously-skip-permissions --allowedTools Edit,MultiEdit,Write,NotebookEdit,Bash,WebSearch,WebFetch";
-    inherit token agents;
+    inherit harnesses modelUsers token agents;
+    defaultHarness = "claude-code";
+    users = lib.listToAttrs (map (u: lib.nameValuePair u.name { inherit (u) uid git; }) agentUsers);
+    inherit gid;
     git = "${pkgs.gitMinimal}/bin/git";
     nix = "${config.nix.package}/bin/nix";
     system = pkgs.stdenv.hostPlatform.system;
@@ -250,7 +282,6 @@ let
       ++ nixArgs ++ vmArgs ++ glArgs ++ lib.optionals cudaSupport cudaArgs;
     # a workspace: an image of these files for / and the home, run with these arguments
     root = rootfs;
-    user = "${uid}:${gid}";
     inherit home;
     runArgs = nixArgs;
     # --gpu asks; whether the host has the devices is its business
@@ -272,27 +303,32 @@ in
     enable = lib.mkEnableOption "the gensokyo-agent sandbox";
     user = lib.mkOption {
       type = lib.types.str;
-      description = "Host user who drives the sandbox and may act as claude.";
+      description = "Host user who drives the sandbox and may act as its users.";
     };
-    uid = lib.mkOption { type = lib.types.int; default = 4738; };
+    uid = lib.mkOption {
+      type = lib.types.int;
+      default = 4738;
+      description = "The first of the sandbox's users, claude; the others follow.";
+    };
     gid = lib.mkOption { type = lib.types.int; default = 384; };
   };
 
   config = lib.mkIf cfg.enable {
     users.groups.agent.gid = cfg.gid;
-    users.users.claude = {
-      isSystemUser = true;      # home defaults to /var/empty; nothing on the host
-      uid = cfg.uid;
+    # home defaults to /var/empty; nothing on the host
+    users.users = lib.listToAttrs (map (u: lib.nameValuePair u.name {
+      isSystemUser = true;
+      inherit (u) uid;
       group = "agent";
-    };
-
-    # user may act as claude inside their user namespace; linger keeps user@UID (and its
-    # D-Bus) alive so rootless podman can reach systemd for cgroups from any session
-    users.users.${cfg.user} = {
-      linger = true;
-      autoSubUidGidRange = true;
-      subUidRanges = [ { startUid = cfg.uid; count = 1; } ];
-      subGidRanges = [ { startGid = cfg.gid; count = 1; } { startGid = config.ids.gids.kvm; count = 1; } ];
+    }) agentUsers) // {
+      # user may act as each inside their user namespace; linger keeps user@UID (and its
+      # D-Bus) alive so rootless podman can reach systemd for cgroups from any session
+      ${cfg.user} = {
+        linger = true;
+        autoSubUidGidRange = true;
+        subUidRanges = [ { startUid = cfg.uid; count = lib.length agentUsers; } ];
+        subGidRanges = [ { startGid = cfg.gid; count = 1; } { startGid = config.ids.gids.kvm; count = 1; } ];
+      };
     };
 
     boot.kernelModules = lib.optional cudaSupport "nvidia-uvm";

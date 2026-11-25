@@ -10,12 +10,18 @@ _gensokyo_agent() {
     --from)
       mapfile -t COMPREPLY < <(compgen -W "$(podman ps -a --filter label=gensokyo-agent --format '{{.Names}}' 2>/dev/null)" -- "$cur")
       return ;;
+    --harness)
+      mapfile -t COMPREPLY < <(compgen -W "claude-code antigravity codex" -- "$cur")
+      return ;;
+    --agent-user)
+      mapfile -t COMPREPLY < <(compgen -W "claude gpt gemini deepseek qwen kimi inkling agent" -- "$cur")
+      return ;;
     --effort)
       mapfile -t COMPREPLY < <(compgen -W "low medium high xhigh max" -- "$cur")
       return ;;
   esac
   if [[ $cur == -* ]]; then
-    mapfile -t COMPREPLY < <(compgen -W "--legacy --history --copy-history --name --connection --secret --gpu --vm --no-vm --device --closure --from --copy --no-copy --git --git-add-remote --cp --ro --rw --bind --prompt --model --effort --publish -p -L -sp --help" -- "$cur")
+    mapfile -t COMPREPLY < <(compgen -W "--legacy --history --copy-history --name --connection --secret --gpu --vm --no-vm --device --closure --from --copy --no-copy --git --git-add-remote --cp --ro --rw --bind --prompt --harness --model --agent-user --effort --publish -p -L -sp --help" -- "$cur")
   fi
 }
 # paths are the default: most of the other flags start with one

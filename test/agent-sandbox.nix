@@ -59,7 +59,8 @@ in
 
     with subtest("the sandbox on the current directory"):
         out = machine.succeed(agent("--legacy sh -c \"id -u; touch \\$HOME/mine; pwd\""))
-        assert "4738" in out and "/home/alice/w" in out, out
+        # no harness's command: the generic user
+        assert "4745" in out and "/home/alice/w" in out, out
         # the clock is in the host's zone, and any other can be asked for
         out = machine.succeed(agent("--legacy sh -c \"readlink -f /etc/localtime; date +%Z; TZ=Europe/Berlin date +%Z\""))
         assert "/zoneinfo/Asia/Tokyo\nJST\nCET" in out.replace("\r", ""), out
@@ -67,9 +68,9 @@ in
 
     with subtest("a workspace is the agent's own"):
         out = machine.succeed(agent(
-            "--name ws1 --cp /etc/hostname:notes/host -- sh -c"
+            "--name ws1 --agent-user gemini --cp /etc/hostname:notes/host -- sh -c"
             " \"id -u; cat notes/host; touch notes/mine \\$HOME/mine; git config user.name; pwd; date +%Z\""))
-        assert "4738\nmachine\nClaude\n/var/tmp/gensokyo-agent/ws1\nJST" in out.replace("\r", ""), out
+        assert "4740\nmachine\nGemini\n/var/tmp/gensokyo-agent/ws1\nJST" in out.replace("\r", ""), out
         assert "nested 2" in machine.succeed(agent("--name ws2 -- " + nested))
 
     with subtest("and it comes back after it stopped"):

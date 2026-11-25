@@ -124,6 +124,7 @@ class AgentTest(unittest.TestCase):
         os.chmod(nix, 0o755)
         root = os.path.join(self.tmp, "rootfs")
         os.makedirs(os.path.join(root, "home", "agent"))
+        os.makedirs(os.path.join(root, "etc"))
         self.conf = {
             "podman": podman,
             "git": "git",
@@ -131,7 +132,18 @@ class AgentTest(unittest.TestCase):
             "nix": nix,
             "system": "x86_64-linux",
             "closure": {"at": "/.gensokyo-agent/closure", "default": "/etc/gensokyo-agent/closure"},
-            "defaultCmd": "claude --dangerously-skip-permissions",
+            # as lib/agent.nix has them
+            "harnesses": {
+                "claude-code": {"cmd": "claude --dangerously-skip-permissions", "user": "claude"},
+                "antigravity": {"cmd": "agy --dangerously-skip-permissions", "user": "gemini"},
+                "codex": {"cmd": "codex --dangerously-bypass-approvals-and-sandbox", "user": "gpt"},
+            },
+            "defaultHarness": "claude-code",
+            "modelUsers": [["claude|opus|sonnet|haiku|fable", "claude"], ["gpt|codex|^o[0-9]", "gpt"], ["gemini", "gemini"],
+                           ["deepseek", "deepseek"], ["qwen", "qwen"], ["kimi|moonshot", "kimi"], ["inkling", "inkling"]],
+            "users": {name: {"uid": 4738 + i, "git": {"name": name.capitalize(), "email": f"{name}@x"}}
+                      for i, name in enumerate(["claude", "gpt", "gemini", "deepseek", "qwen", "kimi", "inkling", "agent"])},
+            "gid": "384",
             "token": {"secret": "claude-oauth-token", "target": "CLAUDE_CODE_OAUTH_TOKEN"},
             # as lib/agent.nix has them
             "agents": {
@@ -155,7 +167,7 @@ class AgentTest(unittest.TestCase):
                 },
             },
             "hereArgs": ["--rm"],
-            "root": root, "user": "4738:384", "home": "/home/agent",
+            "root": root, "home": "/home/agent",
             "runArgs": ["--init"], "gpuArgs": ["--device", "/dev/gpu"], "vmArgs": ["--device", "/dev/kvm"],
         }
         self.base = os.path.join(self.tmp, "ws")
@@ -233,6 +245,54 @@ class AgentTest(unittest.TestCase):
         self.assertIn("exec agy --model gemini-9-pro --effort max\n", self.staged("root", ".gensokyo-agent", "entrypoint"))
         self.dies("--model", "opus", "--", "opencode")
         self.dies("--effort", "high", "--", "opencode")
+
+    def test_harness_model_and_user(self):
+        def pick(*args, **kw):
+            return agent.pick(self.conf, *args, **kw)
+        claude = ["claude", "--dangerously-skip-permissions"]
+        self.assertEqual(pick(), (claude, "claude"))
+        self.assertEqual(pick(model="opus"), (claude, "claude"))
+        # agy's own models are gemini's, unless it runs another's
+        agy = ["agy", "--dangerously-skip-permissions"]
+        self.assertEqual(pick("antigravity"), (agy, "gemini"))
+        self.assertEqual(pick("antigravity", "Claude Opus 5.5"), (agy, "claude"))
+        self.assertEqual(pick("antigravity", "gemini-9-pro"), (agy, "gemini"))
+        self.assertEqual(pick("codex")[1], "gpt")
+        self.assertEqual(pick("codex", "o9-mini")[1], "gpt")
+        self.assertEqual(pick("codex", "Qwen3-Coder")[1], "qwen")
+        self.assertEqual(pick(model="deepseek-v9")[1], "deepseek")
+        self.assertEqual(pick(model="kimi-k9")[1], "kimi")
+        self.assertEqual(pick(model="inkling-1")[1], "inkling")
+        self.assertEqual(pick(model="llama-9")[1], "claude")
+        # a command after --: its harness's, or agent's
+        self.assertEqual(pick(cmd=["/bin/agy", "-p", "x"]), (["/bin/agy", "-p", "x"], "gemini"))
+        self.assertEqual(pick(cmd=["opencode"]), (["opencode"], "agent"))
+        self.assertEqual(pick(cmd=["opencode"], model="gpt-9"), (["opencode"], "gpt"))
+        self.assertEqual(pick("antigravity", cmd=["agy"]), (["agy"], "gemini"))
+        # --agent-user over all
+        self.assertEqual(pick("antigravity", "Claude Opus 5.5", "agent")[1], "agent")
+        with mock.patch.dict(os.environ, {"AGENT_CMD": "codex -x"}):
+            self.assertEqual(pick(), (["codex", "-x"], "gpt"))
+            self.assertEqual(pick("antigravity")[0], agy)
+        for bad in ({"harness": "cursor"}, {"user": "bob"}, {"harness": "codex", "cmd": ["agy"]}):
+            with self.assertRaises(SystemExit), quiet():
+                pick(**bad)
+
+    def test_workspace_of_another_user(self):
+        run = self.new("--name", "ws21", "--harness", "antigravity", "--git", self.repo())
+        # gemini's uid, mapped to this host's; its files gemini's; its commits gemini's
+        joined = " ".join(run)
+        self.assertIn("--uidmap 4740:@4740:1 --user 4740:384", joined)
+        with open(os.path.join(self.out, "Containerfile")) as f:
+            self.assertIn("COPY --chown=4740:384 work/", f.read())
+        self.assertEqual(self.staged("root", "etc", "gitconfig"), "[user]\n\tname = Gemini\n\temail = gemini@x\n")
+        self.assertIn("exec agy --dangerously-skip-permissions\n", self.staged("root", ".gensokyo-agent", "entrypoint"))
+        self.assertEqual(json.loads(run[run.index("--label", 5) + 1].split("=", 1)[1])["user"], "gemini")
+        # claude's by default
+        run = " ".join(self.new("--name", "ws22"))
+        self.assertIn("--uidmap 4738:@4738:1 --user 4738:384", run)
+        self.assertIn("name = Claude", self.staged("root", "etc", "gitconfig"))
+        self.dies("--harness", "codex", "--", "agy")
 
     def test_entrypoint_resumes_claude_only(self):
         claude = agent.entrypoint(["claude", "--x"], "it's time")
@@ -346,7 +406,7 @@ class AgentTest(unittest.TestCase):
         # the login first, the key only without it
         with mock.patch.dict(os.environ, {"STUB_SECRETS": "agy-oauth-token gemini-api-key"}):
             run = self.new("--name", "ws20", "--", "agy")
-        self.assertIn("agy-oauth-token,type=mount,uid=4738,gid=384,mode=0400", run)
+        self.assertIn("agy-oauth-token,type=mount,uid=4740,gid=384,mode=0400", run)
         self.assertNotIn("gemini-api-key", " ".join(run))
         # nor the settings that make agy want the key
         self.assertNotIn("modelProvider", self.staged("home", ".gemini", "antigravity-cli", "settings.json"))
@@ -372,7 +432,7 @@ class AgentTest(unittest.TestCase):
         with quiet():
             agent.run_here(self.conf, ["agy", "-c"])
         (run,) = [c for c in self.calls() if "run" in c]
-        self.assertIn("agy-oauth-token,type=mount,uid=4738,gid=384,mode=0400", run)
+        self.assertIn("agy-oauth-token,type=mount,uid=4740,gid=384,mode=0400", run)
         self.assertEqual(run[-6:-4], ["sh", "-c"])
         self.assertIn("install -m 600 /run/secrets/agy-oauth-token", run[-4])
         self.assertEqual(run[-3:], ["sh", "agy", "-c"])

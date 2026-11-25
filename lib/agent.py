@@ -71,11 +71,20 @@ gensokyo-agent --copy-history [-c CONN]... [DIR]
                               and one that exists is used as it is
   --bind SRC:DST[:DESC]       SRC itself at DST; local only
   --prompt TEXT               what the agent starts on
+  --harness NAME              the agent: claude-code (the default),
+                              antigravity (agy) or codex; any other is a
+                              command after --
   --model MODEL               the agent's model, as it names them. claude:
                               fable, opus, sonnet, haiku, opusplan, or a
                               full model name; [1m] after it for the long
                               context. default: claude-opus-5-5[1m]. agy:
-                              agy models lists them. codex: -m
+                              agy models lists them, its own by default.
+                              codex: -m, its own by default
+  --agent-user USER           who the agent is, and commits as: claude,
+                              gpt, gemini, deepseek, qwen, kimi, inkling,
+                              agent. default: the maker of --model's
+                              model, or of the harness's own (claude,
+                              gemini, gpt), or agent
   --effort LEVEL              claude, agy: low, medium, high, xhigh, max.
                               codex: its model_reasoning_effort. any other
                               agent takes either after --, its own way
@@ -115,9 +124,11 @@ examples:
   gensokyo-agent --from jolly_swartz --no-copy --git .:jolly_swartz:
       its conversation only, on the branch fetched from it (git fetch
       jolly_swartz && git branch jolly_swartz jolly_swartz/master)
-  gensokyo-agent -s openai-api-key,type=env,target=OPENAI_API_KEY -- codex
-      another agent, and a secret of its own
-  gensokyo-agent --git .:: -- agy --dangerously-skip-permissions
+  gensokyo-agent --harness codex -s openai-api-key,type=env,target=OPENAI_API_KEY
+      another agent, gpt in the sandbox, and a secret of its own
+  gensokyo-agent --harness antigravity --model "Claude Opus 5.5" --git .::
+      agy on claude's model, so claude in the sandbox
+  gensokyo-agent --git .:: --harness antigravity
       google's agent, logged in by the podman secret agy-oauth-token (its
       google login, saved from a workspace) or gemini-api-key (an API
       key), never claude's token; with neither it asks you to sign in
@@ -262,6 +273,46 @@ def agent_conf(conf, cmd):
     return conf.get("agents", {}).get(os.path.basename(cmd[0]), {})
 
 
+def pick(conf, harness=None, model=None, user=None, cmd=None):
+    """The command and the user: --harness's command, or the one after --
+    (AGENT_CMD, failing both), claude-code's by default; the user --agent-user
+    names, else that of --model's maker, else that of the harness's own
+    models, else agent."""
+    harnesses = conf["harnesses"]
+    by_cmd = {h["cmd"].split()[0]: name for name, h in harnesses.items()}
+    if harness is not None and harness not in harnesses:
+        die(f"--harness {harness}: one of {', '.join(harnesses)}")
+    if not cmd and harness is None and os.environ.get("AGENT_CMD"):
+        cmd = os.environ["AGENT_CMD"].split()
+    if cmd:
+        known = by_cmd.get(os.path.basename(cmd[0]))
+        if harness is not None and harness != known:
+            die(f"--harness {harness}: not what {cmd[0]} is; one or the other")
+        harness = known
+    else:
+        harness = harness or conf["defaultHarness"]
+        cmd = harnesses[harness]["cmd"].split()
+    if user is None and model:
+        user = next((u for pattern, u in conf["modelUsers"] if re.search(pattern, model, re.I)), None)
+    if user is None:
+        user = harnesses[harness]["user"] if harness else "agent"
+    if user not in conf["users"]:
+        die(f"--agent-user {user}: one of {', '.join(conf['users'])}")
+    return cmd, user
+
+
+def id_args(conf, user):
+    """podman's, for the agent to be user: its uid this host's own, as the gid is."""
+    uid = conf["users"][user]["uid"]
+    return ["--uidmap", f"{uid}:@{uid}:1", "--user", f"{uid}:{conf['gid']}"]
+
+
+def write_gitconfig(root, conf, user):
+    git = conf["users"][user]["git"]
+    with open(os.path.join(root, "etc", "gitconfig"), "w") as f:
+        f.write(f"[user]\n\tname = {git['name']}\n\temail = {git['email']}\n")
+
+
 def write_files(home, files):
     """Files of the home: text as it is, an object as JSON, merged into
     what another wrote there before."""
@@ -300,7 +351,7 @@ MCP_FORMATS = {
 }
 
 
-def token_args(conf, podman, cmd, home):
+def token_args(conf, podman, cmd, home, user):
     """The login of the agent cmd runs: claude's token, or the first of an
     agent's own there is a secret for, and what that one needs in the home.
     Returns podman's arguments and what the first start runs: a login that
@@ -320,7 +371,7 @@ def token_args(conf, podman, cmd, home):
     write_files(home, token.get("home", {}))
     if "file" not in token:
         return ["--secret", f"{token['secret']},type=env,target={token['target']}"], ""
-    uid, gid = conf["user"].split(":")
+    uid, gid = conf["users"][user]["uid"], conf["gid"]
     dst = f"\"$HOME\"/{shlex.quote(token['file'])}"
     return (["--secret", f"{token['secret']},type=mount,uid={uid},gid={gid},mode=0400"],
             f"mkdir -p \"$(dirname {dst})\"\ninstall -m 600 /run/secrets/{shlex.quote(token['secret'])} {dst}\n")
@@ -343,7 +394,7 @@ def run_here(conf, cmd):
     """One command in a throwaway sandbox, the current directory mounted."""
     podman = [conf["podman"]]
     debug = os.environ.get("DEBUG", "0") == "1"
-    cmd = cmd or os.environ.get("AGENT_CMD", conf["defaultCmd"]).split()
+    cmd, user = pick(conf, cmd=cmd)
     cwd = os.getcwd()
 
     # rootless podman can't write into a root-owned store path (unmapped uid,
@@ -354,15 +405,16 @@ def run_here(conf, cmd):
     try:
         copy_writable(conf["root"], root)
         os.chmod(root, 0o755)  # mkdtemp gives 0700; / must be traversable by the agent uid
+        write_gitconfig(root, conf, user)
         home = root + conf["home"]
         write_home(home, cwd)
         write_files(home, agent_conf(conf, cmd).get("home", {}))
 
-        args = conf["hereArgs"] + [
+        args = conf["hereArgs"] + id_args(conf, user) + [
             "-v", f"{home}:{conf['home']}:U",  # ours on the host, the agent's inside
             "-v", f"{cwd}:{cwd}", "-w", cwd,
         ]
-        login, setup = token_args(conf, podman, cmd, home)
+        login, setup = token_args(conf, podman, cmd, home, user)
         args += login + agent_conf(conf, cmd).get("args", [])
         if setup:
             cmd = ["sh", "-c", setup + 'exec "$@"', "sh", *cmd]
@@ -372,7 +424,7 @@ def run_here(conf, cmd):
             args.append("--log-level=debug")
 
         argv = [*podman, "run", "--rootfs", *args, root, *cmd]
-        say(f"{cwd} :: {' '.join(cmd)}")
+        say(f"{cwd} :: {user} :: {' '.join(cmd)}")
         if debug:
             print("+ " + " ".join(argv), file=sys.stderr)
         return subprocess.call(argv)
@@ -403,6 +455,8 @@ def parse_args(argv):
     p.add_argument("--closure")
     p.add_argument("--git-add-remote", action="append", default=[])
     p.add_argument("--prompt")
+    p.add_argument("--harness")
+    p.add_argument("--agent-user")
     p.add_argument("--model")
     p.add_argument("--effort")
     p.add_argument("-p", "--publish", action="append", default=[])
@@ -816,7 +870,7 @@ def new_workspace(conf, opts, cmd, passthrough):
         g["url"] = remote_url(g, name, podman, workdir)
         g["exists"] = check_remote(conf, g, name, g["url"])
 
-    cmd = cmd or os.environ.get("AGENT_CMD", conf["defaultCmd"]).split()
+    cmd, user = pick(conf, opts.harness, opts.model, opts.agent_user, cmd)
     claude = os.path.basename(cmd[0]) == "claude"
     agent = agent_conf(conf, cmd)
     for flag in ("model", "effort"):
@@ -874,6 +928,7 @@ def new_workspace(conf, opts, cmd, passthrough):
             os.mkdir(work)
         root = os.path.join(ctx, "root")
         copy_writable(conf["root"], root)
+        write_gitconfig(root, conf, user)
         # COPY --chown makes the home the agent's only if it makes it
         shutil.rmtree(root + conf["home"], ignore_errors=True)
         os.makedirs(os.path.join(root, ".gensokyo-agent"), exist_ok=True)
@@ -885,7 +940,7 @@ def new_workspace(conf, opts, cmd, passthrough):
                 die(f"--from {opts.from_}: podman cp {src} failed")
         write_home(os.path.join(ctx, "home"), workdir)
         write_files(os.path.join(ctx, "home"), agent.get("home", {}))
-        login, setup = token_args(conf, podman, cmd, os.path.join(ctx, "home"))
+        login, setup = token_args(conf, podman, cmd, os.path.join(ctx, "home"), user)
 
         mounts = []
         notes = {"history": [], "repositories": [], "files": [], "closure": [], "MCP servers": []}
@@ -974,12 +1029,12 @@ def new_workspace(conf, opts, cmd, passthrough):
         with open(os.path.join(work, "AGENTS.md"), "a") as f:
             f.write(agents_md(name, notes))
 
-        user = conf["user"]
+        owner = f"{conf['users'][user]['uid']}:{conf['gid']}"
         containerfile = "".join([
             "FROM scratch\n",
             "COPY root/ /\n",
-            f"COPY --chown={user} home/ {conf['home']}/\n",
-            f"COPY --chown={user} work/ {workdir}/\n",
+            f"COPY --chown={owner} home/ {conf['home']}/\n",
+            f"COPY --chown={owner} work/ {workdir}/\n",
         ])
         image = f"localhost/gensokyo-agent/{name}"
         with open(os.path.join(ctx, "Containerfile"), "w") as f:
@@ -993,12 +1048,12 @@ def new_workspace(conf, opts, cmd, passthrough):
     # checkouts are not recorded, --git-add-remote names them
     record = {
         "closure": closure if custom else None, "servers": servers if custom else [],
-        "system": conf["system"], "cmd": cmd, "passthrough": passthrough,
+        "system": conf["system"], "cmd": cmd, "user": user, "passthrough": passthrough,
         "opts": {k: v for k, v in vars(opts).items() if k not in ("git", "git_add_remote")},
     }
     args = ["--name", name, "--label", f"gensokyo-agent={name}", "--label", f"{LABEL}={json.dumps(record)}",
             "--log-driver", "none", "-w", workdir]
-    args += conf["runArgs"]
+    args += conf["runArgs"] + id_args(conf, user)
     args += ["-v", f"{closure}:{conf['closure']['at']}:ro"]
     for want in ("gpu", "vm"):
         if getattr(opts, want):
@@ -1048,7 +1103,7 @@ def new_workspace(conf, opts, cmd, passthrough):
     for g in repos + adds:
         add_remote(conf, g, name, g["url"], g["exists"])
 
-    say(f"workspace {name} at {workdir}")
+    say(f"workspace {name} at {workdir}, {user} in it: {shlex.join(cmd)}")
     if replace:
         say(f"  in place of the workspace {name} it carries on from, now removed")
     elif old:
