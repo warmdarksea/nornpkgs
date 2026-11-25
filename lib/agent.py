@@ -235,7 +235,8 @@ def write_home(home, workdir):
     with open(os.path.join(home, ".claude.json"), "w") as f:
         json.dump({
             "hasCompletedOnboarding": True,
-            "theme": "auto",
+            # there is no solarized light of claude's: the terminal's colours, then
+            "theme": "light-ansi",
             # the notices of auto mode: what it is, and the offer to make it the default
             "hasSeenAutoModeEntryWarning": True,
             "hasSeenAutoDefaultNotice": True,
@@ -259,6 +260,21 @@ def write_home(home, workdir):
 def agent_conf(conf, cmd):
     """What the wrapper knows of the agent cmd runs (agents in lib/agent.nix)."""
     return conf.get("agents", {}).get(os.path.basename(cmd[0]), {})
+
+
+def write_files(home, files):
+    """Files of the home: text as it is, an object as JSON, merged into
+    what another wrote there before."""
+    for path, content in files.items():
+        dst = os.path.join(home, path)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        if isinstance(content, dict):
+            if os.path.exists(dst):
+                with open(dst) as f:
+                    content = {**json.load(f), **content}
+            content = json.dumps(content)
+        with open(dst, "w") as f:
+            f.write(content)
 
 
 # the closure's MCP servers, as claude has them, for an agent that reads them
@@ -301,10 +317,7 @@ def token_args(conf, podman, cmd, home):
         name = tokens[0]["secret"] if len(tokens) == 1 else "NAME"
         say(f"no podman secret {names} here, {why}: {' '.join(podman)} secret create {name} -")
         return [], ""
-    for path, content in token.get("home", {}).items():
-        os.makedirs(os.path.dirname(os.path.join(home, path)), exist_ok=True)
-        with open(os.path.join(home, path), "w") as f:
-            json.dump(content, f)
+    write_files(home, token.get("home", {}))
     if "file" not in token:
         return ["--secret", f"{token['secret']},type=env,target={token['target']}"], ""
     uid, gid = conf["user"].split(":")
@@ -343,13 +356,14 @@ def run_here(conf, cmd):
         os.chmod(root, 0o755)  # mkdtemp gives 0700; / must be traversable by the agent uid
         home = root + conf["home"]
         write_home(home, cwd)
+        write_files(home, agent_conf(conf, cmd).get("home", {}))
 
         args = conf["hereArgs"] + [
             "-v", f"{home}:{conf['home']}:U",  # ours on the host, the agent's inside
             "-v", f"{cwd}:{cwd}", "-w", cwd,
         ]
         login, setup = token_args(conf, podman, cmd, home)
-        args += login
+        args += login + agent_conf(conf, cmd).get("args", [])
         if setup:
             cmd = ["sh", "-c", setup + 'exec "$@"', "sh", *cmd]
         if sys.stdin.isatty():
@@ -862,6 +876,7 @@ def new_workspace(conf, opts, cmd, passthrough):
             if call([*old["podman"], "cp", src, os.path.join(ctx, "home", ".claude")]) != 0:
                 die(f"--from {opts.from_}: podman cp {src} failed")
         write_home(os.path.join(ctx, "home"), workdir)
+        write_files(os.path.join(ctx, "home"), agent.get("home", {}))
         login, setup = token_args(conf, podman, cmd, os.path.join(ctx, "home"))
 
         mounts = []
@@ -928,11 +943,12 @@ def new_workspace(conf, opts, cmd, passthrough):
                 " are the owner's to approve, and count once they restart you. A server runs in this"
                 " directory: one of a checkout `cd`s there in its command")
         if agent.get("mcp"):
-            # in the workspace, at the first start: its PWD and HOME are the ones to fill in
+            # in the workspace, at the first start: its PWD and HOME are the ones to fill
+            # in. after what the home has there already: TOML's tables follow its keys
             mcp = f"\"$HOME\"/{shlex.quote(agent['mcp']['path'])}"
             jq = shlex.quote(MCP_EXPAND + " | " + MCP_FORMATS[agent["mcp"]["format"]])
             setup += (f"mkdir -p \"$(dirname {mcp})\"\n"
-                      f"PWD=\"$PWD\" jq -r {jq} {conf['closure']['at']}/share/gensokyo-agent/mcp.json > {mcp}\n")
+                      f"PWD=\"$PWD\" jq -r {jq} {conf['closure']['at']}/share/gensokyo-agent/mcp.json >> {mcp}\n")
             if servers:
                 notes["MCP servers"].append(f"{', '.join(f'`{n}`' for n in servers)}: the owner's, from the closure")
             notes["MCP servers"].append(
@@ -995,7 +1011,7 @@ def new_workspace(conf, opts, cmd, passthrough):
         args = kept + ["--group-add", "keep-groups"]
         for spec in opts.device:
             args += ["--device", spec]
-    args += login
+    args += login + agent.get("args", [])
     for spec in opts.secret:
         args += ["--secret", spec]
     args += mounts

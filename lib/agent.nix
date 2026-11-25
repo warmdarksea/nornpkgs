@@ -133,6 +133,9 @@ let
   #           starts logged out, and its google login (the URL it prints, the
   #           code pasted back) lasts in that file, there being no keyring:
   #           once per workspace, unless it is made the secret
+  #   args    podman's, for it
+  #   home    files of its home: an attrset as JSON, merged with a token's,
+  #           text as it is
   #   mcp     where the closure's MCP servers go in its home, and in which of
   #           the formats lib/agent.py converts them to; claude is given them
   #           by flag
@@ -155,13 +158,28 @@ let
           home.".gemini/antigravity-cli/settings.json" = { modelProvider = "gemini"; };
         }
       ];
+      home.".gemini/antigravity-cli/settings.json" = { colorScheme = "solarized light"; };
+      # its telemetry is a setting of the account, but where it goes is clearcut's,
+      # signed in or not: nowhere
+      args = [ "--add-host" "play.googleapis.com:127.0.0.1" ];
       missing = "agy starts logged out: sign in with the URL it prints, then save that login (lib/agent.nix says how); or an API key of aistudio.google.com";
       mcp = { path = ".gemini/config/mcp_config.json"; format = "agy"; };
       instructions = "AGENTS.md";
     };
     codex = {
       flags = { model = [ "-m" "%s" ]; effort = [ "-c" "model_reasoning_effort=%s" ]; };
-      # the whole of its config: there is none else in the sandbox
+      home.".codex/config.toml" = ''
+        [tui]
+        theme = "solarized-light"
+
+        [analytics]
+        enabled = false
+
+        [feedback]
+        enabled = false
+
+      '';
+      # after the rest of its config, there being none else in the sandbox
       mcp = { path = ".codex/config.toml"; format = "codex"; };
       instructions = "AGENTS.md";
     };
@@ -193,6 +211,11 @@ let
     "-e" "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1"
     # nor the connectors of the owner's claude.ai account (mail, drives and the like)
     "-e" "ENABLE_CLAUDEAI_MCP_SERVERS=0"
+    # no telemetry, error reports or surveys of claude's (agy's is a setting
+    # of the google account, /config there; codex's is in its config.toml)
+    "-e" "DISABLE_TELEMETRY=1"
+    "-e" "DISABLE_ERROR_REPORTING=1"
+    "-e" "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY=1"
     # claude kills a command after 2 minutes unless it asked for longer, and
     # may ask for 10 at most; a host evaluation or a build takes more
     "-e" "BASH_DEFAULT_TIMEOUT_MS=600000"

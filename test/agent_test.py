@@ -145,11 +145,14 @@ class AgentTest(unittest.TestCase):
                     ],
                     "missing": "agy starts logged out",
                     "mcp": {"path": ".gemini/config/mcp_config.json", "format": "agy"},
+                    "home": {".gemini/antigravity-cli/settings.json": {"colorScheme": "solarized light"}},
+                    "args": ["--add-host", "play.googleapis.com:127.0.0.1"],
                     "instructions": "AGENTS.md",
                 },
                 "codex": {
                     "flags": {"model": ["-m", "%s"], "effort": ["-c", "model_reasoning_effort=%s"]},
                     "mcp": {"path": ".codex/config.toml", "format": "codex"},
+                    "home": {".codex/config.toml": '[tui]\ntheme = "solarized-light"\n\n'},
                     "instructions": "AGENTS.md",
                 },
             },
@@ -323,18 +326,23 @@ class AgentTest(unittest.TestCase):
         # agy without its secret: logged out, and never claude's token
         run = " ".join(self.new("--name", "ws12", "--", "agy"))
         self.assertNotIn("--secret", run)
-        self.assertFalse(os.path.exists(settings))
+        # its settings, and clearcut nowhere
+        with open(settings) as f:
+            self.assertEqual(json.load(f), {"colorScheme": "solarized light"})
+        self.assertIn("--add-host play.googleapis.com:127.0.0.1", run)
         with mock.patch.dict(os.environ, {"STUB_SECRETS": "gemini-api-key"}):
             run = " ".join(self.new("--name", "ws13", "--", "/bin/agy", "-p", "x"))
             self.assertIn("--secret gemini-api-key,type=env,target=GEMINI_API_KEY", run)
             self.assertNotIn("claude-oauth-token", run)
             with open(settings) as f:
-                self.assertEqual(json.load(f), {"modelProvider": "gemini"})
+                self.assertEqual(json.load(f), {"colorScheme": "solarized light", "modelProvider": "gemini"})
             # nor the others agy's
             run = " ".join(self.new("--name", "ws14"))
             self.assertIn("--secret claude-oauth-token,type=env,target=CLAUDE_CODE_OAUTH_TOKEN", run)
             self.assertNotIn("gemini", run)
+            self.assertNotIn("--add-host", run)
             self.assertFalse(os.path.exists(settings))
+            self.assertEqual(json.loads(self.staged("home", ".claude.json"))["theme"], "light-ansi")
 
     def test_agy_google_login_is_a_file_it_may_rewrite(self):
         # the login first, the key only without it
@@ -343,7 +351,7 @@ class AgentTest(unittest.TestCase):
         self.assertIn("agy-oauth-token,type=mount,uid=4738,gid=384,mode=0400", run)
         self.assertNotIn("gemini-api-key", " ".join(run))
         # nor the settings that make agy want the key
-        self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "home", ".gemini", "antigravity-cli", "settings.json")))
+        self.assertNotIn("modelProvider", self.staged("home", ".gemini", "antigravity-cli", "settings.json"))
         # copied at the first start, the agent's to rewrite
         secrets, home = os.path.join(self.tmp, "secrets"), os.path.join(self.tmp, "home")
         os.makedirs(secrets)
@@ -393,8 +401,9 @@ class AgentTest(unittest.TestCase):
             self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "work", ".mcp.json")))
             script = self.staged("root", ".gensokyo-agent", "entrypoint")
             script = script.replace("/.gensokyo-agent/closure", closure).replace(f"exec {cmd}\n", ":\n")
+            # the home as the image has it
             shutil.rmtree(home, ignore_errors=True)
-            os.makedirs(home)
+            shutil.copytree(os.path.join(self.out, "ctx", "home"), home)
             subprocess.run(["sh", "-c", script], cwd=ws, check=True, env={"HOME": home, "PATH": os.environ["PATH"]})
             with open(os.path.join(home, path), "rb") as f:
                 return f.read()
@@ -402,7 +411,8 @@ class AgentTest(unittest.TestCase):
             "lean": lean,
             "web": {"serverUrl": "https://e/mcp", "headers": {"A": "b"}},
         }})
-        self.assertEqual(tomllib.loads(first_start("ws19", "codex", ".codex/config.toml").decode()), {"mcp_servers": {
+        # after the rest of its config
+        self.assertEqual(tomllib.loads(first_start("ws19", "codex", ".codex/config.toml").decode()), {"tui": {"theme": "solarized-light"}, "mcp_servers": {
             "lean": lean,
             "web": {"url": "https://e/mcp", "http_headers": {"A": "b"}},
         }})
