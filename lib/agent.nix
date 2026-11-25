@@ -139,9 +139,6 @@ let
   #   mcp     where the closure's MCP servers go in its home, and in which of
   #           the formats lib/agent.py converts them to; claude is given them
   #           by flag
-  #   instructions
-  #           the file it reads for its instructions, a link to the
-  #           workspace's CLAUDE.md
   agents = {
     claude.flags = { model = [ "--model" "%s" ]; effort = [ "--effort" "%s" ]; };
     agy = {
@@ -164,7 +161,6 @@ let
       args = [ "--add-host" "play.googleapis.com:127.0.0.1" ];
       missing = "agy starts logged out: sign in with the URL it prints, then save that login (lib/agent.nix says how); or an API key of aistudio.google.com";
       mcp = { path = ".gemini/config/mcp_config.json"; format = "agy"; };
-      instructions = "AGENTS.md";
     };
     codex = {
       flags = { model = [ "-m" "%s" ]; effort = [ "-c" "model_reasoning_effort=%s" ]; };
@@ -181,7 +177,6 @@ let
       '';
       # after the rest of its config, there being none else in the sandbox
       mcp = { path = ".codex/config.toml"; format = "codex"; };
-      instructions = "AGENTS.md";
     };
   };
 

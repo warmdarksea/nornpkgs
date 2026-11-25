@@ -147,13 +147,11 @@ class AgentTest(unittest.TestCase):
                     "mcp": {"path": ".gemini/config/mcp_config.json", "format": "agy"},
                     "home": {".gemini/antigravity-cli/settings.json": {"colorScheme": "solarized light"}},
                     "args": ["--add-host", "play.googleapis.com:127.0.0.1"],
-                    "instructions": "AGENTS.md",
                 },
                 "codex": {
                     "flags": {"model": ["-m", "%s"], "effort": ["-c", "model_reasoning_effort=%s"]},
                     "mcp": {"path": ".codex/config.toml", "format": "codex"},
                     "home": {".codex/config.toml": '[tui]\ntheme = "solarized-light"\n\n'},
-                    "instructions": "AGENTS.md",
                 },
             },
             "hereArgs": ["--rm"],
@@ -286,7 +284,7 @@ class AgentTest(unittest.TestCase):
                          ["allow", "allow", "allow", "deny"])
         with open(os.path.join(ctx, "root", ".gensokyo-agent", "entrypoint")) as f:
             self.assertIn(f'exec claude --dangerously-skip-permissions {MCP} -- go\n', f.read())
-        with open(os.path.join(ctx, "work", "CLAUDE.md")) as f:
+        with open(os.path.join(ctx, "work", "AGENTS.md")) as f:
             md = f.read()
         for line in ("`notes/a`, a copy: a note", "`sets/d`, a read-only volume", "`scratch`, a volume", "`live`, the owner's own"):
             self.assertIn(line, md)
@@ -308,7 +306,7 @@ class AgentTest(unittest.TestCase):
     def test_mcp_json_of_the_agents_own(self):
         self.new("--name", "ws9")
         self.assertEqual(json.loads(self.staged("work", ".mcp.json")), {"mcpServers": {}})
-        self.assertIn("`.mcp.json` here is yours", self.staged("work", "CLAUDE.md"))
+        self.assertIn("`.mcp.json` here is yours", self.staged("work", "AGENTS.md"))
         self.assertTrue(json.loads(self.staged("home", ".claude", "settings.json"))["enableAllProjectMcpServers"])
         # one given is kept
         own = os.path.join(self.tmp, "own.json")
@@ -318,7 +316,7 @@ class AgentTest(unittest.TestCase):
         self.assertIn('"a"', self.staged("work", ".mcp.json"))
         self.new("--name", "ws11", "--", "opencode")
         self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "work", ".mcp.json")))
-        self.assertNotIn("MCP", self.staged("work", "CLAUDE.md"))
+        self.assertNotIn("MCP", self.staged("work", "AGENTS.md"))
         self.assertNotIn("mcp", self.staged("root", ".gensokyo-agent", "entrypoint"))
 
     def test_each_agent_its_own_login(self):
@@ -396,7 +394,6 @@ class AgentTest(unittest.TestCase):
 
         def first_start(name, cmd, path):
             self.new("--name", name, "--", cmd)
-            self.assertTrue(os.path.islink(os.path.join(self.out, "ctx", "work", "AGENTS.md")))
             self.assertIn(f"`~/{path}` is yours", self.staged("work", "AGENTS.md"))
             self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "work", ".mcp.json")))
             script = self.staged("root", ".gensokyo-agent", "entrypoint")
@@ -419,7 +416,9 @@ class AgentTest(unittest.TestCase):
         # claude has them by flag, and no such step
         self.new("--name", "ws18")
         self.assertNotIn("jq", self.staged("root", ".gensokyo-agent", "entrypoint"))
-        self.assertFalse(os.path.lexists(os.path.join(self.out, "ctx", "work", "AGENTS.md")))
+        # the notes in AGENTS.md, which every agent reads; no CLAUDE.md
+        self.assertIn("# workspace ws18", self.staged("work", "AGENTS.md"))
+        self.assertFalse(os.path.lexists(os.path.join(self.out, "ctx", "work", "CLAUDE.md")))
 
     def test_closure_is_built_and_rooted(self):
         state = os.path.join(self.tmp, "state")
@@ -443,7 +442,7 @@ class AgentTest(unittest.TestCase):
         self.assertEqual(sorted(os.listdir(os.path.join(state, "gensokyo-agent"))), ["new", "ws14"])
         self.assertIn(f"{closure}:/.gensokyo-agent/closure:ro", run)
         self.assertNotIn("/etc/gensokyo-agent/closure:/.gensokyo-agent/closure:ro", run)
-        md = self.staged("work", "CLAUDE.md")
+        md = self.staged("work", "AGENTS.md")
         self.assertIn("`lean`: the owner's, from the closure", md)
         self.assertIn("built by the owner from `.#lean`", md)
 
@@ -504,7 +503,7 @@ class AgentTest(unittest.TestCase):
         self.assertTrue(git(top, "config", "remote.ws18.url").endswith(f" sh ws18 %S {older}/src/proj podman -c library"))
         entry = self.staged("root", ".gensokyo-agent", "entrypoint")
         self.assertIn(f"exec claude --dangerously-skip-permissions {MCP} --continue -- 'go on'\n", entry)
-        md = self.staged("work", "CLAUDE.md")
+        md = self.staged("work", "AGENTS.md")
         self.assertIn("conversation so far is that of the workspace `old`", md)
         self.assertIn("on another machine", md)
         self.assertIn("Its files are not here", md)
@@ -524,7 +523,8 @@ class AgentTest(unittest.TestCase):
 
     def carried(self):
         """rec's workspace: an uncommitted file, a checkout, a volume's mount
-        point and the CLAUDE.md of the owner's and the wrapper's"""
+        point and the CLAUDE.md of the owner's and the wrapper's, as the
+        wrapper wrote it before AGENTS.md"""
         work = os.path.join(self.tmp, "recwork")
         clone = os.path.join(work, "src", "proj")
         os.makedirs(os.path.join(clone, ".git"))
@@ -559,7 +559,9 @@ class AgentTest(unittest.TestCase):
         # but not what was mounted there
         self.assertFalse(os.path.exists(os.path.join(self.out, "ctx", "work", "data")))
         self.assertEqual(json.loads(self.staged("work", ".mcp.json")), {"mcpServers": {"mine": {}}})
-        md = self.staged("work", "CLAUDE.md")
+        # its CLAUDE.md is AGENTS.md now
+        md = self.staged("work", "AGENTS.md")
+        self.assertFalse(os.path.lexists(os.path.join(self.out, "ctx", "work", "CLAUDE.md")))
         self.assertTrue(md.startswith("the owner's\n# workspace rec\n"), md)
         self.assertNotIn("stale", md)
         self.assertEqual(md.count("# workspace"), 1)
@@ -614,7 +616,7 @@ class AgentTest(unittest.TestCase):
         self.assertEqual(ssh[:5], ["-p", "2222", "-i", "/id", "alice@library.example"])
         self.assertTrue(ssh[5].startswith("sh -c ") and ssh[5].endswith(f" sh rec {closure}"), ssh[5])
         self.assertFalse(os.path.exists(os.path.join(roots, "rec")))
-        md = self.staged("work", "CLAUDE.md")
+        md = self.staged("work", "AGENTS.md")
         self.assertIn("on another machine", md)
         self.assertIn("a `result` link", md)
         # and from library to here, by way of its connection
@@ -794,7 +796,7 @@ class AgentTest(unittest.TestCase):
         self.assertTrue(url.endswith(f" sh ws3 %S {work}/src/proj podman -c library"), url)
         self.assertEqual(git(top, "config", "remote.ws3.push"), "refs/heads/*:refs/remotes/owner/*")
         self.assertEqual(git(top, "config", "protocol.ext.allow"), "user")
-        with open(os.path.join(self.out, "ctx", "work", "CLAUDE.md")) as f:
+        with open(os.path.join(self.out, "ctx", "work", "AGENTS.md")) as f:
             self.assertIn("`src/proj`, on `master`, started from the owner's `topic`", f.read())
         self.assertEqual(run[3], "run")
         # the name is a remote of the checkout now

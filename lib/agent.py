@@ -87,7 +87,7 @@ gensokyo-agent --copy-history [-c CONN]... [DIR]
   -sp PORT                    both for one port: localhost:PORT here is
                               PORT in the workspace, wherever it runs
   anything else               goes to podman run
-DST is relative to the workspace; DESC ends up in its CLAUDE.md.
+DST is relative to the workspace; DESC ends up in its AGENTS.md.
 
 examples:
   gensokyo-agent --git .::
@@ -475,7 +475,7 @@ fi
 """
 
 
-def claude_md(name, notes):
+def agents_md(name, notes):
     lines = [
         f"# workspace {name}",
         "",
@@ -729,7 +729,8 @@ def inspect_workspace(conf, podman, spec):
 def carried_files(old, work, workdir):
     """What podman cp brought of OLD's workspace, less what it mounted there
     (volumes and binds, which come by their flags or not at all), and less
-    its CLAUDE.md of this wrapper's, written anew."""
+    its AGENTS.md of this wrapper's, written anew: its CLAUDE.md, of one
+    from before there were others than claude."""
     for dst in old["mounts"]:
         rel = os.path.relpath(dst, workdir)
         path = os.path.join(work, rel)
@@ -739,7 +740,14 @@ def carried_files(old, work, workdir):
             remove_tree(path)
         else:
             os.unlink(path)
-    md = os.path.join(work, "CLAUDE.md")
+    md = os.path.join(work, "AGENTS.md")
+    if os.path.islink(md) and os.readlink(md) == "CLAUDE.md":
+        os.unlink(md)
+    claude = os.path.join(work, "CLAUDE.md")
+    if not os.path.lexists(md) and os.path.isfile(claude) and not os.path.islink(claude):
+        with open(claude) as f:
+            if re.search(rf"(?m)^# workspace {re.escape(old['name'])}\n", f.read()):
+                os.rename(claude, md)
     if os.path.isfile(md) and not os.path.islink(md):
         with open(md) as f:
             text = f.read()
@@ -962,11 +970,9 @@ def new_workspace(conf, opts, cmd, passthrough):
         with open(os.path.join(root, ".gensokyo-agent", "entrypoint"), "w") as f:
             f.write(entrypoint(cmd, opts.prompt, resume=bool(old), setup=setup))
             os.fchmod(f.fileno(), 0o755)
-        with open(os.path.join(work, "CLAUDE.md"), "a") as f:
-            f.write(claude_md(name, notes))
-        # an agent that reads another file reads this one there
-        if agent.get("instructions") and not os.path.lexists(os.path.join(work, agent["instructions"])):
-            os.symlink("CLAUDE.md", os.path.join(work, agent["instructions"]))
+        # what claude, agy, codex and opencode all read
+        with open(os.path.join(work, "AGENTS.md"), "a") as f:
+            f.write(agents_md(name, notes))
 
         user = conf["user"]
         containerfile = "".join([
