@@ -63,12 +63,12 @@ let
   # and on, in this order, all of the group agent; what it commits as
   agentUsers = lib.imap0 (i: u: u // { uid = cfg.uid + i; }) [
     { name = "claude"; git = { name = "Claude"; email = "claude@anthropic.com"; }; }
-    { name = "gpt"; git = { name = "GPT"; email = "gpt@gensokyo.internal"; }; }
-    { name = "gemini"; git = { name = "Gemini"; email = "gemini@gensokyo.internal"; }; }
-    { name = "deepseek"; git = { name = "DeepSeek"; email = "deepseek@gensokyo.internal"; }; }
-    { name = "qwen"; git = { name = "Qwen"; email = "qwen@gensokyo.internal"; }; }
-    { name = "kimi"; git = { name = "Kimi"; email = "kimi@gensokyo.internal"; }; }
-    { name = "inkling"; git = { name = "Inkling"; email = "inkling@gensokyo.internal"; }; }
+    { name = "gpt"; git = { name = "GPT"; email = "codex@openai.com"; }; }
+    { name = "gemini"; git = { name = "Gemini"; email = "gemini@google.com"; }; }
+    { name = "deepseek"; git = { name = "DeepSeek"; email = "deepseek@deepseek.com"; }; }
+    { name = "qwen"; git = { name = "Qwen"; email = "qwen@alibabacloud.com"; }; }
+    { name = "kimi"; git = { name = "Kimi"; email = "kimi@moonshot.cn"; }; }
+    { name = "inkling"; git = { name = "Inkling"; email = "inkling@thinkingmachines.ai"; }; }
     { name = "agent"; git = { name = "Agent"; email = "agent@gensokyo.internal"; }; }
   ];
   # gensokyo-agent --harness NAME: the command, and the user of its own
