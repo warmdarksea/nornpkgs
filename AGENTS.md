@@ -1,4 +1,4 @@
-# nornpkgs, for Claude
+# nornpkgs, for agents
 
 NixOS configuration for a handful of hosts plus some terraform, driven by
 GNU make. README.md has the layout. Each host is three layers:
@@ -45,8 +45,8 @@ with the CI tools before claiming a fix works.
 
 ## committing
 
-Interactive session with the owner: author and commit as
-`Claude <claude@anthropic.com>`.
+Interactive session with the owner: author and commit as the sandbox's
+git config has you (claude: `Claude <claude@anthropic.com>`).
 
 GitHub Actions run (`CLAUDE_CODE_ACTION=1`): push with the action's push
 wrapper after every commit, not once at the end. The run ends with your
