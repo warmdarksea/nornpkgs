@@ -92,7 +92,7 @@ resource "cloudflare_dns_record" "www_club" {
 # littledevil.org — www
 resource "cloudflare_pages_project" "www_org" {
   account_id        = var.cf_account_id
-  name              = "www-littledevil-org"
+  name              = "littledevil"
   production_branch = "master"
 }
 
@@ -140,29 +140,19 @@ resource "cloudflare_pages_project" "gehenna" {
   production_branch = "master"
 }
 
-resource "cloudflare_pages_domain" "gehenna_prod" {
+resource "cloudflare_pages_domain" "gehenna" {
   account_id   = var.cf_account_id
   project_name = cloudflare_pages_project.gehenna.name
   name         = "gehenna.littledevil.org"
 }
 
-resource "cloudflare_dns_record" "gehenna_prod" {
+resource "cloudflare_dns_record" "gehenna" {
   zone_id = var.cf_zone_id_littledevil_org
   name    = "gehenna"
   content = cloudflare_pages_project.gehenna.subdomain
   type    = "CNAME"
   proxied = true
   ttl     = 1
-}
-
-resource "cloudflare_pages_project" "gehenna_test" {
-  account_id        = var.cf_account_id
-  name              = "gehenna-test"
-  production_branch = "master"
-}
-
-output "gehenna_test_url" {
-  value = "https://${cloudflare_pages_project.gehenna_test.subdomain}"
 }
 
 # worker that proxies /api, /oauth, /nodeinfo to the akkoma backend
@@ -820,9 +810,8 @@ resource "null_resource" "littledevil_cloudflare" {
     cloudflare_pages_domain.akkoma,
     cloudflare_dns_record.akkoma,
     cloudflare_pages_project.gehenna,
-    cloudflare_pages_domain.gehenna_prod,
-    cloudflare_dns_record.gehenna_prod,
-    cloudflare_pages_project.gehenna_test,
+    cloudflare_pages_domain.gehenna,
+    cloudflare_dns_record.gehenna,
     cloudflare_workers_script.akkoma_proxy,
     cloudflare_workers_route.akkoma_api,
     cloudflare_workers_route.akkoma_oauth,
